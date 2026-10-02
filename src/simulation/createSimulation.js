@@ -100,16 +100,39 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 5 CAMPOS DE FLUJO ARMÓNICOS (Inspirados en las 5 referencias visuales)
     // =========================================================================
 
-    // ARQUETIPO 0 (Tecla 1 - Ref: media_1790969082305.png):
-    // Red Celular Bioluminiscente / Alvéolos y Anillos Vasculares Concéntricos
-    // Anillos vasculares discretos con 18 septos radiales que pulsan con el bombo/bajo
-    const ringWave0 = cos(rho.mul(2.2).sub(params.audioBass.mul(1.4)).sub(params.elapsedTime.mul(0.5)));
-    const septa0 = cos(theta.mul(18.0));
-    const ringForce0 = radial.mul(ringWave0.negate().mul(1.3));
-    const ringCirc0 = tangent.mul(params.swirl.mul(1.1).add(septa0.mul(0.45)));
-    const septaCross0 = radial.mul(septa0.mul(0.65).mul(params.flowDirection));
-    const zCellular0 = vec3(0.0, 0.0, p.z.negate().mul(1.8).add(sin(rho.mul(2.0)).mul(0.25)));
-    const flowCellular = ringForce0.add(ringCirc0).add(septaCross0).add(zCellular0);
+    // ARQUETIPO 0 (Tecla 1 - Ref: media_1790970695936.png):
+    // Sección Transversal Botánica Vascular (Tallo Acuático / Nelumbo / Equisetum)
+    // 1. Núcleo medular central poroso (r < 1.9) con anillo circular doble
+    // 2. 18 trabéculas / columnas radiales gruesas que irradian desde el núcleo
+    // 3. 4 capas concéntricas de lagunas / alvéolos aéreos (células poligonales oscuras rodeadas de paredes brillantes)
+    // 4. Corteza exterior festoneada y ondulada (scalloped perimeter con 12 lóbulos)
+    const uTheta0 = cos(theta.mul(18.0));
+    const bassPulse0 = params.audioBass.mul(0.45);
+    const effRho0 = rho.sub(bassPulse0).max(0.001);
+    const uRho0 = pow(effRho0.max(1.9).sub(1.9).div(7.5), 0.72).mul(12.566);
+
+    // Perímetro festoneado y ondulado de la corteza exterior (12 lóbulos con micro-ondulaciones)
+    const rCortex0 = float(9.4).add(cos(theta.mul(12.0)).mul(0.65)).add(sin(theta.mul(24.0)).mul(0.25));
+
+    // Fuerzas hacia las paredes de las lagunas:
+    // fTier0: atrae a los anillos concéntricos divisorios
+    const fTier0 = radial.mul(sin(uRho0).mul(-1.5).mul(params.flowDirection));
+    // fSpoke0: atrae a los 18 septos radiales (trabéculas)
+    const fSpoke0 = tangent.mul(sin(theta.mul(18.0)).mul(-1.3));
+    // fCirc0: circulación continua por los muros y canales vasculares
+    const fCirc0 = tangent.mul(params.swirl.mul(1.15).add(0.55).add(uTheta0.mul(0.4)));
+
+    // Núcleo medular interno (r < 1.9): micro-poros densos y vórtice suave
+    const inCore0 = effRho0.lessThan(1.9);
+    const fCore0 = tangent.mul(1.6).add(radial.mul(float(1.9).sub(effRho0).mul(2.2)));
+
+    // Corteza exterior (r > rCortex0): contención estricta que traza el borde ondulado
+    const fRim0 = radial.mul(effRho0.sub(rCortex0).max(0.0).mul(-7.0));
+    const zCellular0 = vec3(0.0, 0.0, p.z.negate().mul(3.5));
+
+    const flowCellular = inCore0.select(fCore0, fTier0.add(fSpoke0).add(fCirc0))
+      .add(fRim0)
+      .add(zCellular0);
 
     // ARQUETIPO 1 (Tecla 2 - Ref: media_1790969096547.png):
     // Iris Cósmico / Fingering Fúngico Espectral ("Weird Velocity Effect")
@@ -167,8 +190,18 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       const qRho = length(q).max(0.001);
       const qTheta = atan(q.y, q.x);
 
-      // Evaluación del potencial escalar según el arquetipo
-      const r0 = cos(qRho.mul(2.2).sub(params.audioBass.mul(1.4))).mul(0.55).add(cos(qTheta.mul(18.0)).mul(0.45));
+      // ARQUETIPO 0: Potencial escalar de paredes celulares y trabéculas botánicas
+      const qEffRho0 = qRho.sub(params.audioBass.mul(0.45)).max(0.001);
+      const qURho0 = pow(qEffRho0.max(1.9).sub(1.9).div(7.5), 0.72).mul(12.566);
+      const qRCortex0 = float(9.4).add(cos(qTheta.mul(12.0)).mul(0.65));
+      const sCore = float(1.0).div(qEffRho0.sub(1.9).abs().mul(4.0).add(1.0)).mul(1.5);
+      const sRim = float(1.0).div(qEffRho0.sub(qRCortex0).abs().mul(4.0).add(1.0)).mul(1.4);
+      const sSpokes = cos(qTheta.mul(18.0)).mul(0.6);
+      const sTiers = cos(qURho0).mul(0.6);
+      const sCavityWalls = sSpokes.add(sTiers)
+        .mul(smoothstep(float(1.8), float(2.3), qEffRho0))
+        .mul(smoothstep(qRCortex0.add(0.4), qRCortex0.sub(0.4), qEffRho0));
+      const r0 = max(max(sCore, sRim), sCavityWalls.add(0.4));
       const r1 = cos(qTheta.mul(48.0).add(sin(qRho.mul(2.8)))).mul(0.5).add(sin(qRho.mul(1.8)).mul(0.5));
       const qLogRho = log(qRho.max(0.15));
       const qCoralCoord = qTheta.sub(qLogRho.mul(1.75));
@@ -336,11 +369,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const t = ang.add(rDist.mul(0.4)).add(params.chromaShift);
 
     const samplePalette = (idNode, tVal) => {
-      // PALETA 0 (Ref 1): Red Celular Bioluminiscente (Cobalto profundo y Cian Eléctrico)
-      const c0_cobalt = vec3(0.0, 0.25, 0.95);
-      const c0_cyan = vec3(0.0, 0.92, 1.0);
-      const c0_azure = vec3(0.4, 0.98, 1.0);
-      const c0 = mix(c0_cobalt, mix(c0_cyan, c0_azure, sin(tVal.mul(12.566)).mul(0.5).add(0.5)), cos(tVal.mul(6.283)).mul(0.5).add(0.5));
+      // PALETA 0 (Ref: media_1790970695936.png):
+      // Fluorescencia Botánica Bio-Cian (Núcleo luminoso, trabéculas azul cobalto y ribetes cian eléctrico)
+      const c0_cobalt = vec3(0.0, 0.22, 0.88);
+      const c0_cyan = vec3(0.0, 0.90, 1.0);
+      const c0_highlight = vec3(0.48, 0.98, 1.0);
+      const wallPulse0 = cos(tVal.mul(18.0)).mul(0.5).add(0.5);
+      const c0 = mix(c0_cobalt, mix(c0_cyan, c0_highlight, wallPulse0), cos(tVal.mul(6.283)).mul(0.5).add(0.5));
 
       // PALETA 1 (Ref 2): Iris Cósmico / Fungal Plume (Rampa Espectral: Carmesí -> Oro -> Turquesa -> Amatista)
       const normR1 = rDist.sub(0.15).div(0.85).clamp(0.0, 1.0);

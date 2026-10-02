@@ -197,7 +197,7 @@ export function createLabPanel({
   presetGroup.innerHTML = '<h2>Arquetipos Visuales (Teclas 1–5)</h2><p>Morfologías continuas por fuerzas de Physarum, 36 Points y Craig Reynolds:</p>';
 
   const presets = [
-    { id: 'cellular', label: '1. Red Celular Bio-Cyan (Ref 1)' },
+    { id: 'cellular', label: '1. Tallo Botánico Vascular (Ref 1)' },
     { id: 'iris', label: '2. Iris Cósmico / Fingering (Ref 2)' },
     { id: 'coral', label: '3. Rosa Coralina Espiral 3D (Ref 3)' },
     { id: 'fern', label: '4. Helecho Fractal Jade (Ref 4)' },
@@ -256,6 +256,7 @@ export function createLabPanel({
     lineLength: params.lineLength.value,
     lineWidth: params.lineWidth.value,
     filamentAlpha: params.filamentAlpha.value,
+    trailDamp: params.trailDamp ? params.trailDamp.value : 0.93,
     transitionDuration: params.transitionDuration ? params.transitionDuration.value : 4.5
   };
 
@@ -294,6 +295,9 @@ export function createLabPanel({
   refreshers.push(rangeRow(visualGroup, 'Longitud Filamento', visualState, 'lineLength', 0.1, 1.2, 0.02, (v) => params.lineLength.value = v, () => params.lineLength.value));
   refreshers.push(rangeRow(visualGroup, 'Grosor Línea', visualState, 'lineWidth', 0.008, 0.06, 0.002, (v) => params.lineWidth.value = v, () => params.lineWidth.value));
   refreshers.push(rangeRow(visualGroup, 'Opacidad de Seda', visualState, 'filamentAlpha', 0.04, 0.4, 0.01, (v) => params.filamentAlpha.value = v, () => params.filamentAlpha.value));
+  refreshers.push(rangeRow(visualGroup, 'Delay / Persistencia Rastro', visualState, 'trailDamp', 0.60, 0.98, 0.01, (v) => {
+    if (params.trailDamp) params.trailDamp.value = v;
+  }, () => params.trailDamp ? params.trailDamp.value : 0.93));
 
   panel.append(visualGroup);
 

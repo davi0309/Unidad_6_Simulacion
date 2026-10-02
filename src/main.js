@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import WebGPU from 'three/addons/capabilities/WebGPU.js';
+import { pass } from 'three/tsl';
+import { afterImage } from 'three/addons/tsl/display/AfterImageNode.js';
 import './styles.css';
 
 import { createParameters } from './simulation/parameters.js';
@@ -40,6 +42,11 @@ async function main() {
   const audioManager = createAudioManager();
   const params = createParameters();
   const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
+
+  // PIPELINE DE RENDERIZADO CON RASTRO Y DELAY (AfterImage / Persistencia de filamentos)
+  const scenePass = pass(scene, camera);
+  const trailPass = afterImage(scenePass, params.trailDamp);
+  const postProcessing = new THREE.RenderPipeline(renderer, trailPass);
 
   // GESTIÓN DE VELOCIDAD DINÁMICA (Por defecto lenta y serena) -------------
   let speedLevel = 0; // 0 = Lenta (1.0), 1 = Moderada (1.75), 2 = Rápida (2.8)
@@ -113,7 +120,7 @@ async function main() {
   const shapeConfigs = {
     cellular: {
       id: 0,
-      label: 'Red Celular Bio-Cyan (Ref 1)',
+      label: 'Tallo Botánico Vascular (Ref 1)',
       harmonics: 4.0,
       swirl: 1.2,
       petalMorph: 1.2,
@@ -380,7 +387,7 @@ async function main() {
         // Estructura específica para Motion Picture Soundtrack de Radiohead
         if (curTime < 50) {
           currentStage = 0;
-          stageDesc = '🎹 <strong>Etapa 1 (0:00 - 0:50):</strong> Armonio solitario<br>✦ Visual: <em>1. Red Celular Bio-Cyan (Ref 1)</em>';
+          stageDesc = '🎹 <strong>Etapa 1 (0:00 - 0:50):</strong> Armonio solitario<br>✦ Visual: <em>1. Tallo Botánico Vascular (Ref 1)</em>';
         } else if (curTime < 92) {
           currentStage = 1;
           stageDesc = '🎻 <strong>Etapa 2 (0:50 - 1:32):</strong> Entrada de bajo y melancolía<br>✦ Visual: <em>2. Iris Cósmico / Fingering (Ref 2)</em>';
@@ -423,7 +430,7 @@ async function main() {
     simulation.stepSimulation();
 
     orbit.update();
-    renderer.render(scene, camera);
+    postProcessing.render();
   });
 }
 

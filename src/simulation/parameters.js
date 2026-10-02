@@ -25,8 +25,9 @@ export function createParameters() {
 
     // Geometría y opacidad de los filamentos (Colores vivos sobre fondo negro)
     lineWidth: uniform(0.024),         // Líneas finas y nítidas
-    lineLength: uniform(0.38),         // Longitud de filamento
+    lineLength: uniform(0.42),         // Longitud de filamento
     filamentAlpha: uniform(0.55),      // Opacidad calibrada para colores vivos sin blanquear
+    trailDamp: uniform(0.93),          // Persistencia del rastro con delay (0.0 = sin rastro, 0.96 = estela larga)
 
     // Dinámica de agentes autónomos (Craig Reynolds + Jeff Jones Physarum)
     steerStrength: uniform(6.5),       // Maniobra ágil para responder a las morfologías
