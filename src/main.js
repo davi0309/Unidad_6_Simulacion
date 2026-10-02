@@ -88,9 +88,10 @@ async function main() {
   });
 
   // CONTROLADOR DE TRANSICIÓN GRADUAL DE COLORES (CERO SALTOS BRUSCOS) -----
-  let transitionDuration = 4.5; // duración en segundos de la transición
+  let transitionDuration = 20.0; // duración en segundos de la transición (ultra-lenta y majestuosa)
 
-  const transitionToPalette = (targetId, duration = 4.5) => {
+  const transitionToPalette = (targetId, duration = null) => {
+    const actualDuration = duration !== null ? duration : (params.transitionDuration ? params.transitionDuration.value : 20.0);
     const roundedTarget = Math.round(targetId);
     if (Math.round(params.paletteB.value) === roundedTarget && params.paletteMix.value >= 1.0) {
       return;
@@ -105,11 +106,12 @@ async function main() {
     params.paletteB.value = roundedTarget;
     params.paletteId.value = roundedTarget;
     params.paletteMix.value = 0.0;
-    transitionDuration = Math.max(0.5, duration);
+    transitionDuration = Math.max(1.0, actualDuration);
   };
 
   // ARQUETIPOS GENERATIVOS 3D ----------------------------------------------
   const applyPreset = (id) => {
+    const curFade = params.transitionDuration ? params.transitionDuration.value : 20.0;
     if (id === 'silkFlower') {
       // Flor de Seda 3D: cáliz floral ondulante
       params.harmonics.value = 5.0;
@@ -117,7 +119,7 @@ async function main() {
       params.swirl.value = 1.3;
       params.petalMorph.value = 1.25;
       params.curlStrength.value = 0.55;
-      transitionToPalette(1.0, 3.5);
+      transitionToPalette(1.0, curFade);
     } else if (id === 'wings') {
       // Alas Cósmicas 3D: lóbulos de mariposa con simetría bilateral
       params.harmonics.value = 2.0;
@@ -125,7 +127,7 @@ async function main() {
       params.swirl.value = 0.9;
       params.petalMorph.value = 1.45;
       params.curlStrength.value = 0.65;
-      transitionToPalette(3.0, 3.5);
+      transitionToPalette(3.0, curFade);
     } else if (id === 'nebulaVortex') {
       // Vórtice Toroidal 3D: toroide y circulación poloidal
       params.harmonics.value = 3.0;
@@ -133,7 +135,7 @@ async function main() {
       params.swirl.value = 2.4;
       params.petalMorph.value = 0.8;
       params.curlStrength.value = 0.95;
-      transitionToPalette(2.0, 3.5);
+      transitionToPalette(2.0, curFade);
     } else if (id === 'supernova') {
       // Supernova 3D: radiación esférica con ondulación armónica
       params.harmonics.value = 8.0;
@@ -141,7 +143,7 @@ async function main() {
       params.swirl.value = 0.4;
       params.petalMorph.value = 1.5;
       params.curlStrength.value = 0.45;
-      transitionToPalette(0.0, 3.5);
+      transitionToPalette(0.0, curFade);
     } else if (id === 'causticRays') {
       // Rayos Helicoidales 3D: corrientes helicoidales en el eje vertical
       params.harmonics.value = 1.0;
@@ -149,9 +151,9 @@ async function main() {
       params.swirl.value = 0.3;
       params.petalMorph.value = 0.6;
       params.curlStrength.value = 1.1;
-      transitionToPalette(4.0, 3.5);
+      transitionToPalette(4.0, curFade);
     }
-    simulation.resetVisuals();
+    // No reseteamos partículas: los agentes se reorientan y maniobran orgánicamente con steering en 3D
   };
 
   // CONTROL DE MODOS LAB / PERFORMANCE -------------------------------------
@@ -178,7 +180,7 @@ async function main() {
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onSpeedChange: (mult) => setSpeedMultiplier(mult),
     onBlendingChange: (bMode) => simulation.setBlendingMode(bMode),
-    onPaletteChange: (idx) => transitionToPalette(idx, 2.5)
+    onPaletteChange: (idx) => transitionToPalette(idx, params.transitionDuration.value)
   });
 
   setMode('LAB');
@@ -217,7 +219,7 @@ async function main() {
     // C: Ciclar paleta de color con transición gradual suave
     if (event.code === 'KeyC' && !event.repeat) {
       const nextPal = (Math.round(params.paletteB.value) + 1) % 5;
-      transitionToPalette(nextPal, 2.8);
+      transitionToPalette(nextPal, params.transitionDuration.value);
       panel.refresh();
     }
 
@@ -333,8 +335,9 @@ async function main() {
 
       if (currentStage !== lastStage) {
         lastStage = currentStage;
-        // Transición lenta, majestuosa y etérea de 6.0 segundos
-        transitionToPalette(currentStage, 6.0);
+        // Transición lenta, majestuosa y etérea (20 segundos por defecto)
+        const songFadeDuration = Math.max(20.0, params.transitionDuration ? params.transitionDuration.value : 20.0);
+        transitionToPalette(currentStage, songFadeDuration);
         if (panel?.refresh) panel.refresh();
         if (panel?.setStageInfo) panel.setStageInfo(stageDesc);
       }

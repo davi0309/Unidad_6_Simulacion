@@ -255,7 +255,8 @@ export function createLabPanel({
   const visualState = {
     lineLength: params.lineLength.value,
     lineWidth: params.lineWidth.value,
-    filamentAlpha: params.filamentAlpha.value
+    filamentAlpha: params.filamentAlpha.value,
+    transitionDuration: params.transitionDuration ? params.transitionDuration.value : 20.0
   };
 
   const initialPal = params.paletteB ? params.paletteB.value : params.paletteId.value;
@@ -287,6 +288,9 @@ export function createLabPanel({
     onBlendingChange?.(idx === 0 ? 'normal' : 'additive');
   });
 
+  refreshers.push(rangeRow(visualGroup, 'Duración Transición (s)', visualState, 'transitionDuration', 4, 35, 1, (v) => {
+    if (params.transitionDuration) params.transitionDuration.value = v;
+  }, () => params.transitionDuration ? params.transitionDuration.value : 20));
   refreshers.push(rangeRow(visualGroup, 'Longitud Filamento', visualState, 'lineLength', 0.1, 1.2, 0.02, (v) => params.lineLength.value = v, () => params.lineLength.value));
   refreshers.push(rangeRow(visualGroup, 'Grosor Línea', visualState, 'lineWidth', 0.008, 0.06, 0.002, (v) => params.lineWidth.value = v, () => params.lineWidth.value));
   refreshers.push(rangeRow(visualGroup, 'Opacidad de Seda', visualState, 'filamentAlpha', 0.04, 0.4, 0.01, (v) => params.filamentAlpha.value = v, () => params.filamentAlpha.value));

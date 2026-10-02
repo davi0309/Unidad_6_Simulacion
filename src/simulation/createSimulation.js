@@ -280,9 +280,10 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     };
 
     // Interpolación no lineal ultrasuave (smoothstep) entre Paleta A y Paleta B
-    const colA = samplePalette(params.paletteA, t);
-    const colB = samplePalette(params.paletteB, t);
-    const easeMix = smoothstep(float(0.0), float(1.0), params.paletteMix.clamp(0.0, 1.0));
+    // con dispersión volumétrica radial: el color brota del centro hacia el exterior como tinta en agua
+    const waveOffset = rDist.mul(0.35);
+    const localMix = params.paletteMix.mul(1.35).sub(waveOffset).clamp(0.0, 1.0);
+    const easeMix = smoothstep(float(0.0), float(1.0), localMix);
     const finalCol = mix(colA, colB, easeMix);
 
     return vec4(finalCol, 1.0);

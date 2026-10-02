@@ -43,6 +43,7 @@ export function createParameters() {
     paletteA: uniform(4.0),            // Paleta origen en la transición
     paletteB: uniform(4.0),            // Paleta destino en la transición
     paletteMix: uniform(1.0),          // 0.0 (Paleta A) -> 1.0 (Paleta B), interpolación suave
+    transitionDuration: uniform(20.0),  // Duración en segundos de la transición gradual (20s por defecto)
     chromaShift: uniform(0.0),         // Desplazamiento cromático continuo (deriva lenta orgánica)
     dispersion: uniform(0.85),
 
