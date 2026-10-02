@@ -1,90 +1,58 @@
-# U3 · Forces Instrument
+# Unidad 6 · Instrumento Visual de Agentes Autónomos y Flow Fields
 
-[App desplegada](https://juanferfranco.github.io/forces-instrument-u3/)
+Instrumento visual interactivo y generativo para la **interpretación musical en tiempo real por parte de una persona**, desarrollado con **Three.js WebGPU**, **TSL (Three Shading Language)** y la **Web Audio API**.
 
+---
 
-Proyecto base que servirá como caso de estudio. Nos permitirá abordar los conceptos 
-necesarios para comprender el código generado por la IA al momente 
-de materializar las ideas.
+## 🌟 Filosofía del Instrumento
 
+El sistema está concebido para ser **tocado e interpretado en vivo por una persona**:
+- **Conducción 100% Humana:** La música **no** mueve ni calcula de manera autónoma las fuerzas del sistema. Toda la física, dirección de flujos, selección de formas y acentos cinéticos son guiados por la persona mediante el teclado y el ratón.
+- **Iluminación Reactiva por Audio:** La canción que se reproduce en segundo plano actúa como el lienzo sonoro, modulando sutilmente el **fulgor, luminancia y destellos de color de los filamentos** sin intervenir en las trayectorias de las partículas.
+- **Filamentos Orientados con Dispersión Cromática:** Cada uno de los más de $130{,}000$ agentes se renderiza como una línea de luz orientada en la dirección de su velocidad instantánea ($\operatorname{atan2}(v_y, v_x)$) con mezcla aditiva y refracción espectral sobre fondo negro absoluto (`#000000`).
+- **Variabilidad Procedural sin Pausar la Música (`R`):** Al presionar la tecla `R`, el sistema muta las semillas armónicas y reinicia los filamentos visuales sin detener ni reiniciar la reproducción de la canción.
+- **Soporte Multi-Canción:** Permite cargar cualquier archivo `.mp3`, `.wav`, etc., mediante un botón en la interfaz o arrastrando y soltando el archivo sobre la ventana.
 
-## Requisitos
+---
 
-- Node.js 22 recomendado (Vite 8 requiere Node 20.19+ o 22.12+).
-- Navegador con WebGPU habilitado; usa una versión actual de Chrome, Edge o un navegador con soporte equivalente.
-- Git necesario para clonar el repositorio y trabajar localmente.
+## 🚀 Requisitos y Puesta en Marcha
 
-## Clonar y poner en funcionamiento
+1. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
 
-Clona el repositorio y entra en la carpeta del proyecto:
+2. **Iniciar servidor de desarrollo:**
+   ```bash
+   npm run dev
+   ```
+   Abre en un navegador con WebGPU habilitado (Chrome, Edge o equivalente).
 
-```bash
-git clone https://github.com/juanferfranco/forces-instrument-u3.git
-cd forces-instrument-u3
-```
+3. **Construcción para producción:**
+   ```bash
+   npm run build
+   npm run preview
+   ```
 
-Instala las dependencias:
+---
 
-```bash
-npm install
-```
+## 🎹 Controles de Interpretación en Vivo
 
-Inicia el servidor de desarrollo:
+| Tecla / Gesto | Acción | Descripción |
+|---|---|---|
+| **`P`** | LAB / PERFORMANCE | Oculta la interfaz para proyectar a pantalla completa sobre negro puro. |
+| **`R`** | Mutar Visuales | Genera nuevas semillas y trayectorias sin reiniciar la música. |
+| **`1 .. 5`** | Morfologías Armónicas | 1: Flor de Seda, 2: Alas Cósmicas, 3: Vórtice Infinito, 4: Supernova, 5: Rayos Cáusticos. |
+| **`Espacio`** | Acento Manual de Energía | Impulso físico de energía para acentuar caídas rítmicas y clímax. |
+| **`C`** | Ciclar Paleta | Alterna entre Prisma Arcoíris, Seda Ópalo, Sol Dorado, Neón Lavanda y Cian. |
+| **`F`** | Invertir Flujo | Conmuta entre expansión centrífuga y absorción centrípeta. |
+| **`↑ / ↓`** | Modular Giro | Aumenta o disminuye la vorticidad del campo en tiempo real. |
+| **`← / →`** | Modular Pétalos | Agrega o quita lóbulos armónicos a la figura en vivo. |
+| **Arrastrar Ratón** | Conducir Corrientes | Actúa como un atractor/vórtice manual sobre el campo de flujo. |
 
-```bash
-npm run dev
-```
+---
 
-Abre en el navegador la URL local que muestra Vite. Se necesita un navegador con WebGPU habilitado.
+## 📄 Documentación Complementaria
 
-## Ejecutar
-
-```bash
-npm install
-npm run dev
-```
-
-Abre la URL que imprime Vite.
-
-## Build de producción
-
-```bash
-npm run build
-npm run preview
-```
-
-`preview` sirve el contenido construido en `dist/`; úsalo antes de publicar.
-
-## Controles
-
-- `P`: LAB / PERFORMANCE.
-- `R`: reset.
-- `1..5`: escenarios de exploración.
-- puntero: mueve el atractor sobre el plano Z=0.
-- espacio (PERFORMANCE): invierte temporalmente el signo de la fuerza radial.
-
-## Publicar en GitHub Pages
-
-El repositorio ya incluye `.github/workflows/deploy.yml`.
-
-1. Crea un repositorio en GitHub y sube estos archivos a la rama `main`.
-2. En **Settings → Pages**, selecciona **GitHub Actions** como fuente.
-3. Haz push a `main`.
-4. El workflow ejecutará `npm install`, build y despliegue.
-
-`vite.config.js` usa `base: './'` para que los assets sean relativos y el mismo build funcione bajo una ruta de proyecto de GitHub Pages.
-
-## Archivos que debes entender primero
-
-1. `src/main.js`: escena, cámara, renderer, loop, interacción y modos.
-2. `src/simulation/parameters.js`: parámetros/uniforms accesibles desde CPU.
-3. `src/simulation/createSimulation.js`: estado GPU, fuerzas, integración y render.
-4. `src/ui/labPanel.js`: controles del laboratorio y escenarios de exploración.
-
-Lee la `GUIA_ESTUDIANTE.md` para comprender la estructura del proyecto y 
-cómo se relacionan los archivos.
-
-## Documentación complementaria
-
-- [Guía del estudiante](GUIA_ESTUDIANTE.md)
-- [Validación y depuración](PRUEBAS_Y_DEPURACION.md)
+- [Partitura Visual e Interpretación Musical](SCORE_INTERPRETACION.md)
+- [Guía del Estudiante](GUIA_ESTUDIANTE.md)
