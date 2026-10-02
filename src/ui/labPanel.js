@@ -197,11 +197,11 @@ export function createLabPanel({
   presetGroup.innerHTML = '<h2>Morfologías 3D en la Esfera</h2><p>Pétalos, alas y vórtices tridimensionales:</p>';
 
   const presets = [
-    { id: 'silkFlower', label: '🌸 Flor de Seda 3D (Cáliz floral)' },
-    { id: 'wings', label: '🦋 Alas Cósmicas 3D (Mariposa / Lorenz)' },
-    { id: 'nebulaVortex', label: '🌀 Vórtice Toroidal 3D (Toroide)' },
-    { id: 'supernova', label: '☀️ Supernova Esférica 3D' },
-    { id: 'causticRays', label: '🌊 Rayos Helicoidales 3D' }
+    { id: 'astrolabe', label: '🌌 1. Astrolabio de Cristal (Órbitas 3D)' },
+    { id: 'tornado', label: '🌀 2. Vórtice de Plasma (Tornado de Seda)' },
+    { id: 'cosmicVeil', label: '🌊 3. Velo Cósmico (Membrana Fractal)' },
+    { id: 'celestialLotus', label: '🪽 4. Loto Celestial (Alas de Serafín)' },
+    { id: 'astralPillar', label: '🕯️ 5. Pilar Astral (Alma Ascendente)' }
   ];
 
   const presetGrid = document.createElement('div');

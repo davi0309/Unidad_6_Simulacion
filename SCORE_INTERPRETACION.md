@@ -22,53 +22,50 @@
 ```text
 CRONOLOGÍA MUSICAL:
 0:00 ──── Armonio Solo ──── 0:52 ─── Entra Contrabajo ─── 1:30 ─── Arpa Celestial (Clímax) ─── 2:20 ─── Coda/Vacío ─── 3:18
-[Rayos / Sombra]            [Flor de Seda Ópalo]         [Supernova / Alas Prisma]      [Implosión Lenta]
+[Pilar Astral / Astrolabio] [Vórtice Tornado Ópalo]     [Loto Celestial / Velo Cósmico] [Implosión Lenta / Fuego]
 ```
 
 ### Etapa 1: Apertura y Soledad del Armonio (0:00 – 0:52)
 *«Red wine and cheap sex... / Baby's got the bends...»*
 - **Clima Sonoro:** Sonido áspero y respirado del fuelle del armonio, notas tenues y voz íntima.
 - **Configuración del Instrumento:**
-  - Presiona `5` (**Rayos Helicoidales 3D**) o `1` (**Flor de Seda**).
+  - Presiona `1` (**Astrolabio de Cristal Óptico**) o `5` (**Pilar Astral / Alma Ascendente**).
   - Velocidad: `🐢 Lenta` (Tecla `T` o botón Lenta).
-  - Paleta: `1` (**Seda Ópalo**) o `4` (**Bioluminiscencia Cian**).
+  - Paleta: Se activa automáticamente la paleta **Bioluminiscencia Azul Cian Profundo**.
 - **Gesto de Interpretación:**
-  - No toques el ratón al inicio. Deja que los hilos tenues asciendan lentamente en el centro de la esfera oscura, evocando la fragilidad de una vela en la penumbra.
-  - El armonio aportará un leve fulgor en los acordes.
+  - Deja que los agentes asciendan verticalmente por el pilar de luz o tracen los anillos elípticos del astrolabio, evocando la soledad suspendida en la oscuridad.
 
-### Etapa 2: Entrada del Contrabajo y Resignación (0:52 – 1:30)
+### Etapa 2: Entrada del Contrabajo y Melancolía (0:52 – 1:30)
 *«Stop sending letters... / Letters always get burned...»*
-- **Clima Sonoro:** Entran las notas graves y profundas del contrabajo y pedales del armonio; el espacio se ensancha.
+- **Clima Sonoro:** Entran las notas graves y profundas del contrabajo; el espacio se dilata.
 - **Configuración del Instrumento:**
-  - Presiona `1` (**Flor de Seda 3D**).
-  - Pulsa `Flecha Derecha` (`→`) dos veces para fijar **5 pétalos**.
-  - Rota suavemente la cámara con el ratón para revelar la profundidad tridimensional del cáliz floral.
+  - Presiona `2` (**Vórtice de Plasma / Tornado de Seda**) o `3` (**Velo Cósmico Multicapa**).
+  - Observa cómo los agentes autónomos maniobran mediante fuerzas de dirección (*Reynolds steering*), migrando suavemente durante 5 segundos hacia el reloj de arena vorticial.
+  - La paleta se funde de manera ultra lenta (20 segundos) hacia **Seda Ópalo y Amatista**.
 - **Gesto de Interpretación:**
-  - Los filamentos se abren en múltiples capas translúcidas de seda. Con cada nota grave del contrabajo, verás iluminarse el cáliz interior mientras los pétalos flotan con serenidad.
+  - Rota suavemente la cámara con el ratón para revelar la succión helicoidal tridimensional del vórtice.
 
 ### Etapa 3: El Gran Florecimiento Celestial – Arpa y Coros (1:30 – 2:20)
 *«I think you're crazy, maybe... / I will see you in the next life...»*
-- **Clima Sonoro:** El clímax más conmovedor del disco. Jonny Greenwood desata cascadas de arpa celestial y un coro de sintetizadores que asciende como una ascensión al más allá.
+- **Clima Sonoro:** El clímax más conmovedor del disco: cascadas de arpa celestial y coros etéreos ascendiendo al más allá.
 - **Configuración del Instrumento:**
   - En **1:30 exactos** (al oír el arpa):
-    1. Presiona `2` (**Alas Cósmicas / Mariposa 3D**) o `4` (**Supernova 3D**).
-    2. Presiona `C` para cambiar a la paleta `0` (**Prisma Espectral Arcoíris**).
-    3. Mantén presionado `Shift` (Turbo) brevemente durante los arpegios de arpa para que los filamentos vuelen con exuberancia.
-    4. En las notas culminantes («*in the next life*»), pulsa la **`Barra Espaciadora`** para liberar ondas de choque luminosas.
-- **Gesto de Interpretación:**
-  - Arrastra el ratón en círculos amplios para conducir la estela de luz al compás de los glissandos del arpa. La esfera se llena de alas y velos prismáticos irisados.
+    1. Presiona `4` (**Loto Celestial / Alas de Serafín**).
+    2. Las fuerzas del campo abren los filamentos en un caliz radiante de múltiples plumas escalonadas.
+    3. La paleta florece lentamente hacia **Prisma Espectral Arcoíris**.
+    4. Mantén presionado `Shift` (Turbo) brevemente durante los arpegios de arpa para dar vuelo exuberante a los agentes.
+    5. En las notas culminantes («*in the next life*»), pulsa la **`Barra Espaciadora`** para liberar ondas cinéticas de expansión.
 
 ### Etapa 4: Desvanecimiento, Coda y Silencio (2:20 – 3:18)
 *«(Últimos suspiros del armonio y clic del pedal)»*
 - **Clima Sonoro:** El arpa se extingue, Thom sostiene su última nota y el armonio se queda solo hasta apagar su motor.
 - **Configuración del Instrumento:**
+  - Presiona `5` (**Pilar Astral**) o `1` (**Astrolabio**).
   - Presiona `F` para **invertir el sentido del flujo** (hacia adentro).
-  - Vuelve a velocidad `🐢 Lenta` (`T`).
-  - Pulsa `C` hacia la paleta `1` (**Seda Ópalo**) o `4` (**Cian**).
+  - La paleta adopta el tono crepuscular **Fuego Dorado y Ámbar**.
 - **Gesto de Interpretación:**
-  - Los filamentos, que estaban dispersos en la inmensidad, son absorbidos suavemente hacia el centro de la esfera.
-  - En 3:15, cuando se escucha el clic del pedal del armonio, los filamentos se repliegan en un punto diminuto y reina la oscuridad total.
+  - Los filamentos son atraídos hacia el centro en suave repliegue. En 3:15, con el clic del pedal del armonio, los agentes se concentran en un punto diminuto de luz antes del silencio.
 
 ### Etapa 5 (Opcional): Silencio y Pista Oculta *Genchildren* (4:19 – Final)
-- **Clima Sonoro:** Tras un minuto de silencio absoluto en el disco, emerge una textura celestial de campanas y sintetizadores flotantes.
-- **Acción:** Presiona `R` (**Mutar Visuales**) para hacer florecer una nebulosa toroidal totalmente nueva e inesperada (`3: Vórtice Toroidal`) girando en paz perpetua.
+- **Clima Sonoro:** Textura celestial de campanas y sintetizadores flotantes tras el silencio.
+- **Acción:** Presiona `3` (**Velo Cósmico Multicapa**) o `R` (**Mutar Visuales**) para desplegar mantos de seda dimensional flotando en paz perpetua.

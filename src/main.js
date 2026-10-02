@@ -109,51 +109,94 @@ async function main() {
     transitionDuration = Math.max(1.0, actualDuration);
   };
 
-  // ARQUETIPOS GENERATIVOS 3D ----------------------------------------------
-  const applyPreset = (id) => {
-    const curFade = params.transitionDuration ? params.transitionDuration.value : 20.0;
-    if (id === 'silkFlower') {
-      // Flor de Seda 3D: cáliz floral ondulante
-      params.harmonics.value = 5.0;
-      params.symmetryType.value = 0.0;
-      params.swirl.value = 1.3;
-      params.petalMorph.value = 1.25;
-      params.curlStrength.value = 0.55;
-      transitionToPalette(1.0, curFade);
-    } else if (id === 'wings') {
-      // Alas Cósmicas 3D: lóbulos de mariposa con simetría bilateral
-      params.harmonics.value = 2.0;
-      params.symmetryType.value = 1.0;
-      params.swirl.value = 0.9;
-      params.petalMorph.value = 1.45;
-      params.curlStrength.value = 0.65;
-      transitionToPalette(3.0, curFade);
-    } else if (id === 'nebulaVortex') {
-      // Vórtice Toroidal 3D: toroide y circulación poloidal
-      params.harmonics.value = 3.0;
-      params.symmetryType.value = 2.0;
-      params.swirl.value = 2.4;
-      params.petalMorph.value = 0.8;
-      params.curlStrength.value = 0.95;
-      transitionToPalette(2.0, curFade);
-    } else if (id === 'supernova') {
-      // Supernova 3D: radiación esférica con ondulación armónica
-      params.harmonics.value = 8.0;
-      params.symmetryType.value = 3.0;
-      params.swirl.value = 0.4;
-      params.petalMorph.value = 1.5;
-      params.curlStrength.value = 0.45;
-      transitionToPalette(0.0, curFade);
-    } else if (id === 'causticRays') {
-      // Rayos Helicoidales 3D: corrientes helicoidales en el eje vertical
-      params.harmonics.value = 1.0;
-      params.symmetryType.value = 4.0;
-      params.swirl.value = 0.3;
-      params.petalMorph.value = 0.6;
-      params.curlStrength.value = 1.1;
-      transitionToPalette(4.0, curFade);
+  // CONFIGURACIÓN DE LOS 5 ARQUETIPOS 3D (Inspirados en las imágenes de referencia)
+  const shapeConfigs = {
+    astrolabe: {
+      id: 0,
+      label: 'Astrolabio de Cristal Óptico',
+      harmonics: 4.0,
+      swirl: 1.8,
+      petalMorph: 1.4,
+      curlStrength: 0.35,
+      palette: 4.0
+    },
+    tornado: {
+      id: 1,
+      label: 'Vórtice de Plasma / Tornado',
+      harmonics: 2.0,
+      swirl: 3.4,
+      petalMorph: 1.1,
+      curlStrength: 0.85,
+      palette: 3.0
+    },
+    cosmicVeil: {
+      id: 2,
+      label: 'Velo Cósmico Multicapa',
+      harmonics: 3.0,
+      swirl: 0.8,
+      petalMorph: 1.9,
+      curlStrength: 1.25,
+      palette: 1.0
+    },
+    celestialLotus: {
+      id: 3,
+      label: 'Loto Celestial / Alas de Serafín',
+      harmonics: 7.0,
+      swirl: 1.2,
+      petalMorph: 1.7,
+      curlStrength: 0.45,
+      palette: 0.0
+    },
+    astralPillar: {
+      id: 4,
+      label: 'Pilar Astral / Alma Ascendente',
+      harmonics: 1.0,
+      swirl: 0.6,
+      petalMorph: 0.7,
+      curlStrength: 0.35,
+      palette: 2.0
     }
-    // No reseteamos partículas: los agentes se reorientan y maniobran orgánicamente con steering en 3D
+  };
+
+  // CONTROLADOR DE TRANSICIÓN SUAVE DE MORFOLOGÍA Y FUERZAS 3D (CRAIG REYNOLDS)
+  let shapeMorphDuration = 5.0; // segundos para migrar entre figuras orgánicamente
+  let targetHarmonics = params.harmonics.value;
+  let targetSwirl = params.swirl.value;
+  let targetPetalMorph = params.petalMorph.value;
+  let targetCurlStrength = params.curlStrength.value;
+
+  const transitionToShape = (targetShapeId, duration = 5.0) => {
+    const roundedTarget = Math.round(targetShapeId);
+    if (Math.round(params.shapeB.value) === roundedTarget && params.shapeMorph.value >= 1.0) {
+      return;
+    }
+
+    if (params.shapeMorph.value < 1.0) {
+      params.shapeA.value = params.shapeMorph.value > 0.5 ? params.shapeB.value : params.shapeA.value;
+    } else {
+      params.shapeA.value = params.shapeB.value;
+    }
+
+    params.shapeB.value = roundedTarget;
+    params.symmetryType.value = roundedTarget;
+    params.shapeMorph.value = 0.0;
+    shapeMorphDuration = Math.max(1.0, duration);
+  };
+
+  // ARQUETIPOS GENERATIVOS 3D ----------------------------------------------
+  const applyPreset = (key) => {
+    const config = shapeConfigs[key];
+    if (!config) return;
+
+    // Transición de campo de fuerzas en 3D (los agentes maniobran con steering hacia la nueva forma)
+    transitionToShape(config.id, 5.0);
+    targetHarmonics = config.harmonics;
+    targetSwirl = config.swirl;
+    targetPetalMorph = config.petalMorph;
+    targetCurlStrength = config.curlStrength;
+
+    // También transiciona la paleta correspondiente con suavidad
+    transitionToPalette(config.palette);
   };
 
   // CONTROL DE MODOS LAB / PERFORMANCE -------------------------------------
@@ -209,12 +252,12 @@ async function main() {
       params.speedMultiplier.value = speedMultipliers[speedLevel] * 2.2;
     }
 
-    // 1-5: Cambios de sección y morfología armónica 3D
-    if (event.code === 'Digit1') { applyPreset('silkFlower'); panel.refresh(); }
-    if (event.code === 'Digit2') { applyPreset('wings'); panel.refresh(); }
-    if (event.code === 'Digit3') { applyPreset('nebulaVortex'); panel.refresh(); }
-    if (event.code === 'Digit4') { applyPreset('supernova'); panel.refresh(); }
-    if (event.code === 'Digit5') { applyPreset('causticRays'); panel.refresh(); }
+    // 1-5: Cambios de sección y morfología armónica 3D (Transición orgánica sin saltos)
+    if (event.code === 'Digit1') { applyPreset('astrolabe'); panel.refresh(); }
+    if (event.code === 'Digit2') { applyPreset('tornado'); panel.refresh(); }
+    if (event.code === 'Digit3') { applyPreset('cosmicVeil'); panel.refresh(); }
+    if (event.code === 'Digit4') { applyPreset('celestialLotus'); panel.refresh(); }
+    if (event.code === 'Digit5') { applyPreset('astralPillar'); panel.refresh(); }
 
     // C: Ciclar paleta de color con transición gradual suave
     if (event.code === 'KeyC' && !event.repeat) {
@@ -289,6 +332,18 @@ async function main() {
     // Interpolación suave y gradual entre paletas (avanza de a poco)
     if (params.paletteMix.value < 1.0) {
       params.paletteMix.value = Math.min(1.0, params.paletteMix.value + dt / transitionDuration);
+    }
+
+    // Avance gradual del morphing de formas 3D por fuerzas del sistema (Craig Reynolds)
+    if (params.shapeMorph.value < 1.0) {
+      params.shapeMorph.value = Math.min(1.0, params.shapeMorph.value + dt / shapeMorphDuration);
+
+      // Interpolación continua y suave de los parámetros armónicos hacia la figura destino
+      const lerpSpeed = Math.min(1.0, dt * 2.2);
+      params.harmonics.value += (targetHarmonics - params.harmonics.value) * lerpSpeed;
+      params.swirl.value += (targetSwirl - params.swirl.value) * lerpSpeed;
+      params.petalMorph.value += (targetPetalMorph - params.petalMorph.value) * lerpSpeed;
+      params.curlStrength.value += (targetCurlStrength - params.curlStrength.value) * lerpSpeed;
     }
 
     const audio = audioManager.update();

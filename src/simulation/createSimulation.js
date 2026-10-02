@@ -8,6 +8,7 @@ import {
   clamp,
   color,
   cos,
+  cross,
   floor,
   float,
   hash,
@@ -96,52 +97,92 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     // 1. CAMPOS DE FLUJO 3D MULTICAPA ----------------------------------------
 
-    // ARQUETIPO 0: Flor de Seda 3D (Cáliz floral con pétalos en capas)
-    const effThetaFlower = theta.add(agentPhase.mul(0.25));
-    const harmFlower = sin(effThetaFlower.mul(params.harmonics).add(params.seed));
-    const zPetalTarget = harmFlower.mul(rho).mul(0.38).mul(params.petalMorph).add(agentZOffset.mul(0.8));
-    const flowFlower = radial.mul(harmFlower.mul(params.petalMorph).mul(params.flowDirection).add(0.4))
-      .add(tangent.mul(params.swirl.add(harmFlower.mul(0.3)).add(agentLayer.mul(0.3))))
-      .add(vec3(0.0, 0.0, zPetalTarget.sub(p.z).mul(1.2)));
+    // 1. CAMPOS DE FLUJO 3D MULTICAPA (Inspirados en las 5 referencias visuales)
 
-    // ARQUETIPO 1: Alas Cósmicas 3D (Mariposa / Lorenz)
-    const xSym = abs(p.x);
-    const wingOriginX = float(1.4).add(agentLayer.mul(0.6));
-    const thetaWing = atan(p.y, xSym.sub(wingOriginX));
-    const rWing = length(vec2(xSym.sub(wingOriginX), p.y)).max(0.001);
-    const zWingTarget = sin(thetaWing.mul(2.0)).mul(rWing).mul(0.45).mul(params.petalMorph).add(agentZOffset.mul(0.7));
-    const flowWing = vec3(
-      sin(thetaWing).negate().mul(sign(p.x)).mul(1.3),
-      cos(thetaWing).mul(1.3),
-      zWingTarget.sub(p.z).mul(1.4)
+    // ARQUETIPO 0 (Tecla 1): Astrolabio de Cristal Óptico (Ref: Imagen 1)
+    // Lentes elípticas en planos inclinados cruzados en 3D con caústicas radiales
+    const tiltSign = sign(agentLayer);
+    const planeNorm1 = normalize(vec3(float(0.577).mul(tiltSign), 0.0, 0.816));
+    const toPlane1Dist = p.x.mul(planeNorm1.x).add(p.z.mul(planeNorm1.z));
+    const projOnPlane1 = p.sub(planeNorm1.mul(toPlane1Dist));
+    const rOrbit = length(projOnPlane1).max(0.001);
+    const orbitTargetR = float(3.2).add(agentPhase.mul(0.8));
+    const orbitTangent = cross(planeNorm1, normalize(projOnPlane1));
+    const orbitAttract = normalize(projOnPlane1).mul(orbitTargetR.sub(rOrbit).mul(1.5))
+      .sub(planeNorm1.mul(toPlane1Dist).mul(2.5));
+    const lensSpoke = cos(theta.mul(params.harmonics)).mul(sin(phi.mul(4.0))).mul(params.petalMorph);
+    const flowAstrolabe = orbitTangent.mul(params.swirl.mul(1.4))
+      .add(orbitAttract)
+      .add(radial.mul(lensSpoke.mul(0.8)));
+
+    // ARQUETIPO 1 (Tecla 2): Vórtice de Plasma / Tornado de Seda (Ref: Imagen 2)
+    // Reloj de arena hiperbólico con succión vorticial y cintas helicoidales
+    const waistRadius = float(1.1).add(agentLayer.mul(0.4));
+    const hypTargetR = waistRadius.mul(waistRadius).add(p.z.mul(p.z).mul(0.42)).sqrt();
+    const hypAttract = radial.mul(hypTargetR.sub(rho).mul(1.8));
+    const vortexSuctionZ = p.z.mul(0.65).add(sign(p.z).mul(0.8));
+    const helixRibbon = sin(p.z.mul(2.2).add(theta.mul(2.0))).mul(0.6);
+    const flowTornado = tangent.mul(params.swirl.mul(2.2).add(helixRibbon))
+      .add(hypAttract)
+      .add(vec3(0.0, 0.0, vortexSuctionZ.mul(params.flowDirection)));
+
+    // ARQUETIPO 2 (Tecla 3): Velo Cósmico Multicapa (Ref: Imagen 3)
+    // Membranas y pliegues de seda ondulantes en múltiples niveles en 3D
+    const zTargetVeil = sin(p.x.mul(0.85).add(agentLayer.mul(1.8)))
+      .mul(cos(p.y.mul(0.85)))
+      .mul(params.petalMorph.mul(1.6))
+      .add(sin(rho.mul(1.4).sub(theta.mul(2.0))).mul(1.1))
+      .add(agentZOffset.mul(0.8));
+    const flowVeil = vec3(
+      sin(p.y.mul(0.85).add(params.seed)).negate().mul(1.4),
+      cos(p.x.mul(0.85).add(params.seed)).mul(1.4),
+      zTargetVeil.sub(p.z).mul(1.8)
+    ).add(tangent.mul(params.swirl.mul(0.7)));
+
+    // ARQUETIPO 3 (Tecla 4): Loto Celestial / Alas de Serafín (Ref: Imagen 4)
+    // Cáliz radiante de pétalos de plumas escalonadas en capas curvadas
+    const petalHarm = sin(theta.mul(params.harmonics).add(agentPhase.mul(0.4)));
+    const zLotusCalyx = rho.div(2.4).pow(1.8).mul(1.6)
+      .sub(petalHarm.mul(rho).mul(0.35))
+      .add(agentZOffset.mul(0.7));
+    const flowLotus = radial.mul(petalHarm.mul(params.petalMorph).add(1.2).mul(params.flowDirection))
+      .add(tangent.mul(params.swirl.mul(0.9).add(petalHarm.mul(0.4))))
+      .add(vec3(0.0, 0.0, zLotusCalyx.sub(p.z).mul(1.6)));
+
+    // ARQUETIPO 4 (Tecla 5): Pilar Astral / Alma Ascendente (Ref: Imagen 5)
+    // Columna vertical estilizada, ascensión central y lluvia de chispas
+    const spineRadius = float(1.2).add(agentLayer.mul(0.5));
+    const inSpine = rho.lessThan(spineRadius);
+    const ascendSpeed = float(2.4).mul(float(1.0).sub(rho.div(3.0)).clamp(0.1, 1.0));
+    const fountainFall = float(-1.8).mul(params.flowDirection);
+    const vZTarget = inSpine.select(ascendSpeed, fountainFall);
+    const spineAttract = inSpine.select(
+      radial.mul(float(-0.6)),
+      radial.mul(float(1.1))
     );
+    const flameWiggle = sin(p.z.mul(2.6).add(theta.mul(2.0))).mul(0.45);
+    const flowAstralPillar = vec3(
+      sin(theta.add(flameWiggle)).negate().mul(params.swirl.mul(0.6)),
+      cos(theta.add(flameWiggle)).mul(params.swirl.mul(0.6)),
+      vZTarget
+    ).add(spineAttract);
 
-    // ARQUETIPO 2: Vórtice Toroidal 3D (Toroide ancho con circulación interna)
-    const tubeRadius = float(2.6).add(agentLayer.mul(1.2));
-    const poloidalAngle = atan(p.z, rho.sub(tubeRadius));
-    const flowTorus = tangent.mul(params.swirl.mul(1.4))
-      .add(radial.mul(sin(poloidalAngle).negate().mul(1.1)))
-      .add(vec3(0.0, 0.0, cos(poloidalAngle).mul(1.1)));
+    // Función selectora de campo de flujo por ID
+    const sampleArchetype = (shapeIdNode) => {
+      const sIdx = floor(shapeIdNode.add(0.5));
+      const res = flowAstrolabe.toVar();
+      If(sIdx.equal(1.0), () => { res.assign(flowTornado); });
+      If(sIdx.equal(2.0), () => { res.assign(flowVeil); });
+      If(sIdx.equal(3.0), () => { res.assign(flowLotus); });
+      If(sIdx.equal(4.0), () => { res.assign(flowAstralPillar); });
+      return res;
+    };
 
-    // ARQUETIPO 3: Supernova Esférica 3D (Estallido radial por toda la esfera)
-    const sphHarm = sin(theta.mul(params.harmonics).add(agentPhase)).mul(cos(phi.mul(3.0)));
-    const flowSupernova = normalize(p).mul(sphHarm.mul(params.petalMorph).add(1.3).mul(params.flowDirection))
-      .add(tangent.mul(params.swirl.mul(0.5).add(agentLayer.mul(0.3))));
-
-    // ARQUETIPO 4: Rayos Helicoidales 3D (Columnas de luz cáustica)
-    const helixRadius = float(2.2).add(agentLayer.mul(1.4));
-    const flowCaustic = vec3(
-      sin(p.z.mul(1.1).add(theta)).negate().mul(1.0),
-      cos(p.z.mul(1.1).add(theta)).mul(1.0),
-      float(1.3).mul(params.flowDirection)
-    ).add(radial.mul(helixRadius.sub(rho).mul(0.4)));
-
-    // Selección de campo
-    const flowField3D = flowFlower.toVar();
-    If(params.symmetryType.equal(1.0), () => { flowField3D.assign(flowWing); });
-    If(params.symmetryType.equal(2.0), () => { flowField3D.assign(flowTorus); });
-    If(params.symmetryType.equal(3.0), () => { flowField3D.assign(flowSupernova); });
-    If(params.symmetryType.equal(4.0), () => { flowField3D.assign(flowCaustic); });
+    // Interpolación no lineal ultrasuave de campos de fuerza (los agentes navegan orgánicamente)
+    const fieldA = sampleArchetype(params.shapeA);
+    const fieldB = sampleArchetype(params.shapeB);
+    const morphProgress = smoothstep(float(0.0), float(1.0), params.shapeMorph.clamp(0.0, 1.0));
+    const flowField3D = mix(fieldA, fieldB, morphProgress).toVar();
 
     // 2. TURBULENCIA CURL 3D (Divergence-free = Mantiene volumen amplio y no colapsa)
     const noiseScale = 0.45;
@@ -278,6 +319,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       If(pIdx.equal(4.0), () => { col.assign(c4); });
       return col;
     };
+
+    const colA = samplePalette(params.paletteA, t);
+    const colB = samplePalette(params.paletteB, t);
 
     // Interpolación no lineal ultrasuave (smoothstep) entre Paleta A y Paleta B
     // con dispersión volumétrica radial: el color brota del centro hacia el exterior como tinta en agua

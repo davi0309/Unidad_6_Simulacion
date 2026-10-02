@@ -25,11 +25,14 @@ export function createParameters() {
     steerStrength: uniform(5.2),       // Maniobra fluida orgánica
     dragCoefficient: uniform(0.05),
 
-    // Campo de flujo armónico 3D
-    harmonics: uniform(5.0),           // 5 pétalos / orden armónico 3D
-    symmetryType: uniform(0.0),        // 0: Flor 3D, 1: Alas/Mariposa 3D, 2: Toroide 3D, 3: Supernova 3D, 4: Rayos
-    swirl: uniform(1.1),               // Giro armónico
-    curlStrength: uniform(0.85),       // Ruido curl 3D amplio para movimientos orgánicos
+    // Campo de flujo armónico 3D y transición de fuerzas entre arquetipos (Craig Reynolds)
+    shapeA: uniform(0.0),              // Arquetipo origen en la transición
+    shapeB: uniform(0.0),              // Arquetipo destino (0: Astrolabio, 1: Tornado, 2: Velo, 3: Loto, 4: Pilar)
+    shapeMorph: uniform(1.0),          // 0.0 (100% Campo A) -> 1.0 (100% Campo B)
+    symmetryType: uniform(0.0),        // Mantenido para retrocompatibilidad
+    harmonics: uniform(4.0),           // Orden armónico 3D
+    swirl: uniform(1.4),               // Giro armónico
+    curlStrength: uniform(0.6),        // Ruido curl 3D
     petalMorph: uniform(1.3),          // Amplitud de pétalos/alas 3D
     flowDirection: uniform(1.0),       // 1.0 hacia afuera, -1.0 hacia adentro
 
