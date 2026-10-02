@@ -22,8 +22,8 @@ async function main() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#000000');
 
-  const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
-  camera.position.set(0, 2.5, 11);
+  const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 100);
+  camera.position.set(0, 0, 8.5);
 
   const renderer = new THREE.WebGPURenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -109,63 +109,63 @@ async function main() {
     transitionDuration = Math.max(1.0, actualDuration);
   };
 
-  // CONFIGURACIÓN DE LOS 5 ARQUETIPOS 3D (Inspirados en las imágenes de referencia)
+  // CONFIGURACIÓN DE LOS 5 ARQUETIPOS (Inspirados en las 5 imágenes de referencia)
   const shapeConfigs = {
-    astrolabe: {
+    cellular: {
       id: 0,
-      label: 'Astrolabio de Cristal Óptico',
+      label: 'Red Celular Bio-Cyan (Ref 1)',
       harmonics: 4.0,
-      swirl: 1.8,
-      petalMorph: 1.4,
-      curlStrength: 0.35,
-      palette: 4.0
-    },
-    tornado: {
-      id: 1,
-      label: 'Red de Micro-Vórtices y Eyectores 3D',
-      harmonics: 2.0,
-      swirl: 3.2,
-      petalMorph: 1.1,
-      curlStrength: 0.55,
-      palette: 1.0
-    },
-    cosmicVeil: {
-      id: 2,
-      label: 'Velo Cósmico Multicapa',
-      harmonics: 3.0,
-      swirl: 0.8,
-      petalMorph: 1.9,
-      curlStrength: 1.25,
-      palette: 1.0
-    },
-    celestialLotus: {
-      id: 3,
-      label: 'Loto Celestial / Alas de Serafín',
-      harmonics: 7.0,
       swirl: 1.2,
-      petalMorph: 1.7,
-      curlStrength: 0.45,
-      palette: 0.0
+      petalMorph: 1.2,
+      curlStrength: 0.25,
+      palette: 0
     },
-    astralPillar: {
-      id: 4,
-      label: 'Pilar Astral / Alma Ascendente',
-      harmonics: 1.0,
-      swirl: 0.6,
-      petalMorph: 0.7,
+    iris: {
+      id: 1,
+      label: 'Iris Cósmico / Fingering Fúngico (Ref 2)',
+      harmonics: 2.0,
+      swirl: 2.2,
+      petalMorph: 1.0,
       curlStrength: 0.35,
-      palette: 2.0
+      palette: 1
+    },
+    coral: {
+      id: 2,
+      label: 'Rosa Coralina Espiral / Pliegues 3D (Ref 3)',
+      harmonics: 3.0,
+      swirl: 1.2,
+      petalMorph: 1.8,
+      curlStrength: 0.30,
+      palette: 2
+    },
+    fern: {
+      id: 3,
+      label: 'Helecho Fractal / Nautilus Jade (Ref 4)',
+      harmonics: 5.0,
+      swirl: 1.5,
+      petalMorph: 1.4,
+      curlStrength: 0.25,
+      palette: 3
+    },
+    spirograph: {
+      id: 4,
+      label: '36 Points Sage Jenson RGB Split (Ref 5)',
+      harmonics: 6.0,
+      swirl: 1.0,
+      petalMorph: 1.1,
+      curlStrength: 0.20,
+      palette: 4
     }
   };
 
-  // CONTROLADOR DE TRANSICIÓN SUAVE DE MORFOLOGÍA Y FUERZAS 3D (CRAIG REYNOLDS)
-  let shapeMorphDuration = 5.0; // segundos para migrar entre figuras orgánicamente
+  // CONTROLADOR DE TRANSICIÓN SUAVE DE MORFOLOGÍA Y FUERZAS (CRAIG REYNOLDS + JEFF JONES)
+  let shapeMorphDuration = 4.5; // segundos para migrar entre figuras orgánicamente
   let targetHarmonics = params.harmonics.value;
   let targetSwirl = params.swirl.value;
   let targetPetalMorph = params.petalMorph.value;
   let targetCurlStrength = params.curlStrength.value;
 
-  const transitionToShape = (targetShapeId, duration = 5.0) => {
+  const transitionToShape = (targetShapeId, duration = 4.5) => {
     const roundedTarget = Math.round(targetShapeId);
     if (Math.round(params.shapeB.value) === roundedTarget && params.shapeMorph.value >= 1.0) {
       return;
@@ -183,20 +183,20 @@ async function main() {
     shapeMorphDuration = Math.max(1.0, duration);
   };
 
-  // ARQUETIPOS GENERATIVOS 3D ----------------------------------------------
+  // ARQUETIPOS GENERATIVOS --------------------------------------------------
   const applyPreset = (key) => {
     const config = shapeConfigs[key];
     if (!config) return;
 
-    // Transición de campo de fuerzas en 3D (los agentes maniobran con steering hacia la nueva forma)
-    transitionToShape(config.id, 5.0);
+    // Transición de campo de fuerzas por steering de agentes (4.5s)
+    transitionToShape(config.id, 4.5);
     targetHarmonics = config.harmonics;
     targetSwirl = config.swirl;
     targetPetalMorph = config.petalMorph;
     targetCurlStrength = config.curlStrength;
 
-    // También transiciona la paleta correspondiente con suavidad
-    transitionToPalette(config.palette);
+    // Transiciona también la paleta correspondiente con suavidad (4.5s)
+    transitionToPalette(config.palette, 4.5);
   };
 
   // CONTROL DE MODOS LAB / PERFORMANCE -------------------------------------
@@ -252,12 +252,12 @@ async function main() {
       params.speedMultiplier.value = speedMultipliers[speedLevel] * 2.2;
     }
 
-    // 1-5: Cambios de sección y morfología armónica 3D (Transición orgánica sin saltos)
-    if (event.code === 'Digit1') { applyPreset('astrolabe'); panel.refresh(); }
-    if (event.code === 'Digit2') { applyPreset('tornado'); panel.refresh(); }
-    if (event.code === 'Digit3') { applyPreset('cosmicVeil'); panel.refresh(); }
-    if (event.code === 'Digit4') { applyPreset('celestialLotus'); panel.refresh(); }
-    if (event.code === 'Digit5') { applyPreset('astralPillar'); panel.refresh(); }
+    // 1-5: Cambios de sección y morfología (Transición orgánica sin saltos)
+    if (event.code === 'Digit1') { applyPreset('cellular'); panel.refresh(); }
+    if (event.code === 'Digit2') { applyPreset('iris'); panel.refresh(); }
+    if (event.code === 'Digit3') { applyPreset('coral'); panel.refresh(); }
+    if (event.code === 'Digit4') { applyPreset('fern'); panel.refresh(); }
+    if (event.code === 'Digit5') { applyPreset('spirograph'); panel.refresh(); }
 
     // C: Ciclar paleta de color con transición gradual suave
     if (event.code === 'KeyC' && !event.repeat) {
@@ -350,52 +350,54 @@ async function main() {
     }
 
     const audio = audioManager.update();
+    if (params.audioBass) params.audioBass.value = audio.bass;
+    if (params.audioMid) params.audioMid.value = audio.mid;
+    if (params.audioTreble) params.audioTreble.value = audio.treble;
+    if (params.audioEnergy) params.audioEnergy.value = audio.energy;
 
-    // LA MÚSICA ÚNICAMENTE CAMBIA LA PALETA ESPECTRAL SEGÚN LA ETAPA DE LA CANCIÓN
+    // LA MÚSICA GUÍA LA TRANSICIÓN ARMÓNICA DE LAS 5 FORMAS Y PALETAS
     if (audioManager.getIsPlaying()) {
       const curTime = audioManager.getCurrentTime();
       const duration = audioManager.getDuration();
       let currentStage = 0;
-
       let stageDesc = '';
+      const presetKeys = ['cellular', 'iris', 'coral', 'fern', 'spirograph'];
+
       if (duration > 0 && duration <= 230) {
         // Estructura específica para Motion Picture Soundtrack de Radiohead
-        if (curTime < 52) {
-          currentStage = 4; // Etapa 1: Armonio solo -> Azul Cian Profundo
-          stageDesc = '🎹 <strong>Etapa 1 (0:00 - 0:52):</strong> Armonio solitario<br>✦ Paleta: <em>Bioluminiscencia Azul Cian</em>';
-        } else if (curTime < 90) {
-          currentStage = 1; // Etapa 2: Contrabajo -> Seda Ópalo y Amatista
-          stageDesc = '🎻 <strong>Etapa 2 (0:52 - 1:30):</strong> Entrada de bajo y melancolía<br>✦ Paleta: <em>Seda Ópalo y Amatista</em>';
+        if (curTime < 50) {
+          currentStage = 0;
+          stageDesc = '🎹 <strong>Etapa 1 (0:00 - 0:50):</strong> Armonio solitario<br>✦ Visual: <em>1. Red Celular Bio-Cyan (Ref 1)</em>';
+        } else if (curTime < 92) {
+          currentStage = 1;
+          stageDesc = '🎻 <strong>Etapa 2 (0:50 - 1:32):</strong> Entrada de bajo y melancolía<br>✦ Visual: <em>2. Iris Cósmico / Fingering (Ref 2)</em>';
         } else if (curTime < 140) {
-          currentStage = 0; // Etapa 3: Arpa y Coros -> Prisma Espectral Arcoíris
-          stageDesc = '✨ <strong>Etapa 3 (1:30 - 2:20):</strong> Clímax celestial con arpas<br>✦ Paleta: <em>Prisma Espectral Arcoíris</em>';
+          currentStage = 2;
+          stageDesc = '✨ <strong>Etapa 3 (1:32 - 2:20):</strong> Clímax celestial con arpas<br>✦ Visual: <em>3. Rosa Coralina Espiral 3D (Ref 3)</em>';
+        } else if (curTime < 185) {
+          currentStage = 3;
+          stageDesc = '🌿 <strong>Etapa 4 (2:20 - 3:05):</strong> Ascenso Celestial<br>✦ Visual: <em>4. Helecho Fractal Jade (Ref 4)</em>';
         } else {
-          currentStage = 2; // Etapa 4: Coda y Desvanecimiento -> Fuego Dorado y Ámbar
-          stageDesc = '🌅 <strong>Etapa 4 (2:20 - Fin):</strong> Coda final ("I will see you...")<br>✦ Paleta: <em>Fuego Dorado y Ámbar</em>';
+          currentStage = 4;
+          stageDesc = '🌌 <strong>Etapa 5 (3:05 - Fin):</strong> Coda final ("I will see you...")<br>✦ Visual: <em>5. 36 Points RGB Split (Ref 5)</em>';
         }
       } else if (duration > 0) {
-        // Para cualquier otra canción según su porcentaje de avance
         const prog = curTime / duration;
-        if (prog < 0.25) {
-          currentStage = 4;
-          stageDesc = '🎵 <strong>Etapa 1 (0-25%):</strong> Introducción<br>✦ Paleta: <em>Bioluminiscencia Azul Cian</em>';
-        } else if (prog < 0.50) {
-          currentStage = 1;
-          stageDesc = '🎵 <strong>Etapa 2 (25-50%):</strong> Desarrollo armónico<br>✦ Paleta: <em>Seda Ópalo y Amatista</em>';
-        } else if (prog < 0.75) {
-          currentStage = 0;
-          stageDesc = '🎵 <strong>Etapa 3 (50-75%):</strong> Clímax sonoro<br>✦ Paleta: <em>Prisma Espectral Arcoíris</em>';
-        } else {
-          currentStage = 2;
-          stageDesc = '🎵 <strong>Etapa 4 (75-100%):</strong> Conclusión<br>✦ Paleta: <em>Fuego Dorado y Ámbar</em>';
-        }
+        const sIdx = Math.min(4, Math.floor(prog * 5));
+        currentStage = sIdx;
+        const names = [
+          '1. Red Celular Bio-Cyan (Ref 1)',
+          '2. Iris Cósmico Fingering (Ref 2)',
+          '3. Rosa Coralina Espiral 3D (Ref 3)',
+          '4. Helecho Fractal Jade (Ref 4)',
+          '5. 36 Points RGB Split (Ref 5)'
+        ];
+        stageDesc = `🎵 <strong>Etapa ${sIdx + 1} (${Math.round(prog * 100)}%):</strong> ${names[sIdx]}`;
       }
 
       if (currentStage !== lastStage) {
         lastStage = currentStage;
-        // Transición lenta, majestuosa y etérea (20 segundos por defecto)
-        const songFadeDuration = Math.max(20.0, params.transitionDuration ? params.transitionDuration.value : 20.0);
-        transitionToPalette(currentStage, songFadeDuration);
+        applyPreset(presetKeys[currentStage]);
         if (panel?.refresh) panel.refresh();
         if (panel?.setStageInfo) panel.setStageInfo(stageDesc);
       }

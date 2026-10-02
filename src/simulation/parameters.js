@@ -13,28 +13,34 @@ export function createParameters() {
     maxSpeed: uniform(1.6),            // Velocidad base suave
     speedMultiplier: uniform(1.0),     // Modulador dinámico (1.0 = Lenta, 1.8 = Normal, 2.8 = Rápida)
 
-    // Esfera 3D contenedora
-    sphereRadius: uniform(5.5),        // Radio amplio para que los agentes llenen todo el espacio 3D
-    boundsSize: uniform(14.0),
+    // Cobertura total de la pantalla (Full-screen canvas)
+    sphereRadius: uniform(8.5),        // Radio ampliado para cubrir la pantalla de esquina a esquina
+    boundsSize: uniform(20.0),
+
+    // Reactividad a la música (Audio-reactivity)
+    audioBass: uniform(0.0),           // Graves / Bombo (modula dilatación y pulsos radiales)
+    audioMid: uniform(0.0),            // Medios / Voz / Melodía (modula pliegues y frondas)
+    audioTreble: uniform(0.0),         // Agudos / Platos (modula micro-vibraciones y crenelaciones)
+    audioEnergy: uniform(0.0),         // Energía RMS global
 
     // Geometría y opacidad de los filamentos (Colores vivos sobre fondo negro)
     lineWidth: uniform(0.024),         // Líneas finas y nítidas
-    lineLength: uniform(0.42),         // Longitud de filamento
-    filamentAlpha: uniform(0.45),      // Opacidad translúcida calibrada para colores vivos sin blanquear
+    lineLength: uniform(0.38),         // Longitud de filamento
+    filamentAlpha: uniform(0.55),      // Opacidad calibrada para colores vivos sin blanquear
 
-    // Dinámica de agentes autónomos (Craig Reynolds)
-    steerStrength: uniform(5.2),       // Maniobra fluida orgánica
-    dragCoefficient: uniform(0.05),
+    // Dinámica de agentes autónomos (Craig Reynolds + Jeff Jones Physarum)
+    steerStrength: uniform(6.5),       // Maniobra ágil para responder a las morfologías
+    dragCoefficient: uniform(0.04),
 
-    // Campo de flujo armónico 3D y transición de fuerzas entre arquetipos (Craig Reynolds)
-    shapeA: uniform(0.0),              // Arquetipo origen en la transición
-    shapeB: uniform(0.0),              // Arquetipo destino (0: Astrolabio, 1: Tornado, 2: Velo, 3: Loto, 4: Pilar)
+    // Campo de flujo armónico 3D y transición de fuerzas entre los 5 arquetipos
+    shapeA: uniform(0.0),              // Arquetipo origen
+    shapeB: uniform(0.0),              // Arquetipo destino (0: Red Celular, 1: Iris, 2: Coral, 3: Helecho, 4: 36 Points)
     shapeMorph: uniform(1.0),          // 0.0 (100% Campo A) -> 1.0 (100% Campo B)
-    symmetryType: uniform(0.0),        // Mantenido para retrocompatibilidad
-    harmonics: uniform(4.0),           // Orden armónico 3D
+    symmetryType: uniform(0.0),
+    harmonics: uniform(4.0),           // Orden armónico
     swirl: uniform(1.4),               // Giro armónico
-    curlStrength: uniform(0.6),        // Ruido curl 3D
-    petalMorph: uniform(1.3),          // Amplitud de pétalos/alas 3D
+    curlStrength: uniform(0.35),       // Ruido curl
+    petalMorph: uniform(1.3),          // Amplitud de pliegues
     flowDirection: uniform(1.0),       // 1.0 hacia afuera, -1.0 hacia adentro
 
     // Conducción del intérprete
@@ -42,13 +48,13 @@ export function createParameters() {
     attractorStrength: uniform(0.0),   // Fuerza del conductor con el ratón
     userPulse: uniform(0.0),           // Acento manual (Espacio)
 
-    // Estética espectral y transición suave entre paletas
-    paletteId: uniform(4.0),           // Paleta activa / objetivo
-    paletteA: uniform(4.0),            // Paleta origen en la transición
-    paletteB: uniform(4.0),            // Paleta destino en la transición
-    paletteMix: uniform(1.0),          // 0.0 (Paleta A) -> 1.0 (Paleta B), interpolación suave
-    transitionDuration: uniform(20.0),  // Duración en segundos de la transición gradual (20s por defecto)
-    chromaShift: uniform(0.0),         // Desplazamiento cromático continuo (deriva lenta orgánica)
+    // Paletas cromáticas de referencia (0: Cyan celular, 1: Iris ardiente, 2: Coral teal, 3: Helecho menta, 4: RGB split)
+    paletteId: uniform(0.0),           // Paleta activa por defecto
+    paletteA: uniform(0.0),
+    paletteB: uniform(0.0),
+    paletteMix: uniform(1.0),
+    transitionDuration: uniform(4.5),  // 4.5 segundos para transición suave entre visuales
+    chromaShift: uniform(0.0),         // Desplazamiento cromático sutil
     dispersion: uniform(0.85),
 
     // Semilla procedural

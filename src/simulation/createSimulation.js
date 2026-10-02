@@ -9,12 +9,14 @@ import {
   color,
   cos,
   cross,
+  dot,
   floor,
   float,
   hash,
   instanceIndex,
   instancedArray,
   length,
+  log,
   max,
   min,
   mix,
@@ -38,7 +40,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   const velocityBuffer = instancedArray(count, 'vec3');
   const lifeBuffer = instancedArray(count, 'vec2'); // x = vida actual, y = vida máxima
 
-  // INICIALIZACIÓN: FUENTE VIVA DE FILAMENTOS EN LA ESFERA 3D ----------------
+  // INICIALIZACIÓN: FUENTE VIVA DE FILAMENTOS EN TODA LA PANTALLA --------------
   const initParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
@@ -51,27 +53,27 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r4 = hash(i.add(uint(61)));
     const r5 = hash(i.add(uint(79)));
 
-    // Distribución tridimensional amplia en capas concéntricas
+    // Distribución tridimensional amplia cubriendo toda la pantalla de borde a borde
     const theta = r1.mul(6.2831853);
-    const phi = asin(r2.mul(2.0).sub(1.0));
-    const rad = pow(r3, 0.65).mul(params.sphereRadius.mul(0.85)).add(0.25);
+    const rad = pow(r3, 0.55).mul(params.sphereRadius.mul(0.96)).add(0.2);
+    const zSpread = r2.sub(0.5).mul(params.sphereRadius.mul(0.35));
 
     p.assign(vec3(
-      rad.mul(cos(phi)).mul(cos(theta)),
-      rad.mul(cos(phi)).mul(sin(theta)),
-      rad.mul(sin(phi))
+      rad.mul(cos(theta)),
+      rad.mul(sin(theta)),
+      zSpread
     ));
 
-    const spd = params.initialSpeed.mul(r4.mul(0.4).add(0.8));
-    v.assign(vec3(sin(theta).negate(), cos(theta), cos(phi.mul(2.5)).mul(0.3)).mul(spd));
+    const spd = params.initialSpeed.mul(r4.mul(0.5).add(0.75));
+    v.assign(vec3(sin(theta).negate(), cos(theta), r2.sub(0.5).mul(0.3)).mul(spd));
 
-    // Vida útil desfasada (de 4 a 9 segundos) para renovación continua
+    // Ciclo de vida orgánico (4 a 9 segundos) con desfasamiento continuo
     const maxLife = float(4.5).add(r5.mul(4.5));
     const curLife = r1.mul(maxLife);
     l.assign(vec2(curLife, maxLife));
-  })().compute(count).setName('Init Agents 3D');
+  })().compute(count).setName('Init Agents Fullscreen');
 
-  // COMPUTE PASS: MOVIMIENTO AMPLIO, MULTICAPA Y FLUJO NO REPETITIVO ---------
+  // COMPUTE PASS: PHYSARUM JEFF JONES + 36 POINTS + REACCIONES DE AUDIO --------
   const updateParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
@@ -79,190 +81,184 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const l = lifeBuffer.element(i);
 
     const dt = params.dt.mul(params.timeScale);
-
     l.x.subAssign(dt);
 
-    // Identidad y capa espacial de cada agente para evitar colapso a una línea
-    const agentLayer = hash(i.add(uint(103))).sub(0.5).mul(2.0); // [-1.0 a 1.0]
+    // Identidad y capa de cada agente (dispersión volumétrica permanente)
+    const agentLayer = hash(i.add(uint(103))).sub(0.5).mul(2.0);
     const agentPhase = hash(i.add(uint(149))).sub(0.5).mul(1.5);
     const agentZOffset = hash(i.add(uint(197))).sub(0.5).mul(2.0);
 
-    // Coordenadas esféricas y cilíndricas 3D
-    const rSph = length(p).max(0.001);          // Radio esférico 3D
-    const rho = length(p.xy).max(0.001);        // Radio plano XY
-    const theta = atan(p.y, p.x);               // Ángulo azimutal
-    const phi = atan(p.z, rho);                 // Ángulo de elevación
+    // Coordenadas espaciales cilíndricas y polares
+    const rSph = length(p).max(0.001);
+    const rho = length(p.xy).max(0.001);
+    const theta = atan(p.y, p.x);
 
     const radial = vec3(cos(theta), sin(theta), 0.0);
     const tangent = vec3(sin(theta).negate(), cos(theta), 0.0);
 
-    // 1. CAMPOS DE FLUJO 3D MULTICAPA ----------------------------------------
+    // =========================================================================
+    // 5 CAMPOS DE FLUJO ARMÓNICOS (Inspirados en las 5 referencias visuales)
+    // =========================================================================
 
-    // 1. CAMPOS DE FLUJO 3D MULTICAPA (Inspirados en las 5 referencias visuales)
+    // ARQUETIPO 0 (Tecla 1 - Ref: media_1790969082305.png):
+    // Red Celular Bioluminiscente / Alvéolos y Anillos Vasculares Concéntricos
+    // Anillos vasculares discretos con 18 septos radiales que pulsan con el bombo/bajo
+    const ringWave0 = cos(rho.mul(2.6).sub(params.audioBass.mul(1.4)).sub(params.elapsedTime.mul(0.5)));
+    const septa0 = cos(theta.mul(18.0));
+    const ringForce0 = radial.mul(ringWave0.negate().mul(1.3));
+    const ringCirc0 = tangent.mul(params.swirl.mul(1.1).add(septa0.mul(0.45)));
+    const septaCross0 = radial.mul(septa0.mul(0.65).mul(params.flowDirection));
+    const zCellular0 = vec3(0.0, 0.0, p.z.negate().mul(1.8).add(sin(rho.mul(2.2)).mul(0.25)));
+    const flowCellular = ringForce0.add(ringCirc0).add(septaCross0).add(zCellular0);
 
-    // ARQUETIPO 0 (Tecla 1): Ondas Planetarias y Anillos Ópticos Cruzados (Ref: Imagen 1)
-    // Líneas circulares concéntricas hacia el centro + ondas planetarias viajeras hacia afuera
-    // + 4 lóbulos diagonales en cruz (X) con haz de lente horizontal
-    const wavePhase = rho.mul(2.4).sub(params.elapsedTime.mul(2.5));
-    const planetaryWave = sin(wavePhase);
+    // ARQUETIPO 1 (Tecla 2 - Ref: media_1790969096547.png):
+    // Iris Cósmico / Fingering Fúngico Espectral ("Weird Velocity Effect")
+    // Pupila negra hueca central con fuerte repulsión + plumas radiales con 48 crenelaciones
+    const pupilR = float(1.8).add(params.audioBass.mul(0.65));
+    const inPupil = rho.lessThan(pupilR);
+    const pupilRepel = radial.mul(pupilR.sub(rho).max(0.0).mul(6.0).add(inPupil.select(3.2, 0.0)));
+    const fingerWave1 = cos(theta.mul(48.0).add(sin(rho.mul(3.2))));
+    const fingerShear1 = sin(rho.mul(4.0).add(params.audioTreble.mul(3.5)));
+    const plumeRadial1 = radial.mul(float(1.7).add(fingerWave1.mul(0.95)).add(params.audioEnergy.mul(1.3)));
+    const plumeTangential1 = tangent.mul(params.swirl.mul(0.55).add(fingerShear1.mul(0.65)));
+    const outerBrake1 = radial.mul(rho.sub(8.0).max(0.0).mul(-4.5));
+    const zIris1 = vec3(0.0, 0.0, p.z.negate().mul(1.7).add(fingerWave1.mul(0.25)));
+    const flowIris = pupilRepel.add(plumeRadial1).add(plumeTangential1).add(outerBrake1).add(zIris1);
 
-    // 1. Fuerza de gravedad hacia el centro vs onda de expansión planetaria hacia afuera
-    const inwardGravity = float(-1.1).div(rho.mul(0.25).add(0.7));
-    const outwardWave = planetaryWave.mul(2.2);
-    const radialWaveForce = radial.mul(inwardGravity.add(outwardWave).mul(params.flowDirection));
+    // ARQUETIPO 2 (Tecla 3 - Ref: media_1790969148388.jpg):
+    // Rosa Coralina Espiral / Pliegues 3D (Turbinaria Coral)
+    // Espiral logarítmica con niveles superpuestos y 56 costillas radiales
+    const logRho2 = log(rho.max(0.15));
+    const coralSpiralCoord2 = theta.sub(logRho2.mul(1.75));
+    const tierWave2 = sin(rho.mul(3.4).sub(coralSpiralCoord2));
+    const ribWave2 = cos(coralSpiralCoord2.mul(56.0)).mul(0.22);
+    const zTargetCoral2 = tierWave2.mul(float(1.25).add(params.audioMid.mul(0.85))).mul(smoothstep(0.4, 2.5, rho)).add(ribWave2);
+    const coralRadial2 = radial.mul(tierWave2.mul(0.75).add(params.flowDirection.mul(0.4)));
+    const coralTangent2 = tangent.mul(params.swirl.mul(1.15).add(0.65).add(params.audioMid.mul(0.5)));
+    const coralZ2 = vec3(0.0, 0.0, zTargetCoral2.sub(p.z).mul(2.5));
+    const flowCoral = coralRadial2.add(coralTangent2).add(coralZ2);
 
-    // 2. Líneas circulares concéntricas (órbitas planetarias en capas continuas)
-    const ringSpacing = float(1.25);
-    const nearestRing = round(rho.div(ringSpacing)).mul(ringSpacing).clamp(1.0, 5.0);
-    const ringAttract = radial.mul(nearestRing.sub(rho).mul(1.3));
-    const circularOrbit = tangent.mul(params.swirl.mul(1.5)).add(ringAttract);
+    // ARQUETIPO 3 (Tecla 4 - Ref: media_1790969169603.jpg):
+    // Helecho Fractal / Nautilus Jade (Golden Spiral Fronds)
+    // Espiral áurea con báculos enroscados auto-similares y ojo central de vórtice
+    const fernCoord3 = theta.sub(log(rho.div(0.7).max(0.1)).mul(2.35));
+    const frondWave3 = sin(fernCoord3.mul(14.0).add(theta.mul(2.0)));
+    const tipRipple3 = cos(fernCoord3.mul(28.0).add(params.audioTreble.mul(4.0))).mul(0.3);
+    const eyeSuction3 = float(-1.1).mul(smoothstep(1.3, 0.25, rho));
+    const fernRadial3 = radial.mul(eyeSuction3.add(frondWave3.mul(0.7)).add(tipRipple3));
+    const fernTangent3 = tangent.mul(params.swirl.mul(1.3).add(0.85).add(frondWave3.mul(0.4)));
+    const zFern3 = vec3(0.0, 0.0, sin(fernCoord3.mul(3.0)).mul(0.45).sub(p.z.mul(1.8)));
+    const flowFern = fernRadial3.add(fernTangent3).add(zFern3);
 
-    // 3. Cuatro lóbulos de lente diagonales en cruz (X) inclinados en 3D
-    const diagPattern = sin(theta.mul(2.0));
-    const diagLobe = diagPattern.abs().pow(0.75);
-    const zOrbital = diagPattern.mul(p.x.sub(p.y)).mul(0.26).add(agentZOffset.mul(0.35));
-    const zAttract = vec3(0.0, 0.0, zOrbital.sub(p.z).mul(2.0));
-    const lobeCirculation = radial.mul(diagLobe.mul(planetaryWave).mul(1.6));
+    // ARQUETIPO 4 (Tecla 5 - Ref: media_1790969193604.jpg):
+    // "36 Points" Sage Jenson Espirografía Cromática RGB
+    // 36 órbitas elípticas rotadas armónicamente con división cromática RGB
+    const angle36_4 = theta.mul(36.0);
+    const orbitOsc4 = sin(angle36_4);
+    const spiroTangent4 = tangent.mul(float(1.9).add(params.audioEnergy.mul(0.85)).mul(params.swirl.mul(0.7).add(0.4)));
+    const spiroRadial4 = radial.mul(orbitOsc4.mul(0.85).add(sin(rho.mul(2.2)).mul(0.35)));
+    const zSpiro4 = vec3(0.0, 0.0, cos(theta.mul(18.0)).mul(0.3).sub(p.z.mul(1.6)));
+    const flowSpirograph = spiroRadial4.add(spiroTangent4).add(zSpiro4);
 
-    // 4. Haz horizontal de destello óptico (flare streak ecuatorial)
-    const flareMask = abs(agentLayer).lessThan(0.25);
-    const flareAttract = vec3(0.0, p.y.negate(), p.z.negate()).mul(2.2);
-    const flareStream = vec3(sign(p.x).mul(float(1.5).add(planetaryWave.mul(0.8))), 0.0, 0.0);
-    const flareForce = flareAttract.add(flareStream);
+    // =========================================================================
+    // SENSOR DE CRESTA PHYSARUM (JEFF JONES 2010): 3 SENSORES (L / F / R)
+    // =========================================================================
+    const sampleRidge = (q, sId) => {
+      const qRho = length(q).max(0.001);
+      const qTheta = atan(q.y, q.x);
 
-    const flowAstrolabe = radialWaveForce
-      .add(circularOrbit)
-      .add(zAttract)
-      .add(lobeCirculation)
-      .add(flareMask.select(flareForce, vec3(0.0)));
+      // Evaluación del potencial escalar según el arquetipo
+      const r0 = cos(qRho.mul(2.6).sub(params.audioBass.mul(1.4))).mul(0.55).add(cos(qTheta.mul(18.0)).mul(0.45));
+      const r1 = cos(qTheta.mul(48.0).add(sin(qRho.mul(3.2)))).mul(0.5).add(sin(qRho.mul(2.0)).mul(0.5));
+      const qLogRho = log(qRho.max(0.15));
+      const qCoralCoord = qTheta.sub(qLogRho.mul(1.75));
+      const r2 = sin(qRho.mul(3.4).sub(qCoralCoord)).mul(0.65).add(cos(qCoralCoord.mul(56.0)).mul(0.35));
+      const qFernCoord = qTheta.sub(log(qRho.div(0.7).max(0.1)).mul(2.35));
+      const r3 = sin(qFernCoord.mul(14.0).add(qTheta.mul(2.0))).mul(0.7).add(cos(qFernCoord.mul(2.0)).mul(0.3));
+      const r4 = cos(qTheta.mul(36.0)).mul(0.6).add(cos(qRho.mul(2.2)).mul(0.4));
 
-    // ARQUETIPO 1 (Tecla 2): Red de Micro-Vórtices y Eyectores 3D (Ref: Imagen 2)
-    // Pequeños vórtices que amarran los agentes en anillos rotatorios concentrados
-    // y luego los eyectan mediante haces parabólicos ("los sacan por otro lado") en un circuito cerrado continuo.
-    const calcVortex = (center, axis, spinSpd, ringR, exitTarget) => {
-      const r = p.sub(center);
-      const h = r.dot(axis);
-      const rPerp = r.sub(axis.mul(h));
-      const rhoV = length(rPerp).max(0.001);
-      const d = length(r).max(0.001);
-      const perpDir = rPerp.div(rhoV);
-      const spinDir = cross(axis, perpDir);
-
-      // 1. Fuerza de amarre: sujeta y confina los agentes en un anillo circular definido
-      const trapForce = perpDir.mul(ringR.sub(rhoV).mul(2.6));
-
-      // 2. Giro vorticial veloz alrededor del eje polar del vórtice
-      const spinForce = spinDir.mul(spinSpd.mul(params.swirl.mul(0.6).add(0.4)));
-
-      // 3. Transporte helicoidal axial a lo largo del filamento
-      const axialForce = axis.mul(sign(h).mul(1.3).mul(params.flowDirection));
-
-      // 4. Eyección / Haces de lanzamiento: cuando superan el límite axial, son catapultados hacia otro lado
-      const toNext = normalize(exitTarget.sub(p));
-      const ejectJet = toNext.mul(3.8).add(spinDir.mul(1.4));
-      const ejectMix = smoothstep(float(0.38), float(1.15), h.abs().div(1.3));
-
-      const vLocal = mix(trapForce.add(spinForce).add(axialForce), ejectJet, ejectMix);
-      const weight = float(1.0).div(d.pow(2.2).add(0.25));
-      return { v: vLocal.mul(weight), w: weight };
-    };
-
-    // V0: Gran Vórtice Púrpura/Magenta Central (Luz principal inferior derecha)
-    const v0 = calcVortex(vec3(0.7, -0.5, 0.2), normalize(vec3(0.3, 0.2, 0.95)), float(2.8), float(1.35), vec3(-2.0, 1.9, 0.7));
-    // V1: Micro-vórtice Ámbar Superior Izquierdo (Burbuja circular dorada densa)
-    const v1 = calcVortex(vec3(-2.0, 1.9, 0.7), normalize(vec3(-0.25, 0.35, 0.9)), float(3.4), float(0.85), vec3(-0.95, 2.4, -0.45));
-    // V2: Micro-vórtice Secundario Ámbar (Burbuja satélite adyacente)
-    const v2 = calcVortex(vec3(-0.95, 2.4, -0.45), normalize(vec3(0.35, -0.2, 0.9)), float(3.6), float(0.65), vec3(-1.3, -1.6, -0.3));
-    // V3: Disco Espiral Turquesa / Cian (Amplio remolino con peines radiales)
-    const v3 = calcVortex(vec3(-1.3, -1.6, -0.3), normalize(vec3(-0.15, 0.15, 0.98)), float(-2.6), float(2.1), vec3(2.2, 1.5, -0.5));
-    // V4: Lazo de Retorno Esmeralda Periférico (Conecta de vuelta con V0)
-    const v4 = calcVortex(vec3(2.2, 1.5, -0.5), normalize(vec3(0.5, -0.4, 0.77)), float(2.5), float(1.15), vec3(0.7, -0.5, 0.2));
-
-    const totalVortexForce = v0.v.add(v1.v).add(v2.v).add(v3.v).add(v4.v);
-    const totalVortexWeight = v0.w.add(v1.w).add(v2.w).add(v3.w).add(v4.w).max(0.001);
-    const silkRipple = sin(p.x.mul(1.8).add(p.y.mul(1.8)).add(params.elapsedTime.mul(1.5))).mul(0.35);
-    const flowMicroVortices = totalVortexForce.div(totalVortexWeight).add(vec3(silkRipple, silkRipple.negate(), silkRipple.mul(0.5)));
-
-    // ARQUETIPO 2 (Tecla 3): Velo Cósmico Multicapa (Ref: Imagen 3)
-    // Membranas y pliegues de seda ondulantes en múltiples niveles en 3D
-    const zTargetVeil = sin(p.x.mul(0.85).add(agentLayer.mul(1.8)))
-      .mul(cos(p.y.mul(0.85)))
-      .mul(params.petalMorph.mul(1.6))
-      .add(sin(rho.mul(1.4).sub(theta.mul(2.0))).mul(1.1))
-      .add(agentZOffset.mul(0.8));
-    const flowVeil = vec3(
-      sin(p.y.mul(0.85).add(params.seed)).negate().mul(1.4),
-      cos(p.x.mul(0.85).add(params.seed)).mul(1.4),
-      zTargetVeil.sub(p.z).mul(1.8)
-    ).add(tangent.mul(params.swirl.mul(0.7)));
-
-    // ARQUETIPO 3 (Tecla 4): Loto Celestial / Alas de Serafín (Ref: Imagen 4)
-    // Cáliz radiante de pétalos de plumas escalonadas en capas curvadas
-    const petalHarm = sin(theta.mul(params.harmonics).add(agentPhase.mul(0.4)));
-    const zLotusCalyx = rho.div(2.4).pow(1.8).mul(1.6)
-      .sub(petalHarm.mul(rho).mul(0.35))
-      .add(agentZOffset.mul(0.7));
-    const flowLotus = radial.mul(petalHarm.mul(params.petalMorph).add(1.2).mul(params.flowDirection))
-      .add(tangent.mul(params.swirl.mul(0.9).add(petalHarm.mul(0.4))))
-      .add(vec3(0.0, 0.0, zLotusCalyx.sub(p.z).mul(1.6)));
-
-    // ARQUETIPO 4 (Tecla 5): Pilar Astral / Alma Ascendente (Ref: Imagen 5)
-    // Columna vertical estilizada, ascensión central y lluvia de chispas
-    const spineRadius = float(1.2).add(agentLayer.mul(0.5));
-    const inSpine = rho.lessThan(spineRadius);
-    const ascendSpeed = float(2.4).mul(float(1.0).sub(rho.div(3.0)).clamp(0.1, 1.0));
-    const fountainFall = float(-1.8).mul(params.flowDirection);
-    const vZTarget = inSpine.select(ascendSpeed, fountainFall);
-    const spineAttract = inSpine.select(
-      radial.mul(float(-0.6)),
-      radial.mul(float(1.1))
-    );
-    const flameWiggle = sin(p.z.mul(2.6).add(theta.mul(2.0))).mul(0.45);
-    const flowAstralPillar = vec3(
-      sin(theta.add(flameWiggle)).negate().mul(params.swirl.mul(0.6)),
-      cos(theta.add(flameWiggle)).mul(params.swirl.mul(0.6)),
-      vZTarget
-    ).add(spineAttract);
-
-    // Función selectora de campo de flujo por ID
-    const sampleArchetype = (shapeIdNode) => {
-      const sIdx = floor(shapeIdNode.add(0.5));
-      const res = flowAstrolabe.toVar();
-      If(sIdx.equal(1.0), () => { res.assign(flowMicroVortices); });
-      If(sIdx.equal(2.0), () => { res.assign(flowVeil); });
-      If(sIdx.equal(3.0), () => { res.assign(flowLotus); });
-      If(sIdx.equal(4.0), () => { res.assign(flowAstralPillar); });
+      const sIdx = floor(sId.add(0.5));
+      const res = r0.toVar();
+      If(sIdx.equal(1.0), () => { res.assign(r1); });
+      If(sIdx.equal(2.0), () => { res.assign(r2); });
+      If(sIdx.equal(3.0), () => { res.assign(r3); });
+      If(sIdx.equal(4.0), () => { res.assign(r4); });
       return res;
     };
 
-    // Interpolación no lineal ultrasuave de campos de fuerza (los agentes navegan orgánicamente)
+    // Dirección de rumbo del agente (heading)
+    const vHeading = normalize(v.xy.add(tangent.xy.mul(0.02)));
+    const ds = float(0.35); // Distancia del sensor
+    // Rotación angular de los sensores izquierdo (+32°) y derecho (-32°)
+    const cosPhi = float(0.8525);
+    const sinPhi = float(0.5227);
+    const vLeft = vec2(
+      vHeading.x.mul(cosPhi).sub(vHeading.y.mul(sinPhi)),
+      vHeading.x.mul(sinPhi).add(vHeading.y.mul(cosPhi))
+    );
+    const vRight = vec2(
+      vHeading.x.mul(cosPhi).add(vHeading.y.mul(sinPhi)),
+      vHeading.y.mul(cosPhi).sub(vHeading.x.mul(sinPhi))
+    );
+
+    const pLeft = p.xy.add(vLeft.mul(ds));
+    const pRight = p.xy.add(vRight.mul(ds));
+
+    const sLeftA = sampleRidge(pLeft, params.shapeA);
+    const sRightA = sampleRidge(pRight, params.shapeA);
+    const sLeftB = sampleRidge(pLeft, params.shapeB);
+    const sRightB = sampleRidge(pRight, params.shapeB);
+
+    const morphProg = smoothstep(float(0.0), float(1.0), params.shapeMorph.clamp(0.0, 1.0));
+    const sLeft = mix(sLeftA, sLeftB, morphProg);
+    const sRight = mix(sRightA, sRightB, morphProg);
+
+    // Fuerza de giro lateral perpendicular al heading siguiendo el gradiente de Jeff Jones
+    const steerPerp = vec3(vHeading.y.negate(), vHeading.x, 0.0);
+    const physarumSteer = steerPerp.mul(sLeft.sub(sRight)).mul(2.2);
+
+    // =========================================================================
+    // SELECCIÓN Y MEZCLA DE CAMPOS DE FUERZA (Craig Reynolds Flocking)
+    // =========================================================================
+    const sampleArchetype = (shapeIdNode) => {
+      const sIdx = floor(shapeIdNode.add(0.5));
+      const res = flowCellular.toVar();
+      If(sIdx.equal(1.0), () => { res.assign(flowIris); });
+      If(sIdx.equal(2.0), () => { res.assign(flowCoral); });
+      If(sIdx.equal(3.0), () => { res.assign(flowFern); });
+      If(sIdx.equal(4.0), () => { res.assign(flowSpirograph); });
+      return res;
+    };
+
     const fieldA = sampleArchetype(params.shapeA);
     const fieldB = sampleArchetype(params.shapeB);
-    const morphProgress = smoothstep(float(0.0), float(1.0), params.shapeMorph.clamp(0.0, 1.0));
-    const flowField3D = mix(fieldA, fieldB, morphProgress).toVar();
+    const flowField3D = mix(fieldA, fieldB, morphProg).toVar();
+    flowField3D.addAssign(physarumSteer);
 
-    // 2. TURBULENCIA CURL 3D (Divergence-free = Mantiene volumen amplio y no colapsa)
-    const noiseScale = 0.45;
+    // Turbulencia curl divergence-free suave (volumen sin colapsos)
+    const noiseScale = 0.38;
     const curlX = sin(p.y.mul(noiseScale).add(params.seed)).add(cos(p.z.mul(noiseScale).mul(0.8)));
     const curlY = cos(p.x.mul(noiseScale).add(params.seed)).negate().add(sin(p.z.mul(noiseScale).mul(0.8)));
     const curlZ = sin(p.x.mul(noiseScale).mul(0.8)).negate().add(cos(p.y.mul(noiseScale).mul(0.8)));
     flowField3D.addAssign(vec3(curlX, curlY, curlZ).mul(params.curlStrength));
 
-    // Separación volumétrica permanente entre capas
+    // Separación volumétrica entre capas de filamentos
     const spreadVec = vec3(
       cos(theta.add(1.57)).mul(agentLayer),
       sin(theta.add(1.57)).mul(agentLayer),
       agentZOffset
-    ).mul(0.35);
+    ).mul(0.3);
     flowField3D.addAssign(spreadVec);
 
-    // 3. CONFINAMIENTO DENTRO DE LA GRAN ESFERA 3D ----------------------------
+    // =========================================================================
+    // CONFINAMIENTO EN TODA LA PANTALLA (Borde suave a sphereRadius)
+    // =========================================================================
     const sphereRadius = params.sphereRadius;
     const outsideDist = rSph.sub(sphereRadius);
     const sphereNormal = normalize(p);
     const sphereContainmentForce = sphereNormal.mul(outsideDist.max(0.0).mul(-15.0));
 
-    // 4. STEERING BEHAVIORS (CRAIG REYNOLDS) EN 3D ---------------------------
+    // STEERING BEHAVIORS (CRAIG REYNOLDS)
     const currentMaxSpeed = params.maxSpeed.mul(params.speedMultiplier);
     const desiredVelocity = normalize(flowField3D).mul(currentMaxSpeed);
 
@@ -274,17 +270,17 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     totalForce.addAssign(sphereContainmentForce);
     totalForce.addAssign(v.mul(params.dragCoefficient).negate());
 
-    // Conductor manual con el puntero
+    // Conductor interactivo con el ratón
     const toPointer = params.attractor.sub(p);
     const pointerDist = length(toPointer).max(0.3);
     const pointerDir = toPointer.div(pointerDist);
     totalForce.addAssign(pointerDir.mul(params.attractorStrength).div(pointerDist));
 
-    // Acento manual de energía (Espacio)
+    // Acento manual de energía (Barra espaciadora)
     const userPulseForce = normalize(p).mul(params.userPulse.mul(6.5));
     totalForce.addAssign(userPulseForce);
 
-    // 5. INTEGRACIÓN FÍSICA (Semi-implicit Euler) ----------------------------
+    // INTEGRACIÓN FÍSICA (Semi-implicit Euler)
     v.addAssign(totalForce.mul(dt));
 
     const curSpeed = length(v);
@@ -294,23 +290,25 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     p.addAssign(v.mul(dt));
 
-    // 6. RENOVACIÓN CONTINUA DE AGENTES (Respawn tipo fuente viva) ------------
+    // RENOVACIÓN CONTINUA DE AGENTES EN TODA LA PANTALLA
     const expired = l.x.lessThanEqual(0.0).or(rSph.greaterThan(sphereRadius.mul(1.15)));
     If(expired, () => {
       const respawnTheta = hash(i.add(uint(91))).mul(6.2831853);
-      const respawnPhi = asin(hash(i.add(uint(93))).mul(2.0).sub(1.0));
-      const respawnRad = hash(i.add(uint(97))).mul(0.9).add(0.2);
+      const respawnRad = pow(hash(i.add(uint(97))), 0.55).mul(sphereRadius.mul(0.95)).add(0.2);
+      const respawnZ = hash(i.add(uint(93))).sub(0.5).mul(sphereRadius.mul(0.3));
       p.assign(vec3(
-        respawnRad.mul(cos(respawnPhi)).mul(cos(respawnTheta)),
-        respawnRad.mul(cos(respawnPhi)).mul(sin(respawnTheta)),
-        respawnRad.mul(sin(respawnPhi))
+        respawnRad.mul(cos(respawnTheta)),
+        respawnRad.mul(sin(respawnTheta)),
+        respawnZ
       ));
       v.assign(vec3(sin(respawnTheta).negate(), cos(respawnTheta), 0.0).mul(params.initialSpeed));
       l.x.assign(l.y);
     });
-  })().compute(count).setName('Update Agents 3D');
+  })().compute(count).setName('Update Agents Fullscreen');
 
-  // RENDER PASS: COLORES PUROS VIBRANTES (SIN QUEMADO BLANCO) ----------------
+  // =========================================================================
+  // RENDER PASS: PALETAS DE REFERENCIA EXACTAS Y DIVISIÓN CROMÁTICA RGB
+  // =========================================================================
   const material = new THREE.SpriteNodeMaterial({
     blending: THREE.NormalBlending,
     depthWrite: false,
@@ -325,48 +323,54 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
   material.scaleNode = Fn(() => {
     const spdView = length(vView);
-    const len = params.lineLength.mul(spdView.clamp(0.12, 2.8));
+    const len = params.lineLength.mul(spdView.clamp(0.15, 2.5));
     return vec2(len, params.lineWidth);
   })();
 
-  // COLOR ESPECTRAL 100% PURO CON TRANSICIÓN GRADUAL:
-  // La música y el intérprete modulan transiciones suaves entre paletas a lo largo de varios segundos.
-  // Cero escalones bruscos, cero blanco, mezcla suave tipo seda / acuarela viva.
+  // COLOR ESPECTRAL 100% PURO BASADO EN LAS 5 IMÁGENES DE REFERENCIA
+  // Cero quemado a blanco. Colores vivos sobre fondo negro puro.
   material.colorNode = Fn(() => {
     const pAttr = positionBuffer.toAttribute();
-    const rDist = length(pAttr).mul(0.12);
+    const rDist = length(pAttr.xy).div(params.sphereRadius).clamp(0.0, 1.0);
     const ang = atan(vView.y, vView.x).div(6.2831853).add(0.5);
+    const t = ang.add(rDist.mul(0.4)).add(params.chromaShift);
 
-    const t = ang.add(rDist).add(params.chromaShift);
-
-    // Función constructora de paletas espectrales puras
     const samplePalette = (idNode, tVal) => {
-      // Paleta 0: Prisma Espectral Arcoíris Puro (Cian, Violeta, Naranja, Esmeralda)
-      const c0 = cos(tVal.mul(6.2831853).add(vec3(0.0, 2.094, 4.188))).mul(0.5).add(0.5);
+      // PALETA 0 (Ref 1): Red Celular Bioluminiscente (Cobalto profundo y Cian Eléctrico)
+      const c0_cobalt = vec3(0.0, 0.25, 0.95);
+      const c0_cyan = vec3(0.0, 0.92, 1.0);
+      const c0_azure = vec3(0.4, 0.98, 1.0);
+      const c0 = mix(c0_cobalt, mix(c0_cyan, c0_azure, sin(tVal.mul(12.566)).mul(0.5).add(0.5)), cos(tVal.mul(6.283)).mul(0.5).add(0.5));
 
-      // Paleta 1: Seda Ópalo y Amatista (Turquesa intenso, magenta vivo, violeta y rosa)
-      const c1 = cos(tVal.mul(6.2831853).add(vec3(0.8, 0.1, 0.9))).mul(0.5).add(0.5);
+      // PALETA 1 (Ref 2): Iris Cósmico / Fungal Plume (Rampa Espectral: Carmesí -> Oro -> Turquesa -> Amatista)
+      const normR1 = rDist.sub(0.15).div(0.85).clamp(0.0, 1.0);
+      const c1_crimson = vec3(0.96, 0.16, 0.05);
+      const c1_gold = vec3(1.0, 0.80, 0.04);
+      const c1_turquoise = vec3(0.04, 0.88, 0.78);
+      const c1_purple = vec3(0.72, 0.12, 0.88);
+      const c1_a = mix(c1_crimson, c1_gold, smoothstep(float(0.0), float(0.35), normR1));
+      const c1_b = mix(c1_a, c1_turquoise, smoothstep(float(0.35), float(0.70), normR1));
+      const c1 = mix(c1_b, c1_purple, smoothstep(float(0.70), float(1.0), normR1));
 
-      // Paleta 2: Fuego Dorado y Ámbar (Rojo rubí, naranja fuego, oro cálido)
-      const c2 = vec3(
-        cos(tVal.mul(4.0)).mul(0.48).add(0.52),
-        cos(tVal.mul(4.0).add(1.2)).mul(0.38).add(0.42),
-        cos(tVal.mul(4.0).add(2.4)).mul(0.15)
-      );
+      // PALETA 2 (Ref 3): Rosa Coralina Espiral (Teal Océano Profundo, Esmeralda y Espuma Marina)
+      const c2_deep = vec3(0.0, 0.16, 0.18);
+      const c2_emerald = vec3(0.0, 0.42, 0.38);
+      const c2_teal = vec3(0.0, 0.72, 0.65);
+      const c2_seafoam = vec3(0.48, 1.0, 0.92);
+      const c2 = mix(c2_deep, mix(c2_emerald, mix(c2_teal, c2_seafoam, sin(tVal.mul(18.84)).mul(0.5).add(0.5)), cos(tVal.mul(6.283)).mul(0.5).add(0.5)), sin(rDist.mul(10.0)).mul(0.5).add(0.5));
 
-      // Paleta 3: Neón Lavanda / Mariposa (Azul cobalto profundo, violeta eléctrico, rosa neón)
-      const c3 = vec3(
-        cos(tVal.mul(5.0).add(0.2)).mul(0.48).add(0.52),
-        cos(tVal.mul(5.0).add(2.0)).mul(0.15).add(0.1),
-        cos(tVal.mul(5.0).add(4.0)).mul(0.5).add(0.5)
-      );
+      // PALETA 3 (Ref 4): Helecho Fractal (Menta Neón y Jade Primaveral)
+      const c3_dark = vec3(0.0, 0.18, 0.12);
+      const c3_jade = vec3(0.0, 0.68, 0.45);
+      const c3_mint = vec3(0.05, 1.0, 0.68);
+      const c3_glow = vec3(0.45, 1.0, 0.82);
+      const c3 = mix(c3_dark, mix(c3_jade, mix(c3_mint, c3_glow, sin(tVal.mul(14.0)).mul(0.5).add(0.5)), cos(tVal.mul(6.283)).mul(0.5).add(0.5)), cos(rDist.mul(8.0)).mul(0.5).add(0.5));
 
-      // Paleta 4: Azul Cian y Océano Profundo (Azul marino puro, cian eléctrico, esmeralda)
-      const c4 = vec3(
-        cos(tVal.mul(6.0).add(3.0)).mul(0.1),
-        cos(tVal.mul(6.0).add(1.0)).mul(0.45).add(0.55),
-        cos(tVal.mul(6.0)).mul(0.45).add(0.55)
-      );
+      // PALETA 4 (Ref 5): "36 Points" Sage Jenson (Separación Cromática RGB por Velocidad y Ángulo)
+      const rComp = vView.x.mul(0.42).add(0.5).clamp(0.08, 1.0);
+      const gComp = vView.y.mul(0.42).add(0.5).clamp(0.08, 1.0);
+      const bComp = sin(ang.mul(36.0).add(params.chromaShift)).mul(0.45).add(0.55).clamp(0.08, 1.0);
+      const c4 = vec3(rComp, gComp, bComp);
 
       const pIdx = floor(idNode.add(0.5));
       const col = c0.toVar();
@@ -380,8 +384,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const colA = samplePalette(params.paletteA, t);
     const colB = samplePalette(params.paletteB, t);
 
-    // Interpolación no lineal ultrasuave (smoothstep) entre Paleta A y Paleta B
-    // con dispersión volumétrica radial: el color brota del centro hacia el exterior como tinta en agua
+    // Interpolación no lineal ultrasuave con dispersión radial como tinta en agua
     const waveOffset = rDist.mul(0.35);
     const localMix = params.paletteMix.mul(1.35).sub(waveOffset).clamp(0.0, 1.0);
     const easeMix = smoothstep(float(0.0), float(1.0), localMix);
@@ -403,7 +406,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   mesh.frustumCulled = false;
   scene.add(mesh);
 
-  // Malla sutil de referencia de la esfera en modo LAB
+  // Malla sutil oculta por defecto (pantalla limpia completa)
   const sphereWireframe = new THREE.Mesh(
     new THREE.SphereGeometry(1, 32, 24),
     new THREE.MeshBasicMaterial({
@@ -414,6 +417,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     })
   );
   sphereWireframe.scale.setScalar(params.sphereRadius.value);
+  sphereWireframe.visible = false;
   scene.add(sphereWireframe);
 
   function reset() {

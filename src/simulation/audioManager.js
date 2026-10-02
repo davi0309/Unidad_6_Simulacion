@@ -102,19 +102,40 @@ export function createAudioManager() {
 
   function update() {
     if (!analyser || !isPlaying) {
-      audioData.pulse = 0;
-      audioData.bass = 0;
-      audioData.mid = 0;
-      audioData.treble = 0;
-      audioData.energy = 0;
+      // Pulso orgánico de respiración procedural cuando no hay canción sonando
+      const t = performance.now() * 0.001;
+      audioData.bass = (Math.sin(t * 1.8) * 0.5 + 0.5) * 0.35;
+      audioData.mid = (Math.cos(t * 2.4) * 0.5 + 0.5) * 0.25;
+      audioData.treble = (Math.sin(t * 3.6) * 0.5 + 0.5) * 0.20;
+      audioData.energy = (audioData.bass + audioData.mid + audioData.treble) / 3.0;
+      audioData.pulse = audioData.bass;
       return audioData;
     }
 
     analyser.getByteFrequencyData(frequencyData);
     const binCount = analyser.frequencyBinCount;
-    let sum = 0;
-    for (let i = 0; i < binCount; i++) sum += frequencyData[i];
-    audioData.energy = sum / (binCount * 255.0);
+    let sumBass = 0, countBass = 0;
+    let sumMid = 0, countMid = 0;
+    let sumTreble = 0, countTreble = 0;
+    let sumTotal = 0;
+
+    // Bins para fftSize 1024 (binCount = 512):
+    // Graves (Bass): bins 1..14 (~40Hz - 300Hz)
+    // Medios (Mid): bins 15..100 (~300Hz - 2200Hz)
+    // Agudos (Treble): bins 101..300 (~2200Hz - 6500Hz)
+    for (let i = 0; i < binCount; i++) {
+      const val = frequencyData[i];
+      sumTotal += val;
+      if (i >= 1 && i <= 14) { sumBass += val; countBass++; }
+      else if (i > 14 && i <= 100) { sumMid += val; countMid++; }
+      else if (i > 100 && i <= 300) { sumTreble += val; countTreble++; }
+    }
+
+    audioData.energy = sumTotal / (binCount * 255.0);
+    audioData.bass = countBass > 0 ? (sumBass / (countBass * 255.0)) : 0;
+    audioData.mid = countMid > 0 ? (sumMid / (countMid * 255.0)) : 0;
+    audioData.treble = countTreble > 0 ? (sumTreble / (countTreble * 255.0)) : 0;
+    audioData.pulse = audioData.bass;
 
     return audioData;
   }

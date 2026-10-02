@@ -191,24 +191,24 @@ export function createLabPanel({
 
   panel.append(speedGroup);
 
-  // SECCIÓN 3: FORMAS ARMÓNICAS 3D EN ESFERA --------------------------------
+  // SECCIÓN 3: FORMAS ARMÓNICAS Y ARQUETIPOS DE REFERENCIA -----------------
   const presetGroup = document.createElement('div');
   presetGroup.className = 'group';
-  presetGroup.innerHTML = '<h2>Morfologías 3D en la Esfera</h2><p>Pétalos, alas y vórtices tridimensionales:</p>';
+  presetGroup.innerHTML = '<h2>Arquetipos Visuales (Teclas 1–5)</h2><p>Morfologías continuas por fuerzas de Physarum, 36 Points y Craig Reynolds:</p>';
 
   const presets = [
-    { id: 'astrolabe', label: '🌌 1. Astrolabio de Cristal (Órbitas 3D)' },
-    { id: 'tornado', label: '🌀 2. Micro-Vórtices (Captura y Lanzamiento 3D)' },
-    { id: 'cosmicVeil', label: '🌊 3. Velo Cósmico (Membrana Fractal)' },
-    { id: 'celestialLotus', label: '🪽 4. Loto Celestial (Alas de Serafín)' },
-    { id: 'astralPillar', label: '🕯️ 5. Pilar Astral (Alma Ascendente)' }
+    { id: 'cellular', label: '1. Red Celular Bio-Cyan (Ref 1)' },
+    { id: 'iris', label: '2. Iris Cósmico / Fingering (Ref 2)' },
+    { id: 'coral', label: '3. Rosa Coralina Espiral 3D (Ref 3)' },
+    { id: 'fern', label: '4. Helecho Fractal Jade (Ref 4)' },
+    { id: 'spirograph', label: '5. 36 Points Sage Jenson (Ref 5)' }
   ];
 
   const presetGrid = document.createElement('div');
   presetGrid.className = 'preset-grid';
   presets.forEach((p, idx) => {
     const btn = document.createElement('button');
-    btn.textContent = `${idx + 1}. ${p.label}`;
+    btn.textContent = `${p.label}`;
     btn.addEventListener('click', () => {
       onApplyPreset(p.id);
       refreshAll();
@@ -217,7 +217,7 @@ export function createLabPanel({
   });
   presetGroup.append(presetGrid);
 
-  const mutateBtn = button(presetGroup, '🎲 Mutar Visuales (R) · Nueva Semilla 3D', () => {
+  const mutateBtn = button(presetGroup, '🎲 Mutar Visuales (R) · Nueva Semilla', () => {
     onResetVisuals();
     refreshAll();
   }, 'accent-btn');
@@ -225,10 +225,10 @@ export function createLabPanel({
 
   panel.append(presetGroup);
 
-  // SECCIÓN 4: PARÁMETROS DEL CAMPO 3D Y ESFERA -----------------------------
+  // SECCIÓN 4: PARÁMETROS DEL CAMPO 3D Y ESPACIO -----------------------------
   const agentGroup = document.createElement('div');
   agentGroup.className = 'group';
-  agentGroup.innerHTML = '<h2>Agentes y Esfera 3D (Unidad 6)</h2>';
+  agentGroup.innerHTML = '<h2>Agentes y Espacio Visual (Unidad 6)</h2>';
 
   const simState = {
     harmonics: params.harmonics.value,
@@ -239,10 +239,10 @@ export function createLabPanel({
     steerStrength: params.steerStrength.value
   };
 
-  refreshers.push(rangeRow(agentGroup, 'Pétalos / Armónicos (← →)', simState, 'harmonics', 1, 9, 1, (v) => params.harmonics.value = v, () => params.harmonics.value));
+  refreshers.push(rangeRow(agentGroup, 'Pétalos / Septos (← →)', simState, 'harmonics', 1, 9, 1, (v) => params.harmonics.value = v, () => params.harmonics.value));
   refreshers.push(rangeRow(agentGroup, 'Vórtice / Giro (↑ ↓)', simState, 'swirl', -4, 4, 0.1, (v) => params.swirl.value = v, () => params.swirl.value));
-  refreshers.push(rangeRow(agentGroup, 'Pliegues de Seda 3D', simState, 'petalMorph', 0.2, 2.5, 0.05, (v) => params.petalMorph.value = v, () => params.petalMorph.value));
-  refreshers.push(rangeRow(agentGroup, 'Radio Esfera 3D', simState, 'sphereRadius', 3.0, 8.0, 0.1, (v) => params.sphereRadius.value = v, () => params.sphereRadius.value));
+  refreshers.push(rangeRow(agentGroup, 'Pliegues y Frondas 3D', simState, 'petalMorph', 0.2, 2.5, 0.05, (v) => params.petalMorph.value = v, () => params.petalMorph.value));
+  refreshers.push(rangeRow(agentGroup, 'Radio Pantalla Completa', simState, 'sphereRadius', 4.0, 12.0, 0.1, (v) => params.sphereRadius.value = v, () => params.sphereRadius.value));
   refreshers.push(rangeRow(agentGroup, 'Fuerza Maniobra (Steering)', simState, 'steerStrength', 2, 20, 0.5, (v) => params.steerStrength.value = v, () => params.steerStrength.value));
 
   panel.append(agentGroup);
@@ -250,22 +250,22 @@ export function createLabPanel({
   // SECCIÓN 5: ESTÉTICA Y CROMATISMO ----------------------------------------
   const visualGroup = document.createElement('div');
   visualGroup.className = 'group';
-  visualGroup.innerHTML = '<h2>Filamentos y Cromatismo</h2>';
+  visualGroup.innerHTML = '<h2>Filamentos y Cromatismo (Sage Jenson)</h2>';
 
   const visualState = {
     lineLength: params.lineLength.value,
     lineWidth: params.lineWidth.value,
     filamentAlpha: params.filamentAlpha.value,
-    transitionDuration: params.transitionDuration ? params.transitionDuration.value : 20.0
+    transitionDuration: params.transitionDuration ? params.transitionDuration.value : 4.5
   };
 
   const initialPal = params.paletteB ? params.paletteB.value : params.paletteId.value;
   const paletteSelect = selectRow(visualGroup, 'Paleta Espectral (C)', [
-    '0 · Prisma Espectral Arcoíris',
-    '1 · Seda Ópalo y Cristal',
-    '2 · Sol Dorado y Fuego',
-    '3 · Mariposa Neón / Lavanda',
-    '4 · Bioluminiscencia Azul Cian'
+    '0 · Red Celular Bio-Cyan (Ref 1)',
+    '1 · Iris Cósmico Espectral (Ref 2)',
+    '2 · Rosa Coralina Teal y Espuma (Ref 3)',
+    '3 · Helecho Fractal Menta y Jade (Ref 4)',
+    '4 · 36 Points RGB Split (Ref 5)'
   ], initialPal, (idx) => {
     if (onPaletteChange) {
       onPaletteChange(idx);
@@ -308,17 +308,21 @@ export function createLabPanel({
   guide.className = 'quick-guide';
   guide.innerHTML = `
     <strong>Controles en Vivo del Intérprete:</strong><br>
+    • <strong>1</strong>: Red Celular Bio-Cyan (Ref 1)<br>
+    • <strong>2</strong>: Iris Cósmico / Fingering (Ref 2)<br>
+    • <strong>3</strong>: Rosa Coralina Espiral 3D (Ref 3)<br>
+    • <strong>4</strong>: Helecho Fractal Jade (Ref 4)<br>
+    • <strong>5</strong>: 36 Points RGB Split (Ref 5)<br>
     • <strong>P</strong>: Modo PERFORMANCE (pantalla completa limpia).<br>
-    • <strong>Shift</strong>: Mantener para Turbo / Acelerar velocidad.<br>
+    • <strong>Shift</strong>: Mantener para Turbo / Acelerar.<br>
     • <strong>T</strong>: Ciclar velocidad (Lenta / Moderada / Rápida).<br>
-    • <strong>R</strong>: Mutar / Nueva forma 3D sin pausar música.<br>
-    • <strong>1–5</strong>: Cambiar morfología 3D de la pieza.<br>
+    • <strong>R</strong>: Mutar / Nueva semilla sin pausar música.<br>
     • <strong>Espacio</strong>: Acento manual de energía.<br>
     • <strong>C</strong>: Ciclar paleta espectral.<br>
     • <strong>F</strong>: Invertir sentido del flujo.<br>
-    • <strong>↑ / ↓</strong>: Modular giro/vórtice 3D en vivo.<br>
-    • <strong>← / →</strong>: Modular número de pétalos 3D.<br>
-    • <strong>Orbitar ratón</strong>: Rotar la cámara en 360° por la esfera 3D.
+    • <strong>↑ / ↓</strong>: Modular giro/vórtice en vivo.<br>
+    • <strong>← / →</strong>: Modular número de pétalos/septos.<br>
+    • <strong>Arrastrar ratón</strong>: Orbitar la cámara en 360°.
   `;
   actionGroup.append(guide);
   panel.append(actionGroup);
