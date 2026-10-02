@@ -6,6 +6,7 @@ export function createParameters() {
   return {
     dt: uniform(1 / 60),
     timeScale: uniform(1.0),
+    elapsedTime: uniform(0.0), // Tiempo continuo para ondas planetarias y pulsaciones 3D
 
     // Velocidades: lentas, majestuosas y serenas
     initialSpeed: uniform(0.2),

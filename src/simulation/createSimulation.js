@@ -21,6 +21,7 @@ import {
   modelViewMatrix,
   normalize,
   pow,
+  round,
   sign,
   sin,
   smoothstep,
@@ -99,21 +100,41 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     // 1. CAMPOS DE FLUJO 3D MULTICAPA (Inspirados en las 5 referencias visuales)
 
-    // ARQUETIPO 0 (Tecla 1): Astrolabio de Cristal Óptico (Ref: Imagen 1)
-    // Lentes elípticas en planos inclinados cruzados en 3D con caústicas radiales
-    const tiltSign = sign(agentLayer);
-    const planeNorm1 = normalize(vec3(float(0.577).mul(tiltSign), 0.0, 0.816));
-    const toPlane1Dist = p.x.mul(planeNorm1.x).add(p.z.mul(planeNorm1.z));
-    const projOnPlane1 = p.sub(planeNorm1.mul(toPlane1Dist));
-    const rOrbit = length(projOnPlane1).max(0.001);
-    const orbitTargetR = float(3.2).add(agentPhase.mul(0.8));
-    const orbitTangent = cross(planeNorm1, normalize(projOnPlane1));
-    const orbitAttract = normalize(projOnPlane1).mul(orbitTargetR.sub(rOrbit).mul(1.5))
-      .sub(planeNorm1.mul(toPlane1Dist).mul(2.5));
-    const lensSpoke = cos(theta.mul(params.harmonics)).mul(sin(phi.mul(4.0))).mul(params.petalMorph);
-    const flowAstrolabe = orbitTangent.mul(params.swirl.mul(1.4))
-      .add(orbitAttract)
-      .add(radial.mul(lensSpoke.mul(0.8)));
+    // ARQUETIPO 0 (Tecla 1): Ondas Planetarias y Anillos Ópticos Cruzados (Ref: Imagen 1)
+    // Líneas circulares concéntricas hacia el centro + ondas planetarias viajeras hacia afuera
+    // + 4 lóbulos diagonales en cruz (X) con haz de lente horizontal
+    const wavePhase = rho.mul(2.4).sub(params.elapsedTime.mul(2.5));
+    const planetaryWave = sin(wavePhase);
+
+    // 1. Fuerza de gravedad hacia el centro vs onda de expansión planetaria hacia afuera
+    const inwardGravity = float(-1.1).div(rho.mul(0.25).add(0.7));
+    const outwardWave = planetaryWave.mul(2.2);
+    const radialWaveForce = radial.mul(inwardGravity.add(outwardWave).mul(params.flowDirection));
+
+    // 2. Líneas circulares concéntricas (órbitas planetarias en capas continuas)
+    const ringSpacing = float(1.25);
+    const nearestRing = round(rho.div(ringSpacing)).mul(ringSpacing).clamp(1.0, 5.0);
+    const ringAttract = radial.mul(nearestRing.sub(rho).mul(1.3));
+    const circularOrbit = tangent.mul(params.swirl.mul(1.5)).add(ringAttract);
+
+    // 3. Cuatro lóbulos de lente diagonales en cruz (X) inclinados en 3D
+    const diagPattern = sin(theta.mul(2.0));
+    const diagLobe = diagPattern.abs().pow(0.75);
+    const zOrbital = diagPattern.mul(p.x.sub(p.y)).mul(0.26).add(agentZOffset.mul(0.35));
+    const zAttract = vec3(0.0, 0.0, zOrbital.sub(p.z).mul(2.0));
+    const lobeCirculation = radial.mul(diagLobe.mul(planetaryWave).mul(1.6));
+
+    // 4. Haz horizontal de destello óptico (flare streak ecuatorial)
+    const flareMask = abs(agentLayer).lessThan(0.25);
+    const flareAttract = vec3(0.0, p.y.negate(), p.z.negate()).mul(2.2);
+    const flareStream = vec3(sign(p.x).mul(float(1.5).add(planetaryWave.mul(0.8))), 0.0, 0.0);
+    const flareForce = flareAttract.add(flareStream);
+
+    const flowAstrolabe = radialWaveForce
+      .add(circularOrbit)
+      .add(zAttract)
+      .add(lobeCirculation)
+      .add(flareMask.select(flareForce, vec3(0.0)));
 
     // ARQUETIPO 1 (Tecla 2): Vórtice de Plasma / Tornado de Seda (Ref: Imagen 2)
     // Reloj de arena hiperbólico con succión vorticial y cintas helicoidales

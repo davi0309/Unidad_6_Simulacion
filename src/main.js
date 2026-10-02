@@ -326,6 +326,9 @@ async function main() {
     const dt = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
 
+    // Tiempo acumulado para ondas planetarias viajeras y pulsaciones armónicas
+    if (params.elapsedTime) params.elapsedTime.value += dt;
+
     // Deriva lenta y continua del espectro: los colores fluyen orgánicamente por los filamentos 3D
     params.chromaShift.value += dt * 0.035;
 
