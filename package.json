@@ -1,6 +1,6 @@
 {
-  "name": "forces-instrument-u3",
-  "version": "1.0.0",
+  "name": "heal-visual-instrument",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "lil-gui": "^0.21.0",
     "three": "0.185.1"
   },
   "devDependencies": {
+    "typescript": "^7.0.2",
     "vite": "8.2.1"
   }
 }
