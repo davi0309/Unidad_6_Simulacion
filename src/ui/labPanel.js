@@ -76,7 +76,8 @@ export function createLabPanel({
   onResetVisuals,
   onApplyPreset,
   onModeChange,
-  onSpeedChange
+  onSpeedChange,
+  onBlendingChange
 }) {
   const refreshers = [];
   const panel = document.createElement('aside');
@@ -86,10 +87,10 @@ export function createLabPanel({
     <p>Agentes autónomos en esfera 3D. Conduces la morfología en tiempo real.</p>
   `;
 
-  // SECCIÓN 1: REPRODUCTOR DE MÚSICA Y VÚMETROS ------------------------------
+  // SECCIÓN 1: REPRODUCTOR DE MÚSICA Y PALETA ESPECTRAL ---------------------
   const audioGroup = document.createElement('div');
   audioGroup.className = 'group audio-group';
-  audioGroup.innerHTML = '<h2>Música de Acompañamiento</h2><p>El sonido ilumina los filamentos. Tú conduces el movimiento.</p>';
+  audioGroup.innerHTML = '<h2>Música y Paletas Espectrales</h2><p>La canción cambia automáticamente la paleta espectral según la etapa musical. Cero afectación al brillo.</p>';
 
   const trackInfo = document.createElement('div');
   trackInfo.className = 'track-info';
@@ -130,20 +131,11 @@ export function createLabPanel({
   audioControls.append(playBtn, fileLabel);
   audioGroup.append(audioControls);
 
-  const vuWrap = document.createElement('div');
-  vuWrap.className = 'vu-wrap';
-  vuWrap.innerHTML = `
-    <div class="vu-bar"><div class="vu-fill" id="vu-bass"></div><span>Fulgor</span></div>
-    <div class="vu-bar"><div class="vu-fill" id="vu-mid"></div><span>Medios</span></div>
-    <div class="vu-bar"><div class="vu-fill" id="vu-treble"></div><span>Destello</span></div>
-    <div class="vu-bar"><div class="vu-fill" id="vu-pulse"></div><span>Brillo</span></div>
-  `;
-  audioGroup.append(vuWrap);
-
-  const vuBass = vuWrap.querySelector('#vu-bass');
-  const vuMid = vuWrap.querySelector('#vu-mid');
-  const vuTreble = vuWrap.querySelector('#vu-treble');
-  const vuPulse = vuWrap.querySelector('#vu-pulse');
+  const stageInfo = document.createElement('div');
+  stageInfo.className = 'stage-info';
+  stageInfo.style.cssText = 'margin-top: 8px; font-size: 11.5px; padding: 8px 10px; background: rgba(56, 139, 253, 0.12); border: 1px solid rgba(56, 139, 253, 0.35); border-radius: 6px; color: #79c0ff; line-height: 1.4;';
+  stageInfo.innerHTML = '<strong>Etapa Activa:</strong> Pulsa Reproducir para iniciar la conducción.';
+  audioGroup.append(stageInfo);
 
   panel.append(audioGroup);
 
@@ -261,10 +253,11 @@ export function createLabPanel({
 
   const visualState = {
     lineLength: params.lineLength.value,
-    lineWidth: params.lineWidth.value
+    lineWidth: params.lineWidth.value,
+    filamentAlpha: params.filamentAlpha.value
   };
 
-  selectRow(visualGroup, 'Paleta Espectral (C)', [
+  const paletteSelect = selectRow(visualGroup, 'Paleta Espectral (C)', [
     '0 · Prisma Espectral Arcoíris',
     '1 · Seda Ópalo y Cristal',
     '2 · Sol Dorado y Fuego',
@@ -274,8 +267,22 @@ export function createLabPanel({
     params.paletteId.value = idx;
   });
 
+  refreshers.push({
+    refresh() {
+      paletteSelect.value = String(Math.round(params.paletteId.value));
+    }
+  });
+
+  selectRow(visualGroup, 'Mezcla de Color', [
+    'Seda de Color Puro (Sin Blanco)',
+    'Luz Resplandeciente (Aditivo)'
+  ], 0, (idx) => {
+    onBlendingChange?.(idx === 0 ? 'normal' : 'additive');
+  });
+
   refreshers.push(rangeRow(visualGroup, 'Longitud Filamento', visualState, 'lineLength', 0.1, 1.2, 0.02, (v) => params.lineLength.value = v, () => params.lineLength.value));
   refreshers.push(rangeRow(visualGroup, 'Grosor Línea', visualState, 'lineWidth', 0.008, 0.06, 0.002, (v) => params.lineWidth.value = v, () => params.lineWidth.value));
+  refreshers.push(rangeRow(visualGroup, 'Opacidad de Seda', visualState, 'filamentAlpha', 0.04, 0.4, 0.01, (v) => params.filamentAlpha.value = v, () => params.filamentAlpha.value));
 
   panel.append(visualGroup);
 
@@ -311,13 +318,12 @@ export function createLabPanel({
     for (const item of refreshers) item.refresh();
   }
 
-  function updateAudioMeters(audioData) {
-    if (vuBass) vuBass.style.width = `${Math.min(100, audioData.bass * 100)}%`;
-    if (vuMid) vuMid.style.width = `${Math.min(100, audioData.mid * 100)}%`;
-    if (vuTreble) vuTreble.style.width = `${Math.min(100, audioData.treble * 100)}%`;
-    if (vuPulse) {
-      vuPulse.style.width = `${Math.min(100, (audioData.bass * 0.7 + audioData.energy * 0.4) * 100)}%`;
-    }
+  function updateAudioMeters() {
+    // Los vúmetros se han retirado; el audio modula exclusivamente la paleta según la etapa
+  }
+
+  function setStageInfo(htmlContent) {
+    if (stageInfo) stageInfo.innerHTML = htmlContent;
   }
 
   return {
@@ -325,6 +331,7 @@ export function createLabPanel({
     setVisible(visible) { panel.classList.toggle('hidden', !visible); },
     refresh: refreshAll,
     updateAudioMeters,
-    updateSpeedButtons
+    updateSpeedButtons,
+    setStageInfo
   };
 }

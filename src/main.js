@@ -155,7 +155,8 @@ async function main() {
     onResetVisuals: () => simulation.resetVisuals(),
     onApplyPreset: applyPreset,
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
-    onSpeedChange: (mult) => setSpeedMultiplier(mult)
+    onSpeedChange: (mult) => setSpeedMultiplier(mult),
+    onBlendingChange: (bMode) => simulation.setBlendingMode(bMode)
   });
 
   setMode('LAB');
@@ -249,12 +250,57 @@ async function main() {
   simulation.reset();
 
   // FRAME ANIMATION LOOP ---------------------------------------------------
+  let lastStage = -1;
   renderer.setAnimationLoop(() => {
     const audio = audioManager.update();
 
-    // El audio modula únicamente iluminación y fulgor sutil
-    params.audioGlow.value = audio.bass * 0.7 + audio.energy * 0.4;
-    params.audioShimmer.value = audio.treble;
+    // LA MÚSICA ÚNICAMENTE CAMBIA LA PALETA ESPECTRAL SEGÚN LA ETAPA DE LA CANCIÓN
+    if (audioManager.getIsPlaying()) {
+      const curTime = audioManager.getCurrentTime();
+      const duration = audioManager.getDuration();
+      let currentStage = 0;
+
+      let stageDesc = '';
+      if (duration > 0 && duration <= 230) {
+        // Estructura específica para Motion Picture Soundtrack de Radiohead
+        if (curTime < 52) {
+          currentStage = 4; // Etapa 1: Armonio solo -> Azul Cian Profundo
+          stageDesc = '🎹 <strong>Etapa 1 (0:00 - 0:52):</strong> Armonio solitario<br>✦ Paleta: <em>Bioluminiscencia Azul Cian</em>';
+        } else if (curTime < 90) {
+          currentStage = 1; // Etapa 2: Contrabajo -> Seda Ópalo y Amatista
+          stageDesc = '🎻 <strong>Etapa 2 (0:52 - 1:30):</strong> Entrada de bajo y melancolía<br>✦ Paleta: <em>Seda Ópalo y Amatista</em>';
+        } else if (curTime < 140) {
+          currentStage = 0; // Etapa 3: Arpa y Coros -> Prisma Espectral Arcoíris
+          stageDesc = '✨ <strong>Etapa 3 (1:30 - 2:20):</strong> Clímax celestial con arpas<br>✦ Paleta: <em>Prisma Espectral Arcoíris</em>';
+        } else {
+          currentStage = 2; // Etapa 4: Coda y Desvanecimiento -> Fuego Dorado y Ámbar
+          stageDesc = '🌅 <strong>Etapa 4 (2:20 - Fin):</strong> Coda final ("I will see you...")<br>✦ Paleta: <em>Fuego Dorado y Ámbar</em>';
+        }
+      } else if (duration > 0) {
+        // Para cualquier otra canción según su porcentaje de avance
+        const prog = curTime / duration;
+        if (prog < 0.25) {
+          currentStage = 4;
+          stageDesc = '🎵 <strong>Etapa 1 (0-25%):</strong> Introducción<br>✦ Paleta: <em>Bioluminiscencia Azul Cian</em>';
+        } else if (prog < 0.50) {
+          currentStage = 1;
+          stageDesc = '🎵 <strong>Etapa 2 (25-50%):</strong> Desarrollo armónico<br>✦ Paleta: <em>Seda Ópalo y Amatista</em>';
+        } else if (prog < 0.75) {
+          currentStage = 0;
+          stageDesc = '🎵 <strong>Etapa 3 (50-75%):</strong> Clímax sonoro<br>✦ Paleta: <em>Prisma Espectral Arcoíris</em>';
+        } else {
+          currentStage = 2;
+          stageDesc = '🎵 <strong>Etapa 4 (75-100%):</strong> Conclusión<br>✦ Paleta: <em>Fuego Dorado y Ámbar</em>';
+        }
+      }
+
+      if (currentStage !== lastStage) {
+        lastStage = currentStage;
+        params.paletteId.value = currentStage;
+        if (panel?.refresh) panel.refresh();
+        if (panel?.setStageInfo) panel.setStageInfo(stageDesc);
+      }
+    }
 
     if (mode === 'LAB') {
       panel.updateAudioMeters(audio);

@@ -7,29 +7,30 @@ export function createParameters() {
     dt: uniform(1 / 60),
     timeScale: uniform(1.0),
 
-    // Velocidades: por defecto más lentas, serenas y majestuosas
-    initialSpeed: uniform(0.18),
-    maxSpeed: uniform(1.8),            // Velocidad base lenta para apreciar las formas
-    speedMultiplier: uniform(1.0),     // Modulador dinámico (1.0 = Lenta, 1.8 = Normal, 3.0 = Rápida)
+    // Velocidades: lentas, majestuosas y serenas
+    initialSpeed: uniform(0.2),
+    maxSpeed: uniform(1.6),            // Velocidad base suave
+    speedMultiplier: uniform(1.0),     // Modulador dinámico (1.0 = Lenta, 1.8 = Normal, 2.8 = Rápida)
 
     // Esfera 3D contenedora
-    sphereRadius: uniform(5.2),        // Radio de la gran esfera 3D donde habitan los agentes
+    sphereRadius: uniform(5.5),        // Radio amplio para que los agentes llenen todo el espacio 3D
     boundsSize: uniform(14.0),
 
-    // Dimensiones de los filamentos luminosos (más visibles y definidos)
-    lineWidth: uniform(0.024),         // Grosor mayor para máxima nitidez de figura
-    lineLength: uniform(0.48),         // Longitud de filamento extendida
+    // Geometría y opacidad de los filamentos (Colores vivos sobre fondo negro)
+    lineWidth: uniform(0.024),         // Líneas finas y nítidas
+    lineLength: uniform(0.42),         // Longitud de filamento
+    filamentAlpha: uniform(0.45),      // Opacidad translúcida calibrada para colores vivos sin blanquear
 
-    // Dinámica de agentes autónomos y conducción (Craig Reynolds)
-    steerStrength: uniform(8.5),       // Mayor fuerza de maniobra para figuras muy nítidas
-    dragCoefficient: uniform(0.08),
+    // Dinámica de agentes autónomos (Craig Reynolds)
+    steerStrength: uniform(5.2),       // Maniobra fluida orgánica
+    dragCoefficient: uniform(0.05),
 
     // Campo de flujo armónico 3D
-    harmonics: uniform(4.0),           // Número de pétalos / orden armónico 3D
-    symmetryType: uniform(0.0),        // 0: Flor 3D, 1: Alas/Mariposa 3D, 2: Vórtice Toroidal 3D, 3: Supernova 3D, 4: Rayos
-    swirl: uniform(1.2),               // Vorticidad y giro 3D
-    curlStrength: uniform(0.55),       // Turbulencia curl suave
-    petalMorph: uniform(1.2),          // Definición y curvatura de los pétalos 3D
+    harmonics: uniform(5.0),           // 5 pétalos / orden armónico 3D
+    symmetryType: uniform(0.0),        // 0: Flor 3D, 1: Alas/Mariposa 3D, 2: Toroide 3D, 3: Supernova 3D, 4: Rayos
+    swirl: uniform(1.1),               // Giro armónico
+    curlStrength: uniform(0.85),       // Ruido curl 3D amplio para movimientos orgánicos
+    petalMorph: uniform(1.3),          // Amplitud de pétalos/alas 3D
     flowDirection: uniform(1.0),       // 1.0 hacia afuera, -1.0 hacia adentro
 
     // Conducción del intérprete
@@ -37,12 +38,8 @@ export function createParameters() {
     attractorStrength: uniform(0.0),   // Fuerza del conductor con el ratón
     userPulse: uniform(0.0),           // Acento manual (Espacio)
 
-    // Audio: modula únicamente iluminación y fulgor
-    audioGlow: uniform(0.0),
-    audioShimmer: uniform(0.0),
-
-    // Estética espectral y dispersión cromática (efecto prisma)
-    paletteId: uniform(0.0),
+    // Estética espectral y paletas de color (controladas por la etapa de la música)
+    paletteId: uniform(4.0),           // 0: Prisma Espectral, 1: Seda Ópalo, 2: Sol Dorado, 3: Mariposa Neón, 4: Azul Cian
     chromaShift: uniform(0.0),
     dispersion: uniform(0.85),
 
