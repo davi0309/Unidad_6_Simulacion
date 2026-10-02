@@ -87,6 +87,27 @@ async function main() {
     }
   });
 
+  // CONTROLADOR DE TRANSICIÓN GRADUAL DE COLORES (CERO SALTOS BRUSCOS) -----
+  let transitionDuration = 4.5; // duración en segundos de la transición
+
+  const transitionToPalette = (targetId, duration = 4.5) => {
+    const roundedTarget = Math.round(targetId);
+    if (Math.round(params.paletteB.value) === roundedTarget && params.paletteMix.value >= 1.0) {
+      return;
+    }
+
+    if (params.paletteMix.value < 1.0) {
+      params.paletteA.value = params.paletteMix.value > 0.5 ? params.paletteB.value : params.paletteA.value;
+    } else {
+      params.paletteA.value = params.paletteB.value;
+    }
+
+    params.paletteB.value = roundedTarget;
+    params.paletteId.value = roundedTarget;
+    params.paletteMix.value = 0.0;
+    transitionDuration = Math.max(0.5, duration);
+  };
+
   // ARQUETIPOS GENERATIVOS 3D ----------------------------------------------
   const applyPreset = (id) => {
     if (id === 'silkFlower') {
@@ -96,7 +117,7 @@ async function main() {
       params.swirl.value = 1.3;
       params.petalMorph.value = 1.25;
       params.curlStrength.value = 0.55;
-      params.paletteId.value = 1.0;
+      transitionToPalette(1.0, 3.5);
     } else if (id === 'wings') {
       // Alas Cósmicas 3D: lóbulos de mariposa con simetría bilateral
       params.harmonics.value = 2.0;
@@ -104,7 +125,7 @@ async function main() {
       params.swirl.value = 0.9;
       params.petalMorph.value = 1.45;
       params.curlStrength.value = 0.65;
-      params.paletteId.value = 3.0;
+      transitionToPalette(3.0, 3.5);
     } else if (id === 'nebulaVortex') {
       // Vórtice Toroidal 3D: toroide y circulación poloidal
       params.harmonics.value = 3.0;
@@ -112,7 +133,7 @@ async function main() {
       params.swirl.value = 2.4;
       params.petalMorph.value = 0.8;
       params.curlStrength.value = 0.95;
-      params.paletteId.value = 2.0;
+      transitionToPalette(2.0, 3.5);
     } else if (id === 'supernova') {
       // Supernova 3D: radiación esférica con ondulación armónica
       params.harmonics.value = 8.0;
@@ -120,7 +141,7 @@ async function main() {
       params.swirl.value = 0.4;
       params.petalMorph.value = 1.5;
       params.curlStrength.value = 0.45;
-      params.paletteId.value = 0.0;
+      transitionToPalette(0.0, 3.5);
     } else if (id === 'causticRays') {
       // Rayos Helicoidales 3D: corrientes helicoidales en el eje vertical
       params.harmonics.value = 1.0;
@@ -128,7 +149,7 @@ async function main() {
       params.swirl.value = 0.3;
       params.petalMorph.value = 0.6;
       params.curlStrength.value = 1.1;
-      params.paletteId.value = 4.0;
+      transitionToPalette(4.0, 3.5);
     }
     simulation.resetVisuals();
   };
@@ -156,7 +177,8 @@ async function main() {
     onApplyPreset: applyPreset,
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onSpeedChange: (mult) => setSpeedMultiplier(mult),
-    onBlendingChange: (bMode) => simulation.setBlendingMode(bMode)
+    onBlendingChange: (bMode) => simulation.setBlendingMode(bMode),
+    onPaletteChange: (idx) => transitionToPalette(idx, 2.5)
   });
 
   setMode('LAB');
@@ -192,9 +214,10 @@ async function main() {
     if (event.code === 'Digit4') { applyPreset('supernova'); panel.refresh(); }
     if (event.code === 'Digit5') { applyPreset('causticRays'); panel.refresh(); }
 
-    // C: Ciclar paleta de color
+    // C: Ciclar paleta de color con transición gradual suave
     if (event.code === 'KeyC' && !event.repeat) {
-      params.paletteId.value = (params.paletteId.value + 1) % 5;
+      const nextPal = (Math.round(params.paletteB.value) + 1) % 5;
+      transitionToPalette(nextPal, 2.8);
       panel.refresh();
     }
 
@@ -251,7 +274,21 @@ async function main() {
 
   // FRAME ANIMATION LOOP ---------------------------------------------------
   let lastStage = -1;
+  let lastTime = performance.now();
+
   renderer.setAnimationLoop(() => {
+    const now = performance.now();
+    const dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+
+    // Deriva lenta y continua del espectro: los colores fluyen orgánicamente por los filamentos 3D
+    params.chromaShift.value += dt * 0.035;
+
+    // Interpolación suave y gradual entre paletas (avanza de a poco)
+    if (params.paletteMix.value < 1.0) {
+      params.paletteMix.value = Math.min(1.0, params.paletteMix.value + dt / transitionDuration);
+    }
+
     const audio = audioManager.update();
 
     // LA MÚSICA ÚNICAMENTE CAMBIA LA PALETA ESPECTRAL SEGÚN LA ETAPA DE LA CANCIÓN
@@ -296,7 +333,8 @@ async function main() {
 
       if (currentStage !== lastStage) {
         lastStage = currentStage;
-        params.paletteId.value = currentStage;
+        // Transición lenta, majestuosa y etérea de 6.0 segundos
+        transitionToPalette(currentStage, 6.0);
         if (panel?.refresh) panel.refresh();
         if (panel?.setStageInfo) panel.setStageInfo(stageDesc);
       }

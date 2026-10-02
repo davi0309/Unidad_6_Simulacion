@@ -77,7 +77,8 @@ export function createLabPanel({
   onApplyPreset,
   onModeChange,
   onSpeedChange,
-  onBlendingChange
+  onBlendingChange,
+  onPaletteChange
 }) {
   const refreshers = [];
   const panel = document.createElement('aside');
@@ -257,19 +258,25 @@ export function createLabPanel({
     filamentAlpha: params.filamentAlpha.value
   };
 
+  const initialPal = params.paletteB ? params.paletteB.value : params.paletteId.value;
   const paletteSelect = selectRow(visualGroup, 'Paleta Espectral (C)', [
     '0 · Prisma Espectral Arcoíris',
     '1 · Seda Ópalo y Cristal',
     '2 · Sol Dorado y Fuego',
     '3 · Mariposa Neón / Lavanda',
     '4 · Bioluminiscencia Azul Cian'
-  ], params.paletteId.value, (idx) => {
-    params.paletteId.value = idx;
+  ], initialPal, (idx) => {
+    if (onPaletteChange) {
+      onPaletteChange(idx);
+    } else {
+      params.paletteId.value = idx;
+    }
   });
 
   refreshers.push({
     refresh() {
-      paletteSelect.value = String(Math.round(params.paletteId.value));
+      const activeVal = params.paletteB ? params.paletteB.value : params.paletteId.value;
+      paletteSelect.value = String(Math.round(activeVal));
     }
   });
 

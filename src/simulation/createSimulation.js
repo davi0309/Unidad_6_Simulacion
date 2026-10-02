@@ -22,6 +22,7 @@ import {
   pow,
   sign,
   sin,
+  smoothstep,
   uint,
   uv,
   vec2,
@@ -230,9 +231,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     return vec2(len, params.lineWidth);
   })();
 
-  // COLOR ESPECTRAL 100% PURO:
-  // La música SOLO cambia la paleta espectral.
-  // NO hay modificadores de brillo, ni multiplicadores de volumen, ni blanco.
+  // COLOR ESPECTRAL 100% PURO CON TRANSICIÓN GRADUAL:
+  // La música y el intérprete modulan transiciones suaves entre paletas a lo largo de varios segundos.
+  // Cero escalones bruscos, cero blanco, mezcla suave tipo seda / acuarela viva.
   material.colorNode = Fn(() => {
     const pAttr = positionBuffer.toAttribute();
     const rDist = length(pAttr).mul(0.12);
@@ -240,40 +241,49 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const t = ang.add(rDist).add(params.chromaShift);
 
-    // Paleta 0: Prisma Espectral Arcoíris Puro (Cian, Violeta, Naranja, Esmeralda)
-    const c0 = cos(t.mul(6.2831853).add(vec3(0.0, 2.094, 4.188))).mul(0.5).add(0.5);
+    // Función constructora de paletas espectrales puras
+    const samplePalette = (idNode, tVal) => {
+      // Paleta 0: Prisma Espectral Arcoíris Puro (Cian, Violeta, Naranja, Esmeralda)
+      const c0 = cos(tVal.mul(6.2831853).add(vec3(0.0, 2.094, 4.188))).mul(0.5).add(0.5);
 
-    // Paleta 1: Seda Ópalo y Amatista (Turquesa intenso, magenta vivo, violeta y rosa)
-    const c1 = cos(t.mul(6.2831853).add(vec3(0.8, 0.1, 0.9))).mul(0.5).add(0.5);
+      // Paleta 1: Seda Ópalo y Amatista (Turquesa intenso, magenta vivo, violeta y rosa)
+      const c1 = cos(tVal.mul(6.2831853).add(vec3(0.8, 0.1, 0.9))).mul(0.5).add(0.5);
 
-    // Paleta 2: Fuego Dorado y Ámbar (Rojo rubí, naranja fuego, oro cálido)
-    const c2 = vec3(
-      cos(t.mul(4.0)).mul(0.48).add(0.52),
-      cos(t.mul(4.0).add(1.2)).mul(0.38).add(0.42),
-      cos(t.mul(4.0).add(2.4)).mul(0.15)
-    );
+      // Paleta 2: Fuego Dorado y Ámbar (Rojo rubí, naranja fuego, oro cálido)
+      const c2 = vec3(
+        cos(tVal.mul(4.0)).mul(0.48).add(0.52),
+        cos(tVal.mul(4.0).add(1.2)).mul(0.38).add(0.42),
+        cos(tVal.mul(4.0).add(2.4)).mul(0.15)
+      );
 
-    // Paleta 3: Neón Lavanda / Mariposa (Azul cobalto profundo, violeta eléctrico, rosa neón)
-    const c3 = vec3(
-      cos(t.mul(5.0).add(0.2)).mul(0.48).add(0.52),
-      cos(t.mul(5.0).add(2.0)).mul(0.15).add(0.1),
-      cos(t.mul(5.0).add(4.0)).mul(0.5).add(0.5)
-    );
+      // Paleta 3: Neón Lavanda / Mariposa (Azul cobalto profundo, violeta eléctrico, rosa neón)
+      const c3 = vec3(
+        cos(tVal.mul(5.0).add(0.2)).mul(0.48).add(0.52),
+        cos(tVal.mul(5.0).add(2.0)).mul(0.15).add(0.1),
+        cos(tVal.mul(5.0).add(4.0)).mul(0.5).add(0.5)
+      );
 
-    // Paleta 4: Azul Cian y Océano Profundo (Azul marino puro, cian eléctrico, esmeralda)
-    const c4 = vec3(
-      cos(t.mul(6.0).add(3.0)).mul(0.1),
-      cos(t.mul(6.0).add(1.0)).mul(0.45).add(0.55),
-      cos(t.mul(6.0)).mul(0.45).add(0.55)
-    );
+      // Paleta 4: Azul Cian y Océano Profundo (Azul marino puro, cian eléctrico, esmeralda)
+      const c4 = vec3(
+        cos(tVal.mul(6.0).add(3.0)).mul(0.1),
+        cos(tVal.mul(6.0).add(1.0)).mul(0.45).add(0.55),
+        cos(tVal.mul(6.0)).mul(0.45).add(0.55)
+      );
 
-    // Selección de la paleta dictada por la etapa de la música o el intérprete
-    const palIdx = floor(params.paletteId.add(0.5));
-    const finalCol = c0.toVar();
-    If(palIdx.equal(1.0), () => { finalCol.assign(c1); });
-    If(palIdx.equal(2.0), () => { finalCol.assign(c2); });
-    If(palIdx.equal(3.0), () => { finalCol.assign(c3); });
-    If(palIdx.equal(4.0), () => { finalCol.assign(c4); });
+      const pIdx = floor(idNode.add(0.5));
+      const col = c0.toVar();
+      If(pIdx.equal(1.0), () => { col.assign(c1); });
+      If(pIdx.equal(2.0), () => { col.assign(c2); });
+      If(pIdx.equal(3.0), () => { col.assign(c3); });
+      If(pIdx.equal(4.0), () => { col.assign(c4); });
+      return col;
+    };
+
+    // Interpolación no lineal ultrasuave (smoothstep) entre Paleta A y Paleta B
+    const colA = samplePalette(params.paletteA, t);
+    const colB = samplePalette(params.paletteB, t);
+    const easeMix = smoothstep(float(0.0), float(1.0), params.paletteMix.clamp(0.0, 1.0));
+    const finalCol = mix(colA, colB, easeMix);
 
     return vec4(finalCol, 1.0);
   })();

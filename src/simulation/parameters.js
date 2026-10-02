@@ -38,9 +38,12 @@ export function createParameters() {
     attractorStrength: uniform(0.0),   // Fuerza del conductor con el ratón
     userPulse: uniform(0.0),           // Acento manual (Espacio)
 
-    // Estética espectral y paletas de color (controladas por la etapa de la música)
-    paletteId: uniform(4.0),           // 0: Prisma Espectral, 1: Seda Ópalo, 2: Sol Dorado, 3: Mariposa Neón, 4: Azul Cian
-    chromaShift: uniform(0.0),
+    // Estética espectral y transición suave entre paletas
+    paletteId: uniform(4.0),           // Paleta activa / objetivo
+    paletteA: uniform(4.0),            // Paleta origen en la transición
+    paletteB: uniform(4.0),            // Paleta destino en la transición
+    paletteMix: uniform(1.0),          // 0.0 (Paleta A) -> 1.0 (Paleta B), interpolación suave
+    chromaShift: uniform(0.0),         // Desplazamiento cromático continuo (deriva lenta orgánica)
     dispersion: uniform(0.85),
 
     // Semilla procedural
