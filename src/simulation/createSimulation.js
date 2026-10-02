@@ -55,8 +55,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     // Distribución tridimensional amplia cubriendo toda la pantalla de borde a borde
     const theta = r1.mul(6.2831853);
-    const rad = pow(r3, 0.55).mul(params.sphereRadius.mul(0.96)).add(0.2);
-    const zSpread = r2.sub(0.5).mul(params.sphereRadius.mul(0.35));
+    const rad = pow(r3, 0.65).mul(params.sphereRadius.mul(0.96)).add(0.1);
+    const zSpread = r2.sub(0.5).mul(0.25);
 
     p.assign(vec3(
       rad.mul(cos(theta)),
@@ -101,36 +101,48 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // =========================================================================
 
     // ARQUETIPO 0 (Tecla 1 - Ref: media_1790970695936.png):
-    // Sección Transversal Botánica Vascular (Tallo Acuático / Nelumbo / Equisetum)
-    // 1. Núcleo medular central poroso (r < 1.9) con anillo circular doble
-    // 2. 18 trabéculas / columnas radiales gruesas que irradian desde el núcleo
-    // 3. 4 capas concéntricas de lagunas / alvéolos aéreos (células poligonales oscuras rodeadas de paredes brillantes)
-    // 4. Corteza exterior festoneada y ondulada (scalloped perimeter con 12 lóbulos)
-    const uTheta0 = cos(theta.mul(18.0));
-    const bassPulse0 = params.audioBass.mul(0.45);
-    const effRho0 = rho.sub(bassPulse0).max(0.001);
-    const uRho0 = pow(effRho0.max(1.9).sub(1.9).div(7.5), 0.72).mul(12.566);
+    // Tallo Botánico Vascular (Corte transversal microscópico fluorescente)
+    // 1. Núcleo medular central poroso (rho < 1.25)
+    // 2. 16 sectores radiales / columnas trabeculares
+    // 3. 4 capas de alvéolos/lagunas: 16 pequeñas internas, 16 medias, 16 GRANDES principales y 32 corticales
+    // 4. Perímetro festoneado con 12 lóbulos ondulados (corteza exterior a r ~ 5.65)
+    const calcCavity = (rMin, rMax, spokeN, phaseVal) => {
+      const rc = float((rMin + rMax) * 0.5);
+      const dr = float((rMax - rMin) * 0.5);
+      const phase = float(phaseVal);
+      const barR = rho.sub(rc).div(dr);
+      const inRadial = barR.abs().lessThan(1.0);
+      const uTheta = cos(theta.mul(spokeN).add(phase));
+      // Fuerza radial hacia los anillos divisorios de las paredes
+      const fRad = radial.mul(barR.mul(uTheta.mul(uTheta)).mul(2.2).div(dr));
+      // Fuerza tangencial hacia las trabéculas radiales
+      const fTan = tangent.mul(sin(theta.mul(spokeN).mul(2.0).add(phase.mul(2.0))).negate().mul(float(1.0).sub(barR.mul(barR)).max(0.0)).mul(1.8));
+      return inRadial.select(fRad.add(fTan), vec3(0.0));
+    };
 
-    // Perímetro festoneado y ondulado de la corteza exterior (12 lóbulos con micro-ondulaciones)
-    const rCortex0 = float(9.4).add(cos(theta.mul(12.0)).mul(0.65)).add(sin(theta.mul(24.0)).mul(0.25));
+    const fCavity1 = calcCavity(1.25, 2.10, 16.0, 0.0);
+    const fCavity2 = calcCavity(2.10, 3.25, 16.0, 0.3927);
+    const fCavity3 = calcCavity(3.25, 4.80, 16.0, 0.0);       // Las 16 grandes lagunas principales
+    const fCavity4 = calcCavity(4.80, 5.45, 32.0, 0.0);       // Honeycomb exterior
 
-    // Fuerzas hacia las paredes de las lagunas:
-    // fTier0: atrae a los anillos concéntricos divisorios
-    const fTier0 = radial.mul(sin(uRho0).mul(-1.5).mul(params.flowDirection));
-    // fSpoke0: atrae a los 18 septos radiales (trabéculas)
-    const fSpoke0 = tangent.mul(sin(theta.mul(18.0)).mul(-1.3));
-    // fCirc0: circulación continua por los muros y canales vasculares
-    const fCirc0 = tangent.mul(params.swirl.mul(1.15).add(0.55).add(uTheta0.mul(0.4)));
+    const totalCavityForces = fCavity1.add(fCavity2).add(fCavity3).add(fCavity4);
 
-    // Núcleo medular interno (r < 1.9): micro-poros densos y vórtice suave
-    const inCore0 = effRho0.lessThan(1.9);
-    const fCore0 = tangent.mul(1.6).add(radial.mul(float(1.9).sub(effRho0).mul(2.2)));
+    // Borde exterior festoneado (12 lóbulos ondulados de la corteza)
+    const rCortex0 = float(5.65).add(cos(theta.mul(12.0)).mul(0.32)).add(sin(theta.mul(24.0)).mul(0.12));
 
-    // Corteza exterior (r > rCortex0): contención estricta que traza el borde ondulado
-    const fRim0 = radial.mul(effRho0.sub(rCortex0).max(0.0).mul(-7.0));
+    // Núcleo medular central (rho < 1.25): estopilla porosa y rotación suave
+    const inCore0 = rho.lessThan(1.25);
+    const fCore0 = tangent.mul(1.5).add(radial.mul(float(1.25).sub(rho).mul(3.0)));
+
+    // Contención periférica estricta en la corteza exterior
+    const fRim0 = radial.mul(rho.sub(rCortex0).max(0.0).mul(-8.0));
+
+    // Circulación continua por las paredes de la red celular
+    const fCirc0 = tangent.mul(params.swirl.mul(0.7).add(0.4)).add(radial.mul(sin(rho.mul(6.0)).mul(0.25)));
+
     const zCellular0 = vec3(0.0, 0.0, p.z.negate().mul(3.5));
 
-    const flowCellular = inCore0.select(fCore0, fTier0.add(fSpoke0).add(fCirc0))
+    const flowCellular = inCore0.select(fCore0, totalCavityForces.add(fCirc0))
       .add(fRim0)
       .add(zCellular0);
 
@@ -191,17 +203,29 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       const qTheta = atan(q.y, q.x);
 
       // ARQUETIPO 0: Potencial escalar de paredes celulares y trabéculas botánicas
-      const qEffRho0 = qRho.sub(params.audioBass.mul(0.45)).max(0.001);
-      const qURho0 = pow(qEffRho0.max(1.9).sub(1.9).div(7.5), 0.72).mul(12.566);
-      const qRCortex0 = float(9.4).add(cos(qTheta.mul(12.0)).mul(0.65));
-      const sCore = float(1.0).div(qEffRho0.sub(1.9).abs().mul(4.0).add(1.0)).mul(1.5);
-      const sRim = float(1.0).div(qEffRho0.sub(qRCortex0).abs().mul(4.0).add(1.0)).mul(1.4);
-      const sSpokes = cos(qTheta.mul(18.0)).mul(0.6);
-      const sTiers = cos(qURho0).mul(0.6);
-      const sCavityWalls = sSpokes.add(sTiers)
-        .mul(smoothstep(float(1.8), float(2.3), qEffRho0))
-        .mul(smoothstep(qRCortex0.add(0.4), qRCortex0.sub(0.4), qEffRho0));
-      const r0 = max(max(sCore, sRim), sCavityWalls.add(0.4));
+      const calcCavityP = (qR, qT, rMin, rMax, spokeN, phaseVal) => {
+        const rc = float((rMin + rMax) * 0.5);
+        const dr = float((rMax - rMin) * 0.5);
+        const phase = float(phaseVal);
+        const barR = qR.sub(rc).div(dr);
+        const inRadial = barR.abs().lessThan(1.0);
+        const uTheta = cos(qT.mul(spokeN).add(phase));
+        const P = float(1.0).sub(barR.mul(barR)).max(0.0).mul(uTheta.mul(uTheta));
+        return inRadial.select(P, float(0.0));
+      };
+
+      const p1 = calcCavityP(qRho, qTheta, 1.25, 2.10, 16.0, 0.0);
+      const p2 = calcCavityP(qRho, qTheta, 2.10, 3.25, 16.0, 0.3927);
+      const p3 = calcCavityP(qRho, qTheta, 3.25, 4.80, 16.0, 0.0);
+      const p4 = calcCavityP(qRho, qTheta, 4.80, 5.45, 32.0, 0.0);
+      const pTotal = p1.add(p2).add(p3).add(p4);
+
+      const qRCortex = float(5.65).add(cos(qTheta.mul(12.0)).mul(0.32)).add(sin(qTheta.mul(24.0)).mul(0.12));
+      const qInCore = qRho.lessThan(1.25);
+      const sCore = float(1.0).div(qRho.sub(1.25).abs().mul(6.0).add(1.0)).mul(1.6);
+      const sRim = float(1.0).div(qRho.sub(qRCortex).abs().mul(6.0).add(1.0)).mul(1.5);
+      const sWalls = float(1.0).sub(pTotal.mul(1.3)).clamp(0.0, 1.0);
+      const r0 = qInCore.select(sCore, max(sWalls, sRim));
       const r1 = cos(qTheta.mul(48.0).add(sin(qRho.mul(2.8)))).mul(0.5).add(sin(qRho.mul(1.8)).mul(0.5));
       const qLogRho = log(qRho.max(0.15));
       const qCoralCoord = qTheta.sub(qLogRho.mul(1.75));
@@ -324,11 +348,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     p.addAssign(v.mul(dt));
 
     // RENOVACIÓN CONTINUA DE AGENTES EN TODA LA PANTALLA
-    const expired = l.x.lessThanEqual(0.0).or(rSph.greaterThan(sphereRadius.mul(1.15)));
+    const expired = l.x.lessThanEqual(0.0).or(rSph.greaterThan(sphereRadius.mul(1.10)));
     If(expired, () => {
       const respawnTheta = hash(i.add(uint(91))).mul(6.2831853);
-      const respawnRad = pow(hash(i.add(uint(97))), 0.55).mul(sphereRadius.mul(0.95)).add(0.2);
-      const respawnZ = hash(i.add(uint(93))).sub(0.5).mul(sphereRadius.mul(0.3));
+      const respawnRad = pow(hash(i.add(uint(97))), 0.65).mul(sphereRadius.mul(0.96)).add(0.1);
+      const respawnZ = hash(i.add(uint(93))).sub(0.5).mul(0.25);
       p.assign(vec3(
         respawnRad.mul(cos(respawnTheta)),
         respawnRad.mul(sin(respawnTheta)),

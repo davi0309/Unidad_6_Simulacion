@@ -25,7 +25,7 @@ async function main() {
   scene.background = new THREE.Color('#000000');
 
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
-  camera.position.set(0, 0, 7.8);
+  camera.position.set(0, 0, 14.2);
   camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGPURenderer({ antialias: true });
@@ -320,13 +320,14 @@ async function main() {
     const aspect = innerWidth / innerHeight;
     camera.aspect = aspect;
     camera.fov = 50;
-    // Encuadre exacto para que los agentes cubran el 100% de la pantalla de esquina a esquina
-    const cornerFactor = Math.sqrt(1 + aspect * aspect);
-    const targetCornerDist = 7.5;
+    // Encuadre completo: el patrón botánico (radio exterior ~5.8) se muestra
+    // 100% visible en el espacio de pantalla con un margen limpio alrededor
+    const targetVisibleRadius = 6.6;
     const radFov = (camera.fov * 0.5 * Math.PI) / 180;
-    const optimalZ = targetCornerDist / (Math.tan(radFov) * cornerFactor);
-    const zPos = Math.max(6.2, Math.min(8.2, optimalZ));
-    camera.position.set(0, 0, zPos);
+    // Si la pantalla es apaisada (aspect >= 1), la altura delimita el encuadre
+    // Si es vertical (aspect < 1), la anchura delimita el encuadre
+    const optimalZ = targetVisibleRadius / (Math.tan(radFov) * Math.min(1.0, aspect));
+    camera.position.set(0, 0, optimalZ);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);

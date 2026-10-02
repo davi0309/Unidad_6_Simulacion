@@ -13,9 +13,9 @@ export function createParameters() {
     maxSpeed: uniform(1.6),            // Velocidad base suave
     speedMultiplier: uniform(1.0),     // Modulador dinámico (1.0 = Lenta, 1.8 = Normal, 2.8 = Rápida)
 
-    // Cobertura total de la pantalla (Full-screen canvas)
-    sphereRadius: uniform(11.5),       // Radio ampliado para cubrir la pantalla completa de esquina a esquina
-    boundsSize: uniform(24.0),
+    // Encuadre completo de la sección botánica en pantalla
+    sphereRadius: uniform(5.8),        // Radio exterior canónico del corte botánico
+    boundsSize: uniform(14.0),
 
     // Reactividad a la música (Audio-reactivity)
     audioBass: uniform(0.0),           // Graves / Bombo (modula dilatación y pulsos radiales)
