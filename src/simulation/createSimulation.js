@@ -9,7 +9,6 @@ import {
   color,
   cos,
   cross,
-  exp,
   floor,
   float,
   hash,
@@ -236,153 +235,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       return res;
     };
 
-    // 2. ACORDES DEL ARMONIO (Fila Central A S D F G H J K):
-    // Cada acorde configura polos magnéticos, vórtices y fuentes como limaduras de hierro
-    const calcDipole = (pA, pB, strengthNode) => {
-      const rA = p.sub(pA);
-      const rB = p.sub(pB);
-      const dA = length(rA).max(0.25);
-      const dB = length(rB).max(0.25);
-      const fA = rA.div(dA.pow(2.8));
-      const fB = rB.div(dB.pow(2.8)).negate();
-      return fA.add(fB).mul(strengthNode);
-    };
-
-    // A: Sol Mayor (G) - Tónica de apertura. Bipolar horizontal clásico
-    const chordG = calcDipole(vec3(-2.2, 0.0, 0.0), vec3(2.2, 0.0, 0.0), float(1.8))
-      .add(tangent.mul(params.swirl.mul(0.6)));
-
-    // S: Si Menor (Bm) - Melancolía profunda. Bipolar oblicuo con torsión helicoidal
-    const chordBm = calcDipole(vec3(-1.8, 1.5, 0.8), vec3(1.8, -1.5, -0.8), float(1.6))
-      .add(vec3(p.y.negate(), p.x, p.z.mul(0.3)).mul(0.45));
-
-    // D: Do Mayor (C) - Apertura y luz. Tríada de fuentes radiales a 120°
-    const chordC = calcDipole(vec3(0.0, 2.2, 0.0), vec3(-1.9, -1.1, 0.0), float(1.4))
-      .add(calcDipole(vec3(1.9, -1.1, 0.0), vec3(0.0, 0.0, 1.5), float(1.4)))
-      .add(radial.mul(0.8));
-
-    // F: Do Menor (Cm) - Tensión trágica. Cuadrupolo en cruz
-    const chordCm = calcDipole(vec3(-1.6, -1.6, 0.0), vec3(1.6, 1.6, 0.0), float(1.5))
-      .add(calcDipole(vec3(-1.6, 1.6, 0.0), vec3(1.6, -1.6, 0.0), float(1.5)).negate());
-
-    // G: Sol/Si (G/B) - Inversión flotante. Bipolar asimétrico con corriente de deriva
-    const chordGB = calcDipole(vec3(-2.2, -0.8, 0.0), vec3(1.5, 1.2, 0.0), float(1.6))
-      .add(vec3(1.4, sin(p.x.mul(1.2)).mul(0.5), 0.0));
-
-    // H: Mi Menor (Em) - Suspenso etéreo. Tres vórtices triangulares en resonancia
-    const chordEm = vec3(
-      sin(p.y.mul(1.4).add(params.elapsedTime.mul(0.4))),
-      cos(p.x.mul(1.4).sub(params.elapsedTime.mul(0.4))),
-      sin(p.z.mul(1.4))
-    ).mul(1.9);
-
-    // J: Do9 (Cadd9) - Doble hélice de resonancia armónica
-    const chordCadd9 = vec3(
-      sin(p.z.mul(1.8)).mul(1.5),
-      cos(p.z.mul(1.8)).mul(1.5),
-      sin(length(p.xy).mul(1.8))
-    ).add(tangent.mul(params.swirl.mul(0.8)));
-
-    // K: Re sus4 -> Re (Dsus4) - Preparación al arpa. Bipolar vertical norte-sur
-    const chordDsus4 = calcDipole(vec3(0.0, 2.5, 0.0), vec3(0.0, -2.5, 0.0), float(1.8));
-
-    const sampleChord = (cIdNode) => {
-      const cIdx = floor(cIdNode.add(0.5));
-      const res = chordG.toVar();
-      If(cIdx.equal(1.0), () => { res.assign(chordBm); });
-      If(cIdx.equal(2.0), () => { res.assign(chordC); });
-      If(cIdx.equal(3.0), () => { res.assign(chordCm); });
-      If(cIdx.equal(4.0), () => { res.assign(chordGB); });
-      If(cIdx.equal(5.0), () => { res.assign(chordEm); });
-      If(cIdx.equal(6.0), () => { res.assign(chordCadd9); });
-      If(cIdx.equal(7.0), () => { res.assign(chordDsus4); });
-      return res;
-    };
-
-    // Interpolación no lineal de acordes ("como un fuelle que tarda en llenarse de aire")
-    const chordFlowA = sampleChord(params.chordA);
-    const chordFlowB = sampleChord(params.chordB);
-    const chordMorphProgress = smoothstep(float(0.0), float(1.0), params.chordMorph.clamp(0.0, 1.0));
-    const activeChordFlow = mix(chordFlowA, chordFlowB, chordMorphProgress);
-
-    // Campo base combinado (Acordes de armonio + Arquetipos visuales)
+    // Interpolación no lineal ultrasuave de campos de fuerza (los agentes navegan orgánicamente)
     const fieldA = sampleArchetype(params.shapeA);
     const fieldB = sampleArchetype(params.shapeB);
     const morphProgress = smoothstep(float(0.0), float(1.0), params.shapeMorph.clamp(0.0, 1.0));
-    const archetypeFlow = mix(fieldA, fieldB, morphProgress);
-    const flowField3D = mix(archetypeFlow, activeChordFlow, params.chordWeight.clamp(0.0, 1.0)).toVar();
+    const flowField3D = mix(fieldA, fieldB, morphProgress).toVar();
 
-    // 3. EL FUELLE DEL ARMONIO (Inhalación / Exhalación con Barra Espaciadora)
-    // Al presionar: se contraen hacia el centro formando anillos concéntricos apretados (seek + cohesión)
-    // Al soltar: exhalan y se expanden siguiendo el flow field
-    const ringSpacingBellows = float(0.75).mul(float(1.0).sub(params.bellowsInhale.mul(0.35)));
-    const targetBellowsRing = round(rho.div(ringSpacingBellows)).mul(ringSpacingBellows).clamp(0.35, 4.2);
-    const ringClench = radial.mul(targetBellowsRing.sub(rho).mul(4.5));
-    const seekCenter = radial.negate().mul(float(3.2).add(params.bellowsInhale.mul(2.2)));
-    const zBellowsFlatten = vec3(0.0, 0.0, p.z.negate().mul(3.5));
-    const inhaleVector = seekCenter.add(ringClench).add(zBellowsFlatten);
-    flowField3D.assign(mix(flowField3D, inhaleVector, params.bellowsInhale.mul(0.92)));
-
-    // 4. LA VOZ (El mouse es la voz: alignment de flocking + 3 ecos de reverberación)
-    const toVoice0 = params.voicePos.sub(p);
-    const dVoice0 = length(toVoice0).max(0.01);
-    const prox0 = exp(dVoice0.mul(dVoice0).negate().mul(0.35)).mul(params.voiceActive);
-    const voiceAlign0 = params.voiceVel.mul(prox0.mul(4.0));
-    const voiceSeek0 = toVoice0.div(dVoice0).mul(prox0.mul(2.0));
-
-    // Ecos fantasma de la voz (reverberación de catedral con retraso)
-    const toEcho1 = params.voiceEcho1.sub(p);
-    const dEcho1 = length(toEcho1).max(0.01);
-    const prox1 = exp(dEcho1.mul(dEcho1).negate().mul(0.20)).mul(params.voiceActive).mul(0.55);
-    const echoSeek1 = toEcho1.div(dEcho1).mul(prox1.mul(1.5));
-
-    const toEcho2 = params.voiceEcho2.sub(p);
-    const dEcho2 = length(toEcho2).max(0.01);
-    const prox2 = exp(dEcho2.mul(dEcho2).negate().mul(0.12)).mul(params.voiceActive).mul(0.32);
-    const echoSeek2 = toEcho2.div(dEcho2).mul(prox2.mul(1.2));
-
-    const toEcho3 = params.voiceEcho3.sub(p);
-    const dEcho3 = length(toEcho3).max(0.01);
-    const prox3 = exp(dEcho3.mul(dEcho3).negate().mul(0.07)).mul(params.voiceActive).mul(0.18);
-    const echoSeek3 = toEcho3.div(dEcho3).mul(prox3.mul(1.0));
-
-    flowField3D.addAssign(voiceAlign0.add(voiceSeek0).add(echoSeek1).add(echoSeek2).add(echoSeek3));
-
-    // 5. LAS ARPAS (Glissandos barriendo del 1 al 0: filamentos como cuerdas verticales con onda acústica)
-    const harpStringX = round(p.x.div(0.55)).mul(0.55).clamp(-3.85, 3.85);
-    const harpStringPull = vec3(harpStringX.sub(p.x).mul(6.5), 0.0, p.z.negate().mul(3.5));
-    const harpWaveDist = abs(p.x.sub(params.harpWavePos));
-    const harpWavePulse = exp(harpWaveDist.negate().mul(1.8));
-    const harpVibY = sin(p.y.mul(9.0).add(params.elapsedTime.mul(26.0))).mul(harpWavePulse).mul(2.2);
-    const harpVibZ = cos(p.y.mul(9.0).add(params.elapsedTime.mul(26.0))).mul(harpWavePulse).mul(1.6);
-    const harpForce = harpStringPull.add(vec3(0.0, harpVibY, harpVibZ));
-    flowField3D.assign(mix(flowField3D, harpForce, params.harpActive.mul(0.95)));
-
-    // 6. EL FINAL CELESTIAL (Shift: Gravedad invertida + Physarum ramificado hacia arriba)
-    const physarumBranchX = sin(p.y.mul(2.2).add(p.z.mul(1.5))).mul(cos(p.x.mul(1.8))).mul(1.5);
-    const physarumBranchZ = cos(p.y.mul(2.2).sub(p.x.mul(1.5))).mul(sin(p.z.mul(1.8))).mul(1.5);
-    const celestialHalo = vec3(p.z.negate(), 0.0, p.x).mul(1.4);
-    const celestialLift = vec3(physarumBranchX, float(5.0), physarumBranchZ).add(celestialHalo);
-    flowField3D.assign(mix(flowField3D, celestialLift, params.celestialActive.mul(0.95)));
-
-    // 7. LOS CRÉDITOS Y EL SILENCIO FINAL (Enter)
-    const creditRowY = round(p.y.div(0.42)).mul(0.42);
-    const creditRoll = vec3(
-      p.x.mul(0.04).negate(),
-      creditRowY.sub(p.y).mul(5.5).add(1.8),
-      p.z.negate().mul(3.5)
-    );
-    flowField3D.assign(mix(flowField3D, creditRoll, params.creditsActive.mul(0.98)));
-
-    // Silencio: motas tenues de polvo cósmico flotando si se pulsa una tecla
-    const silenceMoteFlutter = vec3(
-      sin(p.y.mul(4.0).add(params.elapsedTime.mul(2.0))),
-      cos(p.x.mul(4.0).add(params.elapsedTime.mul(2.0))),
-      sin(p.z.mul(4.0))
-    ).mul(params.codaMotePulse.mul(0.45));
-    flowField3D.assign(mix(flowField3D, silenceMoteFlutter, params.codaSilence.mul(0.95)));
-
-    // 8. TURBULENCIA CURL 3D (Divergence-free = Mantiene volumen amplio y no colapsa)
+    // 2. TURBULENCIA CURL 3D (Divergence-free = Mantiene volumen amplio y no colapsa)
     const noiseScale = 0.45;
     const curlX = sin(p.y.mul(noiseScale).add(params.seed)).add(cos(p.z.mul(noiseScale).mul(0.8)));
     const curlY = cos(p.x.mul(noiseScale).add(params.seed)).negate().add(sin(p.z.mul(noiseScale).mul(0.8)));
@@ -397,13 +256,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     ).mul(0.35);
     flowField3D.addAssign(spreadVec);
 
-    // 9. CONFINAMIENTO DENTRO DE LA GRAN ESFERA 3D ----------------------------
+    // 3. CONFINAMIENTO DENTRO DE LA GRAN ESFERA 3D ----------------------------
     const sphereRadius = params.sphereRadius;
     const outsideDist = rSph.sub(sphereRadius);
     const sphereNormal = normalize(p);
     const sphereContainmentForce = sphereNormal.mul(outsideDist.max(0.0).mul(-15.0));
 
-    // 10. STEERING BEHAVIORS (CRAIG REYNOLDS) EN 3D --------------------------
+    // 4. STEERING BEHAVIORS (CRAIG REYNOLDS) EN 3D ---------------------------
     const currentMaxSpeed = params.maxSpeed.mul(params.speedMultiplier);
     const desiredVelocity = normalize(flowField3D).mul(currentMaxSpeed);
 
@@ -466,13 +325,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
   material.scaleNode = Fn(() => {
     const spdView = length(vView);
-    // Rayitas cortas de celuloide, pelos o limaduras de hierro orientadas según velocidad
-    const len = params.lineLength.mul(spdView.clamp(0.15, 2.5));
+    const len = params.lineLength.mul(spdView.clamp(0.12, 2.8));
     return vec2(len, params.lineWidth);
   })();
 
-  // COLOR ESPECTRAL Y ESTÉTICA DE PELÍCULA ANTIGUA (CELULOIDE Y GRABADO VIVO):
-  // Tonos añil, gris pizarra, celuloide y blanco cálido marfil con grano de 24 FPS y parpadeo de proyector
+  // COLOR ESPECTRAL 100% PURO CON TRANSICIÓN GRADUAL:
+  // La música y el intérprete modulan transiciones suaves entre paletas a lo largo de varios segundos.
+  // Cero escalones bruscos, cero blanco, mezcla suave tipo seda / acuarela viva.
   material.colorNode = Fn(() => {
     const pAttr = positionBuffer.toAttribute();
     const rDist = length(pAttr).mul(0.12);
@@ -480,19 +339,15 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const t = ang.add(rDist).add(params.chromaShift);
 
-    // Función constructora de paletas espectrales
+    // Función constructora de paletas espectrales puras
     const samplePalette = (idNode, tVal) => {
-      // Paleta 0: Película de Celuloide Antiguo (Añil cianótipo, gris pizarra y blanco cálido marfil)
-      const c0 = vec3(
-        cos(tVal.mul(4.0).add(0.4)).mul(0.24).add(0.66), // R marfil
-        cos(tVal.mul(4.0).add(0.8)).mul(0.26).add(0.68), // G plata
-        cos(tVal.mul(4.0).add(1.8)).mul(0.36).add(0.62)  // B añil celuloide
-      );
+      // Paleta 0: Prisma Espectral Arcoíris Puro (Cian, Violeta, Naranja, Esmeralda)
+      const c0 = cos(tVal.mul(6.2831853).add(vec3(0.0, 2.094, 4.188))).mul(0.5).add(0.5);
 
       // Paleta 1: Seda Ópalo y Amatista (Turquesa intenso, magenta vivo, violeta y rosa)
       const c1 = cos(tVal.mul(6.2831853).add(vec3(0.8, 0.1, 0.9))).mul(0.5).add(0.5);
 
-      // Paleta 2: Fuego Dorado y Ámbar (Rojo rubí, naranja fuego, oro cálido de madera)
+      // Paleta 2: Fuego Dorado y Ámbar (Rojo rubí, naranja fuego, oro cálido)
       const c2 = vec3(
         cos(tVal.mul(4.0)).mul(0.48).add(0.52),
         cos(tVal.mul(4.0).add(1.2)).mul(0.38).add(0.42),
@@ -526,41 +381,21 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const colB = samplePalette(params.paletteB, t);
 
     // Interpolación no lineal ultrasuave (smoothstep) entre Paleta A y Paleta B
+    // con dispersión volumétrica radial: el color brota del centro hacia el exterior como tinta en agua
     const waveOffset = rDist.mul(0.35);
     const localMix = params.paletteMix.mul(1.35).sub(waveOffset).clamp(0.0, 1.0);
     const easeMix = smoothstep(float(0.0), float(1.0), localMix);
     const finalCol = mix(colA, colB, easeMix);
 
-    // Grano de película de 35mm a 24 cuadros por segundo
-    const filmFrame = floor(params.elapsedTime.mul(24.0));
-    const grain = hash(instanceIndex.add(uint(filmFrame.mul(1031)))).sub(0.5).mul(params.filmGrain);
-
-    // Parpadeo leve de proyector (Flicker)
-    const flicker = sin(params.elapsedTime.mul(19.0)).mul(0.04)
-      .add(cos(params.elapsedTime.mul(29.0)).mul(0.03))
-      .mul(params.filmFlicker);
-
-    // Resplandor angelical en el ascenso celestial
-    const celestialGlow = params.celestialActive.mul(0.25);
-    const filmTone = finalCol.add(vec3(grain.add(flicker))).add(vec3(celestialGlow)).clamp(0.0, 1.0);
-
-    return vec4(filmTone, 1.0);
+    return vec4(finalCol, 1.0);
   })();
 
-  // OPACIDAD DE SEDA TRANSLÚCIDA CON DESVANECIMIENTO DE CRÉDITOS Y SILENCIO
+  // OPACIDAD DE SEDA TRANSLÚCIDA CALIBRADA (Cero adición a blanco)
   material.opacityNode = Fn(() => {
-    const pAttr = positionBuffer.toAttribute();
     const coords = uv().sub(0.5);
     const ellipseDist = coords.x.mul(coords.x).mul(1.3).add(coords.y.mul(coords.y).mul(4.0));
     const lineFalloff = float(1.0).sub(ellipseDist.mul(1.6)).clamp(0.0, 1.0).pow(1.5);
-
-    // Desvanecimiento progresivo al subir por los créditos
-    const creditsFade = float(1.0).sub(pAttr.y.sub(3.6).max(0.0).mul(0.5)).clamp(0.0, 1.0);
-
-    // En el silencio: pantalla vacía salvo si se tocan teclas (motas tenues)
-    const silenceFade = float(1.0).sub(params.codaSilence.mul(float(1.0).sub(params.codaMotePulse.mul(0.4))));
-
-    return lineFalloff.mul(params.filamentAlpha).mul(creditsFade).mul(silenceFade);
+    return lineFalloff.mul(params.filamentAlpha);
   })();
 
   const geometry = new THREE.PlaneGeometry(1, 1);

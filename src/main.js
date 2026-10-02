@@ -23,7 +23,7 @@ async function main() {
   scene.background = new THREE.Color('#000000');
 
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
-  camera.position.set(0, 2.0, 11);
+  camera.position.set(0, 2.5, 11);
 
   const renderer = new THREE.WebGPURenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -50,17 +50,11 @@ async function main() {
     panel.updateSpeedButtons(mult);
   };
 
-  // 1. LA VOZ (EL MOUSE) CON ECOS DE REVERBERACIÓN -------------------------
-  // El cursor es el punto luminoso de canto; atractores fantasma repiten la trayectoria con retraso
+  // CONDUCCIÓN EXPRESIVA CON EL PUNTERO / RATÓN ----------------------------
   const pointerNdc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
   const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   const hit = new THREE.Vector3();
-
-  const voiceHistory = []; // { pos: Vector3, time: number }
-  const lastVoicePos = new THREE.Vector3();
-  let lastVoiceTime = performance.now();
-  let lastMoveTime = 0;
 
   window.addEventListener('pointermove', (event) => {
     pointerNdc.x = (event.clientX / innerWidth) * 2 - 1;
@@ -68,9 +62,6 @@ async function main() {
     raycaster.setFromCamera(pointerNdc, camera);
     if (raycaster.ray.intersectPlane(interactionPlane, hit)) {
       params.attractor.value.copy(hit);
-      params.voicePos.value.copy(hit);
-      params.voiceActive.value = 1.0;
-      lastMoveTime = performance.now();
     }
   });
 
@@ -96,8 +87,8 @@ async function main() {
     }
   });
 
-  // CONTROLADOR DE TRANSICIÓN GRADUAL DE COLORES ---------------------------
-  let transitionDuration = 20.0;
+  // CONTROLADOR DE TRANSICIÓN GRADUAL DE COLORES (CERO SALTOS BRUSCOS) -----
+  let transitionDuration = 20.0; // duración en segundos de la transición (ultra-lenta y majestuosa)
 
   const transitionToPalette = (targetId, duration = null) => {
     const actualDuration = duration !== null ? duration : (params.transitionDuration ? params.transitionDuration.value : 20.0);
@@ -118,99 +109,93 @@ async function main() {
     transitionDuration = Math.max(1.0, actualDuration);
   };
 
-  // 2. ACORDES DEL ARMONIO (FILA CENTRAL A S D F G H J K) -------------------
-  let chordDuration = 3.2; // segundos para derretirse lentamente de un acorde al siguiente
-  const transitionToChord = (targetId, duration = 3.2) => {
-    const rounded = Math.round(targetId);
-    if (Math.round(params.chordB.value) === rounded && params.chordMorph.value >= 1.0 && params.chordWeight.value >= 0.99) {
-      return;
-    }
-    if (params.chordMorph.value < 1.0) {
-      params.chordA.value = params.chordMorph.value > 0.5 ? params.chordB.value : params.chordA.value;
-    } else {
-      params.chordA.value = params.chordB.value;
-    }
-    params.chordB.value = rounded;
-    params.chordMorph.value = 0.0;
-    params.chordWeight.value = 1.0;
-    chordDuration = duration;
-    panel?.updateActiveChord(rounded);
-  };
-
-  // 3. GLISSANDO DE ARPAS (FILA NUMÉRICA 1 AL 0) ---------------------------
-  const numberKeyMap = {
-    'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4,
-    'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9
-  };
-  let lastHarpKey = -1;
-  let lastHarpTime = 0;
-
-  const triggerHarpGlissando = (dir = 1.0, keyIdx = null) => {
-    params.harpActive.value = 1.0;
-    params.harpWaveDir.value = dir;
-    if (keyIdx !== null) {
-      const xPos = ((keyIdx / 9.0) - 0.5) * 7.0;
-      params.harpWavePos.value = xPos;
-    } else {
-      params.harpWavePos.value = dir > 0 ? -4.2 : 4.2;
-    }
-    panel?.flashHarp(dir);
-  };
-
-  // 4. CRÉDITOS FINALES Y SILENCIO (ENTER) ---------------------------------
-  let creditsState = 'IDLE'; // 'IDLE' | 'ROLLING' | 'SILENCE'
-  let creditsElapsed = 0;
-
-  const triggerCredits = () => {
-    if (creditsState === 'IDLE') {
-      creditsState = 'ROLLING';
-      creditsElapsed = 0;
-      params.creditsActive.value = 1.0;
-      params.codaSilence.value = 0.0;
-      params.codaMotePulse.value = 0.0;
-    } else {
-      // Reiniciar y volver a la pieza activa
-      creditsState = 'IDLE';
-      params.creditsActive.value = 0.0;
-      params.codaSilence.value = 0.0;
-      params.codaMotePulse.value = 0.0;
-    }
-    panel?.updateCreditsState(creditsState);
-  };
-
-  // ARQUETIPOS DE PRESET NUMÉRICOS (Mantenidos para compatibilidad) ---------
+  // CONFIGURACIÓN DE LOS 5 ARQUETIPOS 3D (Inspirados en las imágenes de referencia)
   const shapeConfigs = {
-    astrolabe: { id: 0, harmonics: 4.0, swirl: 1.8, petalMorph: 1.4, curlStrength: 0.35, palette: 4.0 },
-    tornado: { id: 1, harmonics: 2.0, swirl: 3.2, petalMorph: 1.1, curlStrength: 0.55, palette: 1.0 },
-    cosmicVeil: { id: 2, harmonics: 3.0, swirl: 0.8, petalMorph: 1.9, curlStrength: 1.25, palette: 1.0 },
-    celestialLotus: { id: 3, harmonics: 7.0, swirl: 1.2, petalMorph: 1.7, curlStrength: 0.45, palette: 0.0 },
-    astralPillar: { id: 4, harmonics: 1.0, swirl: 0.6, petalMorph: 0.7, curlStrength: 0.35, palette: 2.0 }
+    astrolabe: {
+      id: 0,
+      label: 'Astrolabio de Cristal Óptico',
+      harmonics: 4.0,
+      swirl: 1.8,
+      petalMorph: 1.4,
+      curlStrength: 0.35,
+      palette: 4.0
+    },
+    tornado: {
+      id: 1,
+      label: 'Red de Micro-Vórtices y Eyectores 3D',
+      harmonics: 2.0,
+      swirl: 3.2,
+      petalMorph: 1.1,
+      curlStrength: 0.55,
+      palette: 1.0
+    },
+    cosmicVeil: {
+      id: 2,
+      label: 'Velo Cósmico Multicapa',
+      harmonics: 3.0,
+      swirl: 0.8,
+      petalMorph: 1.9,
+      curlStrength: 1.25,
+      palette: 1.0
+    },
+    celestialLotus: {
+      id: 3,
+      label: 'Loto Celestial / Alas de Serafín',
+      harmonics: 7.0,
+      swirl: 1.2,
+      petalMorph: 1.7,
+      curlStrength: 0.45,
+      palette: 0.0
+    },
+    astralPillar: {
+      id: 4,
+      label: 'Pilar Astral / Alma Ascendente',
+      harmonics: 1.0,
+      swirl: 0.6,
+      petalMorph: 0.7,
+      curlStrength: 0.35,
+      palette: 2.0
+    }
   };
 
-  let shapeMorphDuration = 5.0;
+  // CONTROLADOR DE TRANSICIÓN SUAVE DE MORFOLOGÍA Y FUERZAS 3D (CRAIG REYNOLDS)
+  let shapeMorphDuration = 5.0; // segundos para migrar entre figuras orgánicamente
   let targetHarmonics = params.harmonics.value;
   let targetSwirl = params.swirl.value;
   let targetPetalMorph = params.petalMorph.value;
   let targetCurlStrength = params.curlStrength.value;
 
-  const applyPreset = (key) => {
-    const config = shapeConfigs[key];
-    if (!config) return;
-    params.chordWeight.value = 0.0; // Cambia a modo arquetipo visual
-    const roundedTarget = Math.round(config.id);
+  const transitionToShape = (targetShapeId, duration = 5.0) => {
+    const roundedTarget = Math.round(targetShapeId);
+    if (Math.round(params.shapeB.value) === roundedTarget && params.shapeMorph.value >= 1.0) {
+      return;
+    }
+
     if (params.shapeMorph.value < 1.0) {
       params.shapeA.value = params.shapeMorph.value > 0.5 ? params.shapeB.value : params.shapeA.value;
     } else {
       params.shapeA.value = params.shapeB.value;
     }
-    params.shapeB.value = roundedTarget;
-    params.shapeMorph.value = 0.0;
-    shapeMorphDuration = 5.0;
 
+    params.shapeB.value = roundedTarget;
+    params.symmetryType.value = roundedTarget;
+    params.shapeMorph.value = 0.0;
+    shapeMorphDuration = Math.max(1.0, duration);
+  };
+
+  // ARQUETIPOS GENERATIVOS 3D ----------------------------------------------
+  const applyPreset = (key) => {
+    const config = shapeConfigs[key];
+    if (!config) return;
+
+    // Transición de campo de fuerzas en 3D (los agentes maniobran con steering hacia la nueva forma)
+    transitionToShape(config.id, 5.0);
     targetHarmonics = config.harmonics;
     targetSwirl = config.swirl;
     targetPetalMorph = config.petalMorph;
     targetCurlStrength = config.curlStrength;
+
+    // También transiciona la paleta correspondiente con suavidad
     transitionToPalette(config.palette);
   };
 
@@ -222,28 +207,19 @@ async function main() {
     panel.setVisible(lab);
     simulation.setSphereHelperVisible(lab);
     hud.innerHTML = lab
-      ? '<strong>PELÍCULA & ARMONIO</strong> · Espacio: Fuelle · A-K: Acordes · 1-0: Arpas · Shift: Celestial · Enter: Créditos'
-      : '<strong>CINEMA EN VIVO</strong> · Espacio: Respirar · A-K: Acordes · 1-0: Arpas · Shift: Celestial · Enter: Créditos · P: Lab';
+      ? '<strong>LAB</strong> · P: performance · R: mutar 3D · T: velocidad · Shift: turbo · Flechas: forma'
+      : '<strong>PERFORMANCE</strong> · P: lab · Espacio: acento · Shift: turbo · T: velocidad · Rotar: orbitar 3D';
   };
 
   const hud = document.createElement('div');
   hud.className = 'hud';
   document.body.append(hud);
 
-  let spaceHolding = false;
-  let shiftHolding = false;
-
   const panel = createLabPanel({
     params,
     audioManager,
     onResetVisuals: () => simulation.resetVisuals(),
     onApplyPreset: applyPreset,
-    onChordChange: (cId) => transitionToChord(cId),
-    onBellowsToggle: (holding) => { spaceHolding = holding; },
-    onHarpGlissando: (dir) => triggerHarpGlissando(dir),
-    onCelestialHold: (holding) => { shiftHolding = holding; },
-    onCreditsToggle: () => triggerCredits(),
-    onCodaMotePulse: () => { params.codaMotePulse.value = 1.0; },
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onSpeedChange: (mult) => setSpeedMultiplier(mult),
     onBlendingChange: (bMode) => simulation.setBlendingMode(bMode),
@@ -253,84 +229,56 @@ async function main() {
   setMode('LAB');
 
   // MAPEO DE TECLADO PARA TOCAR EL INSTRUMENTO EN VIVO ----------------------
-  const chordKeys = {
-    'KeyA': 0, 'KeyS': 1, 'KeyD': 2, 'KeyF': 3,
-    'KeyG': 4, 'KeyH': 5, 'KeyJ': 6, 'KeyK': 7
-  };
-
+  let shiftPressed = false;
   window.addEventListener('keydown', (event) => {
     if (event.code === 'KeyP' && !event.repeat) setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
 
-    // EN SILENCIO TRAS LOS CRÉDITOS: cualquier tecla despierta motas tenues de polvo
-    if (creditsState === 'SILENCE' && event.code !== 'Enter') {
-      params.codaMotePulse.value = 1.0;
-      return;
-    }
-
-    // ESPACIO (Mantener): Inhalar con el fuelle del armonio
-    if (event.code === 'Space' && !event.repeat) {
-      event.preventDefault();
-      spaceHolding = true;
-    }
-
-    // ACORDES DE LA FILA CENTRAL (A S D F G H J K):
-    if (event.code in chordKeys && !event.repeat) {
-      transitionToChord(chordKeys[event.code]);
-      panel.refresh();
-    }
-
-    // BARRIDO DE ARPAS (FILA 1 AL 0):
-    if (event.code in numberKeyMap) {
-      const curIdx = numberKeyMap[event.code];
-      const now = performance.now();
-      let dir = 1.0;
-      if (lastHarpKey !== -1 && (now - lastHarpTime) < 650) {
-        dir = curIdx >= lastHarpKey ? 1.0 : -1.0;
-      } else {
-        dir = curIdx >= 5 ? -1.0 : 1.0;
-      }
-      lastHarpKey = curIdx;
-      lastHarpTime = now;
-      triggerHarpGlissando(dir, curIdx);
-    }
-
-    // SHIFT (Mantener): Ascenso celestial (gravedad invertida + Physarum)
-    if ((event.code === 'ShiftLeft' || event.code === 'ShiftRight') && !shiftHolding) {
-      shiftHolding = true;
-    }
-
-    // ENTER: Créditos finales y pantalla vacía de celuloide
-    if (event.code === 'Enter' && !event.repeat) {
-      triggerCredits();
-    }
-
-    // R: Mutar visuales / nueva semilla
+    // R: Mutar visuales sin reiniciar la música
     if (event.code === 'KeyR' && !event.repeat) {
       simulation.resetVisuals();
       panel.refresh();
     }
 
-    // T: Ciclar velocidad
+    // T: Ciclar velocidad entre Lenta, Moderada y Rápida
     if (event.code === 'KeyT' && !event.repeat) {
       speedLevel = (speedLevel + 1) % 3;
       setSpeedMultiplier(speedMultipliers[speedLevel]);
       panel.refresh();
     }
 
-    // C: Ciclar paleta
+    // Shift: Turbo / acelerador momentáneo mientras se mantiene presionado
+    if ((event.code === 'ShiftLeft' || event.code === 'ShiftRight') && !shiftPressed) {
+      shiftPressed = true;
+      params.speedMultiplier.value = speedMultipliers[speedLevel] * 2.2;
+    }
+
+    // 1-5: Cambios de sección y morfología armónica 3D (Transición orgánica sin saltos)
+    if (event.code === 'Digit1') { applyPreset('astrolabe'); panel.refresh(); }
+    if (event.code === 'Digit2') { applyPreset('tornado'); panel.refresh(); }
+    if (event.code === 'Digit3') { applyPreset('cosmicVeil'); panel.refresh(); }
+    if (event.code === 'Digit4') { applyPreset('celestialLotus'); panel.refresh(); }
+    if (event.code === 'Digit5') { applyPreset('astralPillar'); panel.refresh(); }
+
+    // C: Ciclar paleta de color con transición gradual suave
     if (event.code === 'KeyC' && !event.repeat) {
       const nextPal = (Math.round(params.paletteB.value) + 1) % 5;
       transitionToPalette(nextPal, params.transitionDuration.value);
       panel.refresh();
     }
 
-    // F: Invertir sentido del flujo
+    // F: Invertir sentido del flujo (implosión vs expansión)
     if (event.code === 'KeyF' && !event.repeat) {
       params.flowDirection.value *= -1.0;
       panel.refresh();
     }
 
-    // Flechas: modular giro y armónicos
+    // Espacio: Acento musical manual
+    if (event.code === 'Space' && !event.repeat) {
+      event.preventDefault();
+      params.userPulse.value = 1.0;
+    }
+
+    // Flechas Arriba/Abajo: Modular torsión/vorticidad
     if (event.code === 'ArrowUp') {
       params.swirl.value = Math.min(4.0, params.swirl.value + 0.2);
       panel.refresh();
@@ -339,6 +287,8 @@ async function main() {
       params.swirl.value = Math.max(-4.0, params.swirl.value - 0.2);
       panel.refresh();
     }
+
+    // Flechas Izquierda/Derecha: Modular armónicos / pétalos 3D
     if (event.code === 'ArrowRight') {
       params.harmonics.value = Math.min(9.0, params.harmonics.value + 1.0);
       panel.refresh();
@@ -350,13 +300,12 @@ async function main() {
   });
 
   window.addEventListener('keyup', (event) => {
-    // Al soltar ESPACIO: Exhalar y expandir el aire del fuelle
     if (event.code === 'Space') {
-      spaceHolding = false;
+      params.userPulse.value = 0.0;
     }
-    // Al soltar SHIFT: Desactivar ascenso celestial
     if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
-      shiftHolding = false;
+      shiftPressed = false;
+      params.speedMultiplier.value = speedMultipliers[speedLevel];
     }
   });
 
@@ -377,95 +326,22 @@ async function main() {
     const dt = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
 
-    // Tiempo continuo para ondas planetarias, grano 24 FPS y parpadeo
+    // Tiempo acumulado para ondas planetarias viajeras y pulsaciones armónicas
     if (params.elapsedTime) params.elapsedTime.value += dt;
 
-    // Deriva lenta y continua del espectro cromático
-    params.chromaShift.value += dt * 0.028;
+    // Deriva lenta y continua del espectro: los colores fluyen orgánicamente por los filamentos 3D
+    params.chromaShift.value += dt * 0.035;
 
-    // 1. EL FUELLE DEL ARMONIO (Dinámica continua de respiración)
-    if (spaceHolding) {
-      params.bellowsInhale.value = Math.min(1.0, params.bellowsInhale.value + dt * 2.2);
-    } else {
-      params.bellowsInhale.value = Math.max(0.0, params.bellowsInhale.value - dt * 1.5);
-    }
-    panel?.updateBellows(params.bellowsInhale.value);
-
-    // 2. INTERPOLACIÓN LENTA DE ACORDES ("como un fuelle llenándose de aire")
-    if (params.chordMorph.value < 1.0) {
-      params.chordMorph.value = Math.min(1.0, params.chordMorph.value + dt / chordDuration);
-    }
-
-    // 3. LA VOZ (MOUSE) Y SUS 3 ECOS DE REVERBERACIÓN
-    if (now - lastMoveTime < 1800) {
-      voiceHistory.push({ pos: hit.clone(), time: now });
-      while (voiceHistory.length > 0 && (now - voiceHistory[0].time) > 1300) {
-        voiceHistory.shift();
-      }
-      const dtVoice = Math.max(0.016, (now - lastVoiceTime) / 1000);
-      params.voiceVel.value.subVectors(hit, lastVoicePos).divideScalar(dtVoice);
-      lastVoicePos.copy(hit);
-      lastVoiceTime = now;
-
-      const findEcho = (delayMs) => {
-        const targetTime = now - delayMs;
-        let bestPos = hit;
-        let bestDiff = Infinity;
-        for (let i = 0; i < voiceHistory.length; i++) {
-          const diff = Math.abs(voiceHistory[i].time - targetTime);
-          if (diff < bestDiff) {
-            bestDiff = diff;
-            bestPos = voiceHistory[i].pos;
-          }
-        }
-        return bestPos;
-      };
-
-      params.voiceEcho1.value.copy(findEcho(200));
-      params.voiceEcho2.value.copy(findEcho(450));
-      params.voiceEcho3.value.copy(findEcho(750));
-    } else {
-      params.voiceActive.value = Math.max(0.0, params.voiceActive.value - dt * 1.5);
-    }
-
-    // 4. PROPAGACIÓN DE ONDA ACÚSTICA DE LAS ARPAS
-    if (params.harpActive.value > 0.0) {
-      params.harpWavePos.value += params.harpWaveDir.value * dt * 9.5;
-      params.harpActive.value = Math.max(0.0, params.harpActive.value - dt * 0.35);
-    }
-
-    // 5. ASCENSO CELESTIAL AL MANTENER SHIFT
-    if (shiftHolding) {
-      params.celestialActive.value = Math.min(1.0, params.celestialActive.value + dt * 2.5);
-      params.speedMultiplier.value = 1.85;
-    } else {
-      params.celestialActive.value = Math.max(0.0, params.celestialActive.value - dt * 1.8);
-      params.speedMultiplier.value = speedMultipliers[speedLevel];
-    }
-
-    // 6. CONTROL DE CRÉDITOS Y SILENCIO FINAL
-    if (creditsState === 'ROLLING') {
-      creditsElapsed += dt;
-      if (creditsElapsed > 6.5) {
-        creditsState = 'SILENCE';
-        params.creditsActive.value = 0.0;
-        params.codaSilence.value = 1.0;
-        panel?.updateCreditsState(creditsState);
-      }
-    } else if (creditsState === 'SILENCE') {
-      if (params.codaMotePulse.value > 0.0) {
-        params.codaMotePulse.value = Math.max(0.0, params.codaMotePulse.value - dt * 0.45);
-      }
-    }
-
-    // Interpolación suave y gradual entre paletas
+    // Interpolación suave y gradual entre paletas (avanza de a poco)
     if (params.paletteMix.value < 1.0) {
       params.paletteMix.value = Math.min(1.0, params.paletteMix.value + dt / transitionDuration);
     }
 
-    // Avance gradual del morphing de formas 3D
+    // Avance gradual del morphing de formas 3D por fuerzas del sistema (Craig Reynolds)
     if (params.shapeMorph.value < 1.0) {
       params.shapeMorph.value = Math.min(1.0, params.shapeMorph.value + dt / shapeMorphDuration);
+
+      // Interpolación continua y suave de los parámetros armónicos hacia la figura destino
       const lerpSpeed = Math.min(1.0, dt * 2.2);
       params.harmonics.value += (targetHarmonics - params.harmonics.value) * lerpSpeed;
       params.swirl.value += (targetSwirl - params.swirl.value) * lerpSpeed;
@@ -475,54 +351,62 @@ async function main() {
 
     const audio = audioManager.update();
 
-    // SINCRONIZACIÓN DE LA PARTITURA VISUAL CON RADIOHEAD
+    // LA MÚSICA ÚNICAMENTE CAMBIA LA PALETA ESPECTRAL SEGÚN LA ETAPA DE LA CANCIÓN
     if (audioManager.getIsPlaying()) {
       const curTime = audioManager.getCurrentTime();
       const duration = audioManager.getDuration();
       let currentStage = 0;
-      let stageDesc = '';
 
+      let stageDesc = '';
       if (duration > 0 && duration <= 230) {
+        // Estructura específica para Motion Picture Soundtrack de Radiohead
         if (curTime < 52) {
-          currentStage = 0; // Paleta 0: Película de Celuloide Antiguo (Añil, pizarra y marfil)
-          stageDesc = '🎹 <strong>Etapa 1 (0:00 - 0:52):</strong> Armonio solitario y celuloide<br>✦ <em>Fuelle con Espacio · Toca los acordes con A S D F G H J K</em>';
+          currentStage = 4; // Etapa 1: Armonio solo -> Azul Cian Profundo
+          stageDesc = '🎹 <strong>Etapa 1 (0:00 - 0:52):</strong> Armonio solitario<br>✦ Paleta: <em>Bioluminiscencia Azul Cian</em>';
         } else if (curTime < 90) {
-          currentStage = 2; // Paleta 2: Madera cálida y ámbar
-          stageDesc = '🎻 <strong>Etapa 2 (0:52 - 1:30):</strong> Entrada de bajo · La voz de Thom<br>✦ <em>El mouse es la voz: dibuja la melodía y observa los 3 ecos</em>';
+          currentStage = 1; // Etapa 2: Contrabajo -> Seda Ópalo y Amatista
+          stageDesc = '🎻 <strong>Etapa 2 (0:52 - 1:30):</strong> Entrada de bajo y melancolía<br>✦ Paleta: <em>Seda Ópalo y Amatista</em>';
         } else if (curTime < 140) {
-          currentStage = 1; // Paleta 1: Seda Ópalo y Prisma
-          stageDesc = '✨ <strong>Etapa 3 (1:30 - 2:20):</strong> Clímax celestial con arpa y coros<br>✦ <em>Barre 1 al 0 para arpas · Mantén Shift para ascensión celestial</em>';
+          currentStage = 0; // Etapa 3: Arpa y Coros -> Prisma Espectral Arcoíris
+          stageDesc = '✨ <strong>Etapa 3 (1:30 - 2:20):</strong> Clímax celestial con arpas<br>✦ Paleta: <em>Prisma Espectral Arcoíris</em>';
         } else {
-          currentStage = 0;
-          stageDesc = '🌅 <strong>Etapa 4 (2:20 - Fin):</strong> Desvanecimiento y Coda<br>✦ <em>Presiona Enter para rodar créditos · Toca teclas en el silencio</em>';
+          currentStage = 2; // Etapa 4: Coda y Desvanecimiento -> Fuego Dorado y Ámbar
+          stageDesc = '🌅 <strong>Etapa 4 (2:20 - Fin):</strong> Coda final ("I will see you...")<br>✦ Paleta: <em>Fuego Dorado y Ámbar</em>';
         }
       } else if (duration > 0) {
+        // Para cualquier otra canción según su porcentaje de avance
         const prog = curTime / duration;
         if (prog < 0.25) {
-          currentStage = 0;
-          stageDesc = '🎵 <strong>Etapa 1 (0-25%):</strong> Armonio y celuloide';
+          currentStage = 4;
+          stageDesc = '🎵 <strong>Etapa 1 (0-25%):</strong> Introducción<br>✦ Paleta: <em>Bioluminiscencia Azul Cian</em>';
         } else if (prog < 0.50) {
-          currentStage = 2;
-          stageDesc = '🎵 <strong>Etapa 2 (25-50%):</strong> Bajo y voz';
-        } else if (prog < 0.75) {
           currentStage = 1;
-          stageDesc = '🎵 <strong>Etapa 3 (50-75%):</strong> Clímax celestial';
-        } else {
+          stageDesc = '🎵 <strong>Etapa 2 (25-50%):</strong> Desarrollo armónico<br>✦ Paleta: <em>Seda Ópalo y Amatista</em>';
+        } else if (prog < 0.75) {
           currentStage = 0;
-          stageDesc = '🎵 <strong>Etapa 4 (75-100%):</strong> Coda y créditos';
+          stageDesc = '🎵 <strong>Etapa 3 (50-75%):</strong> Clímax sonoro<br>✦ Paleta: <em>Prisma Espectral Arcoíris</em>';
+        } else {
+          currentStage = 2;
+          stageDesc = '🎵 <strong>Etapa 4 (75-100%):</strong> Conclusión<br>✦ Paleta: <em>Fuego Dorado y Ámbar</em>';
         }
       }
 
       if (currentStage !== lastStage) {
         lastStage = currentStage;
-        const songFadeDuration = Math.max(15.0, params.transitionDuration ? params.transitionDuration.value : 15.0);
+        // Transición lenta, majestuosa y etérea (20 segundos por defecto)
+        const songFadeDuration = Math.max(20.0, params.transitionDuration ? params.transitionDuration.value : 20.0);
         transitionToPalette(currentStage, songFadeDuration);
-        panel?.refresh();
-        panel?.setStageInfo(stageDesc);
+        if (panel?.refresh) panel.refresh();
+        if (panel?.setStageInfo) panel.setStageInfo(stageDesc);
       }
     }
 
+    if (mode === 'LAB') {
+      panel.updateAudioMeters(audio);
+    }
+
     simulation.stepSimulation();
+
     orbit.update();
     renderer.render(scene, camera);
   });
