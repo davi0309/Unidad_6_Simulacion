@@ -1,6 +1,6 @@
 # Unidad 6 · Instrumento Visual de Agentes Autónomos y Flow Fields
 
-Instrumento visual interactivo y generativo para la **interpretación musical en tiempo real por parte de una persona**, desarrollado con **Three.js WebGPU**, **TSL (Three Shading Language)** y la **Web Audio API**.
+Instrumento visual interactivo y generativo para la **interpretación musical en tiempo real por parte de una persona**, desarrollado con **Three.js WebGPU**, **TSL (Three Shading Language)** y la **Web Audio API**. xd
 
 ---
 
