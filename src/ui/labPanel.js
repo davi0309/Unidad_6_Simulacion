@@ -1,8 +1,7 @@
 /**
  * labPanel.js
- * Panel interactivo para el Instrumento Visual 3D de la Unidad 6.
- * Incluye selector de velocidad con un solo clic, arquetipos 3D en esfera,
- * controles del campo armónico y atajos de interpretación.
+ * Consola de Interpretación y Laboratorio para Motion Picture Soundtrack
+ * Metáfora: Película Vieja de Celuloide y Respiración de Armonio
  */
 
 function rangeRow(parent, label, object, key, min, max, step, onInput, getValue) {
@@ -75,6 +74,12 @@ export function createLabPanel({
   audioManager,
   onResetVisuals,
   onApplyPreset,
+  onChordChange,
+  onBellowsToggle,
+  onHarpGlissando,
+  onCelestialHold,
+  onCreditsToggle,
+  onCodaMotePulse,
   onModeChange,
   onSpeedChange,
   onBlendingChange,
@@ -84,14 +89,14 @@ export function createLabPanel({
   const panel = document.createElement('aside');
   panel.className = 'panel';
   panel.innerHTML = `
-    <h1>U6 · Instrumento Visual 3D (Esfera)</h1>
-    <p>Agentes autónomos en esfera 3D. Conduces la morfología en tiempo real.</p>
+    <h1>🎞️ Película Vieja & Respiración</h1>
+    <p><em>Motion Picture Soundtrack</em> · Armonio, Celuloide y Luz 3D en WebGPU</p>
   `;
 
-  // SECCIÓN 1: REPRODUCTOR DE MÚSICA Y PALETA ESPECTRAL ---------------------
+  // SECCIÓN 1: REPRODUCTOR DE MÚSICA Y GUÍA DE PARTITURA ---------------------
   const audioGroup = document.createElement('div');
   audioGroup.className = 'group audio-group';
-  audioGroup.innerHTML = '<h2>Música y Paletas Espectrales</h2><p>La canción cambia automáticamente la paleta espectral según la etapa musical. Cero afectación al brillo.</p>';
+  audioGroup.innerHTML = '<h2>Música y Etapas de la Obra</h2>';
 
   const trackInfo = document.createElement('div');
   trackInfo.className = 'track-info';
@@ -106,7 +111,7 @@ export function createLabPanel({
 
   const playBtn = document.createElement('button');
   playBtn.className = 'primary-btn';
-  playBtn.textContent = '▶ Reproducir';
+  playBtn.textContent = '▶ Reproducir Canción';
   playBtn.addEventListener('click', () => {
     const playing = audioManager.togglePlay();
     playBtn.textContent = playing ? '⏸ Pausar' : '▶ Reproducir';
@@ -115,7 +120,7 @@ export function createLabPanel({
 
   const fileLabel = document.createElement('label');
   fileLabel.className = 'file-btn';
-  fileLabel.innerHTML = '📂 Cargar canción (.mp3)';
+  fileLabel.innerHTML = '📂 Cargar .mp3 propio';
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = 'audio/*';
@@ -135,143 +140,153 @@ export function createLabPanel({
   const stageInfo = document.createElement('div');
   stageInfo.className = 'stage-info';
   stageInfo.style.cssText = 'margin-top: 8px; font-size: 11.5px; padding: 8px 10px; background: rgba(56, 139, 253, 0.12); border: 1px solid rgba(56, 139, 253, 0.35); border-radius: 6px; color: #79c0ff; line-height: 1.4;';
-  stageInfo.innerHTML = '<strong>Etapa Activa:</strong> Pulsa Reproducir para iniciar la conducción.';
+  stageInfo.innerHTML = '<strong>Etapa Activa:</strong> Pulsa Reproducir para sincronizar el score.';
   audioGroup.append(stageInfo);
 
   panel.append(audioGroup);
 
-  // SECCIÓN 2: CONTROL DE VELOCIDAD DINÁMICA ---------------------------------
-  const speedGroup = document.createElement('div');
-  speedGroup.className = 'group';
-  speedGroup.innerHTML = '<h2>Velocidad de Flujo (Tecla T / Shift)</h2><p>Por defecto lenta y serena para apreciar las formas:</p>';
+  // SECCIÓN 2: EL FUELLE DEL ARMONIO (INHALAR / EXHALAR CON ESPACIO) ----------
+  const bellowsGroup = document.createElement('div');
+  bellowsGroup.className = 'group';
+  bellowsGroup.innerHTML = '<h2>🫁 El Fuelle del Armonio (Espacio)</h2><p>Mantén presionada la Barra Espaciadora para inhalar (anillos apretados concéntricos). Suelta para exhalar y expandir el aire.</p>';
 
-  const speedButtonRow = document.createElement('div');
-  speedButtonRow.className = 'button-row speed-row';
+  const bellowsBox = document.createElement('div');
+  bellowsBox.className = 'bellows-box';
 
-  const slowBtn = document.createElement('button');
-  slowBtn.textContent = '🐢 Lenta (Defecto)';
-  slowBtn.className = 'active';
+  const bellowsStatus = document.createElement('div');
+  bellowsStatus.className = 'bellows-status';
+  bellowsStatus.innerHTML = '<span id="bellows-label">Exhalando (Flujo libre)</span><span id="bellows-pct">0%</span>';
 
-  const normalBtn = document.createElement('button');
-  normalBtn.textContent = '🚶 Moderada';
+  const bellowsTrack = document.createElement('div');
+  bellowsTrack.className = 'bellows-track';
+  const bellowsBar = document.createElement('div');
+  bellowsBar.className = 'bellows-bar';
+  bellowsTrack.append(bellowsBar);
 
-  const fastBtn = document.createElement('button');
-  fastBtn.textContent = '⚡ Rápida';
+  const pumpBtn = document.createElement('button');
+  pumpBtn.className = 'accent-btn';
+  pumpBtn.textContent = '🫁 Bombear Fuelle (Mantener presionado)';
+  pumpBtn.addEventListener('mousedown', () => onBellowsToggle?.(true));
+  window.addEventListener('mouseup', () => onBellowsToggle?.(false));
+  pumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); onBellowsToggle?.(true); });
+  window.addEventListener('touchend', () => onBellowsToggle?.(false));
 
-  const updateSpeedButtons = (multiplier) => {
-    slowBtn.classList.toggle('active', multiplier <= 1.1);
-    normalBtn.classList.toggle('active', multiplier > 1.1 && multiplier <= 2.0);
-    fastBtn.classList.toggle('active', multiplier > 2.0);
-  };
+  bellowsBox.append(bellowsStatus, bellowsTrack, pumpBtn);
+  bellowsGroup.append(bellowsBox);
+  panel.append(bellowsGroup);
 
-  slowBtn.addEventListener('click', () => {
-    onSpeedChange(1.0);
-    updateSpeedButtons(1.0);
-    refreshAll();
-  });
-  normalBtn.addEventListener('click', () => {
-    onSpeedChange(1.75);
-    updateSpeedButtons(1.75);
-    refreshAll();
-  });
-  fastBtn.addEventListener('click', () => {
-    onSpeedChange(2.8);
-    updateSpeedButtons(2.8);
-    refreshAll();
-  });
+  // SECCIÓN 3: ACORDES DEL ÓRGANO (FILA CENTRAL A S D F G H J K) -------------
+  const chordsGroup = document.createElement('div');
+  chordsGroup.className = 'group';
+  chordsGroup.innerHTML = '<h2>🎹 Acordes del Armonio (A S D F G H J K)</h2><p>Líneas de campo magnético como limaduras de hierro. Se derriten lentamente de uno a otro:</p>';
 
-  speedButtonRow.append(slowBtn, normalBtn, fastBtn);
-  speedGroup.append(speedButtonRow);
-
-  const speedState = {
-    maxSpeed: params.maxSpeed.value,
-    speedMultiplier: params.speedMultiplier.value
-  };
-  refreshers.push(rangeRow(speedGroup, 'Velocidad Base', speedState, 'maxSpeed', 0.5, 5.0, 0.1, (v) => params.maxSpeed.value = v, () => params.maxSpeed.value));
-
-  panel.append(speedGroup);
-
-  // SECCIÓN 3: FORMAS ARMÓNICAS 3D EN ESFERA --------------------------------
-  const presetGroup = document.createElement('div');
-  presetGroup.className = 'group';
-  presetGroup.innerHTML = '<h2>Morfologías 3D en la Esfera</h2><p>Pétalos, alas y vórtices tridimensionales:</p>';
-
-  const presets = [
-    { id: 'astrolabe', label: '🌌 1. Astrolabio de Cristal (Órbitas 3D)' },
-    { id: 'tornado', label: '🌀 2. Micro-Vórtices (Captura y Lanzamiento 3D)' },
-    { id: 'cosmicVeil', label: '🌊 3. Velo Cósmico (Membrana Fractal)' },
-    { id: 'celestialLotus', label: '🪽 4. Loto Celestial (Alas de Serafín)' },
-    { id: 'astralPillar', label: '🕯️ 5. Pilar Astral (Alma Ascendente)' }
+  const chords = [
+    { id: 0, key: 'A', name: 'Sol Mayor (G)', note: 'Tónica de apertura' },
+    { id: 1, key: 'S', name: 'Si Menor (Bm)', note: 'Melancolía profunda' },
+    { id: 2, key: 'D', name: 'Do Mayor (C)', note: 'Alivio y apertura' },
+    { id: 3, key: 'F', name: 'Do Menor (Cm)', note: 'Tensión trágica' },
+    { id: 4, key: 'G', name: 'Sol/Si (G/B)', note: 'Inversión flotante' },
+    { id: 5, key: 'H', name: 'Mi Menor (Em)', note: 'Suspenso etéreo' },
+    { id: 6, key: 'J', name: 'Do9 (Cadd9)', note: 'Doble hélice armónica' },
+    { id: 7, key: 'K', name: 'Re sus4 (Dsus4)', note: 'Preparación al arpa' }
   ];
 
-  const presetGrid = document.createElement('div');
-  presetGrid.className = 'preset-grid';
-  presets.forEach((p, idx) => {
+  const chordGrid = document.createElement('div');
+  chordGrid.className = 'chord-grid';
+  const chordButtons = [];
+
+  chords.forEach((c) => {
     const btn = document.createElement('button');
-    btn.textContent = `${idx + 1}. ${p.label}`;
+    btn.className = 'chord-btn';
+    btn.innerHTML = `<span class="key-badge">${c.key}</span> <span>${c.name}</span>`;
+    btn.title = `${c.name}: ${c.note}`;
+    if (c.id === 0) btn.classList.add('active');
     btn.addEventListener('click', () => {
-      onApplyPreset(p.id);
-      refreshAll();
+      onChordChange?.(c.id);
+      chordButtons.forEach((b, idx) => b.classList.toggle('active', idx === c.id));
     });
-    presetGrid.append(btn);
+    chordButtons.push(btn);
+    chordGrid.append(btn);
   });
-  presetGroup.append(presetGrid);
 
-  const mutateBtn = button(presetGroup, '🎲 Mutar Visuales (R) · Nueva Semilla 3D', () => {
-    onResetVisuals();
-    refreshAll();
-  }, 'accent-btn');
-  mutateBtn.title = 'Genera nuevas trayectorias tridimensionales sin reiniciar la música';
+  chordsGroup.append(chordGrid);
+  panel.append(chordsGroup);
 
-  panel.append(presetGroup);
+  // SECCIÓN 4: LA VOZ Y LAS ARPAS --------------------------------------------
+  const voiceGroup = document.createElement('div');
+  voiceGroup.className = 'group';
+  voiceGroup.innerHTML = `
+    <h2>🗣️ La Voz y 🪽 Las Arpas</h2>
+    <p><strong>Mouse = La Voz:</strong> Tu cursor es el punto luminoso de la melodía. Deja 3 ecos fantasma con reverberación de catedral.</p>
+    <p><strong>Fila 1–0 = Glissando de Arpa:</strong> Barre los números con el dedo. Los filamentos forman cuerdas verticales y vibran al paso de la onda:</p>
+  `;
 
-  // SECCIÓN 4: PARÁMETROS DEL CAMPO 3D Y ESFERA -----------------------------
-  const agentGroup = document.createElement('div');
-  agentGroup.className = 'group';
-  agentGroup.innerHTML = '<h2>Agentes y Esfera 3D (Unidad 6)</h2>';
+  const harpStrip = document.createElement('div');
+  harpStrip.className = 'harp-strip';
 
-  const simState = {
-    harmonics: params.harmonics.value,
-    swirl: params.swirl.value,
-    petalMorph: params.petalMorph.value,
-    curlStrength: params.curlStrength.value,
-    sphereRadius: params.sphereRadius.value,
-    steerStrength: params.steerStrength.value
-  };
+  const harpAscBtn = document.createElement('button');
+  harpAscBtn.innerHTML = '▶ Glissando Ascendente (1 al 0)';
+  harpAscBtn.addEventListener('click', () => onHarpGlissando?.(1.0));
 
-  refreshers.push(rangeRow(agentGroup, 'Pétalos / Armónicos (← →)', simState, 'harmonics', 1, 9, 1, (v) => params.harmonics.value = v, () => params.harmonics.value));
-  refreshers.push(rangeRow(agentGroup, 'Vórtice / Giro (↑ ↓)', simState, 'swirl', -4, 4, 0.1, (v) => params.swirl.value = v, () => params.swirl.value));
-  refreshers.push(rangeRow(agentGroup, 'Pliegues de Seda 3D', simState, 'petalMorph', 0.2, 2.5, 0.05, (v) => params.petalMorph.value = v, () => params.petalMorph.value));
-  refreshers.push(rangeRow(agentGroup, 'Radio Esfera 3D', simState, 'sphereRadius', 3.0, 8.0, 0.1, (v) => params.sphereRadius.value = v, () => params.sphereRadius.value));
-  refreshers.push(rangeRow(agentGroup, 'Fuerza Maniobra (Steering)', simState, 'steerStrength', 2, 20, 0.5, (v) => params.steerStrength.value = v, () => params.steerStrength.value));
+  const harpDescBtn = document.createElement('button');
+  harpDescBtn.innerHTML = '◀ Glissando Descendente (0 al 1)';
+  harpDescBtn.addEventListener('click', () => onHarpGlissando?.(-1.0));
 
-  panel.append(agentGroup);
+  harpStrip.append(harpAscBtn, harpDescBtn);
+  voiceGroup.append(harpStrip);
+  panel.append(voiceGroup);
 
-  // SECCIÓN 5: ESTÉTICA Y CROMATISMO ----------------------------------------
-  const visualGroup = document.createElement('div');
-  visualGroup.className = 'group';
-  visualGroup.innerHTML = '<h2>Filamentos y Cromatismo</h2>';
+  // SECCIÓN 5: FINAL CELESTIAL Y CRÉDITOS ------------------------------------
+  const climaxGroup = document.createElement('div');
+  climaxGroup.className = 'group';
+  climaxGroup.innerHTML = '<h2>✨ Final Celestial y 📜 Créditos</h2>';
 
-  const visualState = {
+  const celestialBtn = document.createElement('button');
+  celestialBtn.className = 'celestial-btn';
+  celestialBtn.innerHTML = '✨ Ascenso Celestial [Shift Mantener] · Gravedad Invertida + Physarum';
+  celestialBtn.addEventListener('mousedown', () => { onCelestialHold?.(true); celestialBtn.classList.add('active'); });
+  window.addEventListener('mouseup', () => { onCelestialHold?.(false); celestialBtn.classList.remove('active'); });
+  celestialBtn.addEventListener('touchstart', (e) => { e.preventDefault(); onCelestialHold?.(true); celestialBtn.classList.add('active'); });
+  window.addEventListener('touchend', () => { onCelestialHold?.(false); celestialBtn.classList.remove('active'); });
+  climaxGroup.append(celestialBtn);
+
+  const creditsBtn = document.createElement('button');
+  creditsBtn.className = 'credits-btn';
+  creditsBtn.style.marginTop = '6px';
+  creditsBtn.innerHTML = '📜 Rodar Créditos Finales [Enter] ➔ Pantalla Vacía y Silencio';
+  creditsBtn.addEventListener('click', () => onCreditsToggle?.());
+  climaxGroup.append(creditsBtn);
+
+  const motesBtn = document.createElement('button');
+  motesBtn.style.marginTop = '6px';
+  motesBtn.innerHTML = '🌌 Motas Tenues del Silencio (Coda Oculta *Genchildren*)';
+  motesBtn.addEventListener('click', () => onCodaMotePulse?.());
+  climaxGroup.append(motesBtn);
+
+  panel.append(climaxGroup);
+
+  // SECCIÓN 6: ESTÉTICA DE PELÍCULA ANTIGUA Y CELULOIDE ----------------------
+  const filmGroup = document.createElement('div');
+  filmGroup.className = 'group';
+  filmGroup.innerHTML = '<h2>🎞️ Celuloide y Textura de Película</h2>';
+
+  const filmState = {
+    filmGrain: params.filmGrain.value,
+    filmFlicker: params.filmFlicker.value,
     lineLength: params.lineLength.value,
     lineWidth: params.lineWidth.value,
-    filamentAlpha: params.filamentAlpha.value,
-    transitionDuration: params.transitionDuration ? params.transitionDuration.value : 20.0
+    filamentAlpha: params.filamentAlpha.value
   };
 
   const initialPal = params.paletteB ? params.paletteB.value : params.paletteId.value;
-  const paletteSelect = selectRow(visualGroup, 'Paleta Espectral (C)', [
-    '0 · Prisma Espectral Arcoíris',
-    '1 · Seda Ópalo y Cristal',
-    '2 · Sol Dorado y Fuego',
+  const paletteSelect = selectRow(filmGroup, 'Paleta Cinemática (C)', [
+    '0 · Película de Celuloide Antiguo (Añil, pizarra y marfil)',
+    '1 · Seda Ópalo y Amatista (Turquesa y magenta)',
+    '2 · Fuego Dorado y Madera Cálida',
     '3 · Mariposa Neón / Lavanda',
-    '4 · Bioluminiscencia Azul Cian'
+    '4 · Océano Profundo y Azul Cian'
   ], initialPal, (idx) => {
-    if (onPaletteChange) {
-      onPaletteChange(idx);
-    } else {
-      params.paletteId.value = idx;
-    }
+    onPaletteChange?.(idx);
   });
 
   refreshers.push({
@@ -281,68 +296,114 @@ export function createLabPanel({
     }
   });
 
-  selectRow(visualGroup, 'Mezcla de Color', [
-    'Seda de Color Puro (Sin Blanco)',
-    'Luz Resplandeciente (Aditivo)'
-  ], 0, (idx) => {
-    onBlendingChange?.(idx === 0 ? 'normal' : 'additive');
-  });
+  refreshers.push(rangeRow(filmGroup, 'Grano de Película (24 FPS)', filmState, 'filmGrain', 0.0, 0.7, 0.02, (v) => params.filmGrain.value = v, () => params.filmGrain.value));
+  refreshers.push(rangeRow(filmGroup, 'Parpadeo de Proyector (Flicker)', filmState, 'filmFlicker', 0.0, 0.5, 0.02, (v) => params.filmFlicker.value = v, () => params.filmFlicker.value));
+  refreshers.push(rangeRow(filmGroup, 'Longitud de Rayón / Pelo', filmState, 'lineLength', 0.1, 0.8, 0.02, (v) => params.lineLength.value = v, () => params.lineLength.value));
+  refreshers.push(rangeRow(filmGroup, 'Grosor de Filamento', filmState, 'lineWidth', 0.008, 0.05, 0.002, (v) => params.lineWidth.value = v, () => params.lineWidth.value));
+  refreshers.push(rangeRow(filmGroup, 'Opacidad de Celuloide', filmState, 'filamentAlpha', 0.1, 0.9, 0.02, (v) => params.filamentAlpha.value = v, () => params.filamentAlpha.value));
 
-  refreshers.push(rangeRow(visualGroup, 'Duración Transición (s)', visualState, 'transitionDuration', 4, 35, 1, (v) => {
-    if (params.transitionDuration) params.transitionDuration.value = v;
-  }, () => params.transitionDuration ? params.transitionDuration.value : 20));
-  refreshers.push(rangeRow(visualGroup, 'Longitud Filamento', visualState, 'lineLength', 0.1, 1.2, 0.02, (v) => params.lineLength.value = v, () => params.lineLength.value));
-  refreshers.push(rangeRow(visualGroup, 'Grosor Línea', visualState, 'lineWidth', 0.008, 0.06, 0.002, (v) => params.lineWidth.value = v, () => params.lineWidth.value));
-  refreshers.push(rangeRow(visualGroup, 'Opacidad de Seda', visualState, 'filamentAlpha', 0.04, 0.4, 0.01, (v) => params.filamentAlpha.value = v, () => params.filamentAlpha.value));
+  panel.append(filmGroup);
 
-  panel.append(visualGroup);
+  // SECCIÓN 7: VELOCIDAD Y ACCIONES GLOBALES ---------------------------------
+  const actionsGroup = document.createElement('div');
+  actionsGroup.className = 'group';
+  actionsGroup.innerHTML = '<h2>Velocidad y Pantalla</h2>';
 
-  // SECCIÓN 6: ACCIONES Y PERFORMANCE ---------------------------------------
-  const actionGroup = document.createElement('div');
-  actionGroup.className = 'group';
-  actionGroup.innerHTML = '<h2>Interpretación en Vivo</h2>';
+  const speedRow = document.createElement('div');
+  speedRow.className = 'speed-row';
 
-  button(actionGroup, 'Cambiar Modo (P): LAB / PERFORMANCE', onModeChange, 'primary-btn');
+  const slowBtn = document.createElement('button');
+  slowBtn.textContent = '🐢 Lenta';
+  slowBtn.className = 'active';
 
+  const normBtn = document.createElement('button');
+  normBtn.textContent = '🚶 Moderada';
+
+  const fastBtn = document.createElement('button');
+  fastBtn.textContent = '⚡ Rápida';
+
+  const updateSpeedButtons = (multiplier) => {
+    slowBtn.classList.toggle('active', multiplier <= 1.1);
+    normBtn.classList.toggle('active', multiplier > 1.1 && multiplier <= 2.0);
+    fastBtn.classList.toggle('active', multiplier > 2.0);
+  };
+
+  slowBtn.addEventListener('click', () => { onSpeedChange?.(1.0); updateSpeedButtons(1.0); });
+  normBtn.addEventListener('click', () => { onSpeedChange?.(1.75); updateSpeedButtons(1.75); });
+  fastBtn.addEventListener('click', () => { onSpeedChange?.(2.8); updateSpeedButtons(2.8); });
+
+  speedRow.append(slowBtn, normBtn, fastBtn);
+  actionsGroup.append(speedRow);
+
+  button(actionsGroup, '📺 Alternar Modo (P): LAB / PERFORMANCE', onModeChange, 'primary-btn');
+  button(actionsGroup, '🎲 Mutar Trayectorias (R) · Nueva Semilla', onResetVisuals, 'accent-btn');
+
+  // GUÍA RÁPIDA DE INTERPRETACIÓN
   const guide = document.createElement('div');
   guide.className = 'quick-guide';
   guide.innerHTML = `
-    <strong>Controles en Vivo del Intérprete:</strong><br>
-    • <strong>P</strong>: Modo PERFORMANCE (pantalla completa limpia).<br>
-    • <strong>Shift</strong>: Mantener para Turbo / Acelerar velocidad.<br>
-    • <strong>T</strong>: Ciclar velocidad (Lenta / Moderada / Rápida).<br>
-    • <strong>R</strong>: Mutar / Nueva forma 3D sin pausar música.<br>
-    • <strong>1–5</strong>: Cambiar morfología 3D de la pieza.<br>
-    • <strong>Espacio</strong>: Acento manual de energía.<br>
-    • <strong>C</strong>: Ciclar paleta espectral.<br>
-    • <strong>F</strong>: Invertir sentido del flujo.<br>
-    • <strong>↑ / ↓</strong>: Modular giro/vórtice 3D en vivo.<br>
-    • <strong>← / →</strong>: Modular número de pétalos 3D.<br>
-    • <strong>Orbitar ratón</strong>: Rotar la cámara en 360° por la esfera 3D.
+    <strong>Tabla de Interpretación al Teclado:</strong><br>
+    • <strong>Espacio</strong>: Fuelle del armonio (inhalar y exhalar)<br>
+    • <strong>A S D F G H J K</strong>: Acordes de armonio (G, Bm, C, Cm, G/B, Em, Cadd9, D)<br>
+    • <strong>Mouse</strong>: La voz con reverberación (3 ecos difusos)<br>
+    • <strong>1 al 0 (barrido)</strong>: Glissando de arpas (cuerdas vibrantes)<br>
+    • <strong>Shift</strong>: Ascenso celestial (gravedad invertida + Physarum)<br>
+    • <strong>Enter</strong>: Créditos finales y pantalla vacía de celuloide<br>
+    • <strong>Cualquier tecla en el silencio</strong>: Motas tenues del final
   `;
-  actionGroup.append(guide);
-  panel.append(actionGroup);
+  actionsGroup.append(guide);
 
+  panel.append(actionsGroup);
   document.body.append(panel);
 
   function refreshAll() {
     for (const item of refreshers) item.refresh();
   }
 
-  function updateAudioMeters() {
-    // Los vúmetros se han retirado; el audio modula exclusivamente la paleta según la etapa
-  }
-
   function setStageInfo(htmlContent) {
     if (stageInfo) stageInfo.innerHTML = htmlContent;
+  }
+
+  function updateBellows(val) {
+    bellowsBar.style.width = `${Math.round(val * 100)}%`;
+    const label = document.getElementById('bellows-label');
+    const pct = document.getElementById('bellows-pct');
+    if (label && pct) {
+      pct.textContent = `${Math.round(val * 100)}%`;
+      label.textContent = val > 0.05 ? '🫁 Inhalando (Fuelle comprimido)' : '🌬️ Exhalando (Fuelle relajado)';
+    }
+  }
+
+  function updateActiveChord(idx) {
+    chordButtons.forEach((b, i) => b.classList.toggle('active', i === idx));
+  }
+
+  function updateCreditsState(state) {
+    creditsBtn.classList.toggle('active', state === 'ROLLING' || state === 'SILENCE');
+    if (state === 'ROLLING') {
+      creditsBtn.innerHTML = '⏳ Rodando Créditos... [Enter para reiniciar]';
+    } else if (state === 'SILENCE') {
+      creditsBtn.innerHTML = '🌌 Silencio Total (Toca teclas para motas) [Enter para reiniciar]';
+    } else {
+      creditsBtn.innerHTML = '📜 Rodar Créditos Finales [Enter] ➔ Pantalla Vacía y Silencio';
+    }
+  }
+
+  function flashHarp(dir) {
+    const btn = dir > 0 ? harpAscBtn : harpDescBtn;
+    btn.style.borderColor = '#388bfd';
+    setTimeout(() => { btn.style.borderColor = ''; }, 400);
   }
 
   return {
     element: panel,
     setVisible(visible) { panel.classList.toggle('hidden', !visible); },
     refresh: refreshAll,
-    updateAudioMeters,
     updateSpeedButtons,
-    setStageInfo
+    setStageInfo,
+    updateBellows,
+    updateActiveChord,
+    updateCreditsState,
+    flashHarp
   };
 }

@@ -17,38 +17,68 @@ export function createParameters() {
     sphereRadius: uniform(5.5),        // Radio amplio para que los agentes llenen todo el espacio 3D
     boundsSize: uniform(14.0),
 
-    // Geometría y opacidad de los filamentos (Colores vivos sobre fondo negro)
-    lineWidth: uniform(0.024),         // Líneas finas y nítidas
-    lineLength: uniform(0.42),         // Longitud de filamento
-    filamentAlpha: uniform(0.45),      // Opacidad translúcida calibrada para colores vivos sin blanquear
+    // Geometría y opacidad de los filamentos (Estética de Celuloide / Rayones de Película)
+    lineWidth: uniform(0.022),         // Rayón fino
+    lineLength: uniform(0.35),         // Rayitas cortas de celuloide / limaduras
+    filamentAlpha: uniform(0.55),      // Densidad sin blanqueamiento
+    filmGrain: uniform(0.28),          // Grano de película de 35mm (24 FPS)
+    filmFlicker: uniform(0.20),        // Parpadeo sutil de lámpara de proyector
 
     // Dinámica de agentes autónomos (Craig Reynolds)
-    steerStrength: uniform(5.2),       // Maniobra fluida orgánica
+    steerStrength: uniform(6.5),       // Maniobra ágil y sensible
     dragCoefficient: uniform(0.05),
 
-    // Campo de flujo armónico 3D y transición de fuerzas entre arquetipos (Craig Reynolds)
-    shapeA: uniform(0.0),              // Arquetipo origen en la transición
-    shapeB: uniform(0.0),              // Arquetipo destino (0: Astrolabio, 1: Tornado, 2: Velo, 3: Loto, 4: Pilar)
-    shapeMorph: uniform(1.0),          // 0.0 (100% Campo A) -> 1.0 (100% Campo B)
-    symmetryType: uniform(0.0),        // Mantenido para retrocompatibilidad
-    harmonics: uniform(4.0),           // Orden armónico 3D
-    swirl: uniform(1.4),               // Giro armónico
-    curlStrength: uniform(0.6),        // Ruido curl 3D
-    petalMorph: uniform(1.3),          // Amplitud de pétalos/alas 3D
-    flowDirection: uniform(1.0),       // 1.0 hacia afuera, -1.0 hacia adentro
+    // 1. EL FUELLE DEL ARMONIO (Barra Espaciadora: Inhalar / Exhalar)
+    bellowsInhale: uniform(0.0),       // 0.0 = Exhalar / Expansión del campo -> 1.0 = Inhalar / Anillos apretados
 
-    // Conducción del intérprete
+    // 2. ACORDES DEL ÓRGANO (Fila Central A S D F G H J K)
+    chordA: uniform(0.0),              // Acorde origen
+    chordB: uniform(0.0),              // Acorde destino (0: G, 1: Bm, 2: C, 3: Cm, 4: G/B, 5: Em, 6: Cadd9, 7: Dsus4)
+    chordMorph: uniform(1.0),          // 0.0 -> 1.0 transición lenta ("como un armonio llenándose de aire")
+    chordWeight: uniform(1.0),         // 1.0 = Acordes de armonio activos, 0.0 = Arquetipos libres
+
+    // Campo de flujo armónico 3D y arquetipos visuales
+    shapeA: uniform(0.0),
+    shapeB: uniform(0.0),
+    shapeMorph: uniform(1.0),
+    symmetryType: uniform(0.0),
+    harmonics: uniform(4.0),
+    swirl: uniform(1.4),
+    curlStrength: uniform(0.45),
+    petalMorph: uniform(1.3),
+    flowDirection: uniform(1.0),
+
+    // 3. LA VOZ (El mouse es la voz con ecos de reverberación)
+    voicePos: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
+    voiceVel: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
+    voiceEcho1: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
+    voiceEcho2: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
+    voiceEcho3: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
+    voiceActive: uniform(0.0),         // 1.0 cuando la voz canta/se mueve
     attractor: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
-    attractorStrength: uniform(0.0),   // Fuerza del conductor con el ratón
-    userPulse: uniform(0.0),           // Acento manual (Espacio)
+    attractorStrength: uniform(0.0),
+    userPulse: uniform(0.0),
+
+    // 4. LAS ARPAS (Glissando barrido del 1 al 0)
+    harpActive: uniform(0.0),          // 0.0 -> 1.0 cuerdas tensas vibrando
+    harpWavePos: uniform(0.0),         // Posición de la onda viajera a lo largo de las cuerdas (-4.0 a +4.0)
+    harpWaveDir: uniform(1.0),         // +1.0 (barrido 1->0) o -1.0 (barrido 0->1)
+
+    // 5. EL FINAL CELESTIAL (Shift mantener: Gravedad Invertida + Physarum)
+    celestialActive: uniform(0.0),     // 0.0 -> 1.0 al mantener Shift
+
+    // 6. LOS CRÉDITOS Y EL SILENCIO (Enter)
+    creditsActive: uniform(0.0),       // 0.0 -> 1.0 filamentos suben en renglones de celuloide
+    codaSilence: uniform(0.0),         // 1.0 cuando la pantalla queda vacía con grano y parpadeo
+    codaMotePulse: uniform(0.0),       // Motas de polvo tenues al tocar cualquier tecla en el silencio
 
     // Estética espectral y transición suave entre paletas
-    paletteId: uniform(4.0),           // Paleta activa / objetivo
-    paletteA: uniform(4.0),            // Paleta origen en la transición
-    paletteB: uniform(4.0),            // Paleta destino en la transición
-    paletteMix: uniform(1.0),          // 0.0 (Paleta A) -> 1.0 (Paleta B), interpolación suave
-    transitionDuration: uniform(20.0),  // Duración en segundos de la transición gradual (20s por defecto)
-    chromaShift: uniform(0.0),         // Desplazamiento cromático continuo (deriva lenta orgánica)
+    paletteId: uniform(0.0),           // Paleta 0 por defecto: Azul Celuloide y Plata
+    paletteA: uniform(0.0),
+    paletteB: uniform(0.0),
+    paletteMix: uniform(1.0),
+    transitionDuration: uniform(20.0),
+    chromaShift: uniform(0.0),
     dispersion: uniform(0.85),
 
     // Semilla procedural

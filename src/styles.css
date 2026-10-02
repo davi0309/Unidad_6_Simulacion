@@ -226,3 +226,88 @@ canvas { display: block; width: 100%; height: 100%; }
   pointer-events: none;
 }
 .hud strong { color: #58a6ff; }
+
+/* ESTILOS DE ARMONIO Y PELÍCULA VIEJA */
+.bellows-box {
+  background: rgba(13, 17, 23, 0.7);
+  border: 1px solid rgba(56, 139, 253, 0.25);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+.bellows-status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  margin-bottom: 6px;
+  color: #79c0ff;
+}
+.bellows-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.bellows-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #388bfd, #58a6ff, #e6edf3);
+  transition: width 0.05s linear;
+}
+.chord-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.chord-btn {
+  text-align: left;
+  font-size: 11.5px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chord-btn .key-badge {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #58a6ff;
+}
+.chord-btn.active {
+  background: rgba(56, 139, 253, 0.35);
+  border-color: #388bfd;
+  color: #fff;
+}
+.harp-strip {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.harp-strip button {
+  font-size: 11px;
+  padding: 7px;
+}
+.celestial-btn {
+  background: linear-gradient(135deg, rgba(210, 153, 34, 0.25), rgba(163, 113, 247, 0.25)) !important;
+  border-color: #d29922 !important;
+  color: #f0e6d2 !important;
+}
+.celestial-btn.active {
+  background: linear-gradient(135deg, rgba(210, 153, 34, 0.55), rgba(163, 113, 247, 0.55)) !important;
+  box-shadow: 0 0 12px rgba(210, 153, 34, 0.4);
+}
+.credits-btn {
+  background: rgba(110, 118, 129, 0.2) !important;
+  border-color: rgba(110, 118, 129, 0.4) !important;
+  color: #c9d1d9 !important;
+}
+.credits-btn.active {
+  background: rgba(248, 81, 73, 0.25) !important;
+  border-color: #f85149 !important;
+  color: #ff7b72 !important;
+}
