@@ -1,15 +1,15 @@
-# Unidad 6 · Instrumento Visual de Agentes Autónomos y Flow Fields
+# Unidad 6 · Instrumento Visual de Agentes Autónomos y Flow Fields en Esfera 3D
 
-Instrumento visual interactivo y generativo para la **interpretación musical en tiempo real por parte de una persona**, desarrollado con **Three.js WebGPU**, **TSL (Three Shading Language)** y la **Web Audio API**. xd
+Instrumento visual interactivo y generativo para la **interpretación musical en tiempo real por parte de una persona**, desarrollado con **Three.js WebGPU**, **TSL (Three Shading Language)** y la **Web Audio API**.
 
 ---
 
-## 🌟 Filosofía del Instrumento
+## 🌟 Filosofía y Novedades del Instrumento
 
-El sistema está concebido para ser **tocado e interpretado en vivo por una persona**:
-- **Conducción 100% Humana:** La música **no** mueve ni calcula de manera autónoma las fuerzas del sistema. Toda la física, dirección de flujos, selección de formas y acentos cinéticos son guiados por la persona mediante el teclado y el ratón.
-- **Iluminación Reactiva por Audio:** La canción que se reproduce en segundo plano actúa como el lienzo sonoro, modulando sutilmente el **fulgor, luminancia y destellos de color de los filamentos** sin intervenir en las trayectorias de las partículas.
-- **Filamentos Orientados con Dispersión Cromática:** Cada uno de los más de $130{,}000$ agentes se renderiza como una línea de luz orientada en la dirección de su velocidad instantánea ($\operatorname{atan2}(v_y, v_x)$) con mezcla aditiva y refracción espectral sobre fondo negro absoluto (`#000000`).
+- **Espacio Esférico 3D:** Los más de $130{,}000$ agentes se mueven por todo el volumen tridimensional, confinados elásticamente dentro de una gran esfera. Puedes orbitar en 360° con el ratón para apreciar la profundidad, los pliegues y las capas interiores.
+- **Velocidad Serenade y Control de Tempo:** Por defecto, los filamentos se desplazan de manera más lenta y majestuosa, permitiendo apreciar nítidamente la geometría de las figuras (flores en copa, alas de mariposa, toroides y supernovas). Puedes cambiar de tempo al instante con los botones en pantalla, la tecla `T` o manteniendo presionada la tecla `Shift` para un turbo momentáneo.
+- **Conducción 100% Humana:** La música no mueve ni deforma las partículas; toda la física y dirección de flujo es decidida en vivo por el intérprete.
+- **Iluminación Reactiva por Audio:** El audio en segundo plano modula sutilmente el **fulgor, luminancia y destellos de color de los filamentos** sin intervenir en las trayectorias.
 - **Variabilidad Procedural sin Pausar la Música (`R`):** Al presionar la tecla `R`, el sistema muta las semillas armónicas y reinicia los filamentos visuales sin detener ni reiniciar la reproducción de la canción.
 - **Soporte Multi-Canción:** Permite cargar cualquier archivo `.mp3`, `.wav`, etc., mediante un botón en la interfaz o arrastrando y soltando el archivo sobre la ventana.
 
@@ -41,14 +41,16 @@ El sistema está concebido para ser **tocado e interpretado en vivo por una pers
 | Tecla / Gesto | Acción | Descripción |
 |---|---|---|
 | **`P`** | LAB / PERFORMANCE | Oculta la interfaz para proyectar a pantalla completa sobre negro puro. |
-| **`R`** | Mutar Visuales | Genera nuevas semillas y trayectorias sin reiniciar la música. |
-| **`1 .. 5`** | Morfologías Armónicas | 1: Flor de Seda, 2: Alas Cósmicas, 3: Vórtice Infinito, 4: Supernova, 5: Rayos Cáusticos. |
-| **`Espacio`** | Acento Manual de Energía | Impulso físico de energía para acentuar caídas rítmicas y clímax. |
+| **`Shift`** | Turbo / Acelerar | Mantiene una velocidad aumentada mientras se presiona para clímax musicales. |
+| **`T`** | Selector de Velocidad | Cicla entre Lenta (Defecto), Moderada y Rápida. |
+| **`R`** | Mutar Visuales 3D | Genera nuevas semillas y trayectorias 3D sin reiniciar la música. |
+| **`1 .. 5`** | Morfologías Armónicas 3D | 1: Flor de Seda, 2: Alas Cósmicas, 3: Vórtice Toroidal, 4: Supernova, 5: Rayos Helicoidales. |
+| **`Espacio`** | Acento Manual de Energía | Impulso físico de energía para acentuar caídas rítmicas. |
 | **`C`** | Ciclar Paleta | Alterna entre Prisma Arcoíris, Seda Ópalo, Sol Dorado, Neón Lavanda y Cian. |
 | **`F`** | Invertir Flujo | Conmuta entre expansión centrífuga y absorción centrípeta. |
-| **`↑ / ↓`** | Modular Giro | Aumenta o disminuye la vorticidad del campo en tiempo real. |
-| **`← / →`** | Modular Pétalos | Agrega o quita lóbulos armónicos a la figura en vivo. |
-| **Arrastrar Ratón** | Conducir Corrientes | Actúa como un atractor/vórtice manual sobre el campo de flujo. |
+| **`↑ / ↓`** | Modular Giro 3D | Aumenta o disminuye la vorticidad del campo en tiempo real. |
+| **`← / →`** | Modular Pétalos 3D | Agrega o quita lóbulos armónicos a la figura en vivo. |
+| **Orbitar Ratón** | Vista 360° | Rota la cámara alrededor de la gran esfera 3D. |
 
 ---
 

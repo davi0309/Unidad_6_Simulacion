@@ -8,7 +8,7 @@ import { createSimulation } from './simulation/createSimulation.js';
 import { createAudioManager } from './simulation/audioManager.js';
 import { createLabPanel } from './ui/labPanel.js';
 
-const PARTICLE_COUNT = 131072; // 2^17 agentes en GPU para filamentos densos
+const PARTICLE_COUNT = 131072; // 2^17 agentes en GPU en volumen esférico 3D
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -18,12 +18,12 @@ async function main() {
     throw new Error('Este proyecto requiere WebGPU para ejecutar los compute shaders de agentes.');
   }
 
-  // ESCENA SOBRE FONDO NEGRO PURO ------------------------------------------
+  // ESCENA 3D SOBRE FONDO NEGRO PURO ---------------------------------------
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#000000');
 
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
-  camera.position.set(0, 0, 9.5);
+  camera.position.set(0, 2.5, 11);
 
   const renderer = new THREE.WebGPURenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -41,6 +41,15 @@ async function main() {
   const params = createParameters();
   const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
 
+  // GESTIÓN DE VELOCIDAD DINÁMICA (Por defecto lenta y serena) -------------
+  let speedLevel = 0; // 0 = Lenta (1.0), 1 = Moderada (1.75), 2 = Rápida (2.8)
+  const speedMultipliers = [1.0, 1.75, 2.8];
+
+  const setSpeedMultiplier = (mult) => {
+    params.speedMultiplier.value = mult;
+    panel.updateSpeedButtons(mult);
+  };
+
   // CONDUCCIÓN EXPRESIVA CON EL PUNTERO / RATÓN ----------------------------
   const pointerNdc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
@@ -57,9 +66,8 @@ async function main() {
   });
 
   window.addEventListener('pointerdown', (e) => {
-    // Si no es un clic sobre la interfaz HTML
     if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && !e.target.closest('.panel')) {
-      params.attractorStrength.value = 5.5; // Activa el atractor/vórtice manual
+      params.attractorStrength.value = 5.5;
     }
   });
 
@@ -79,42 +87,47 @@ async function main() {
     }
   });
 
-  // ARQUETIPOS GENERATIVOS PARA INTERPRETAR EN VIVO -------------------------
+  // ARQUETIPOS GENERATIVOS 3D ----------------------------------------------
   const applyPreset = (id) => {
     if (id === 'silkFlower') {
+      // Flor de Seda 3D: cáliz floral ondulante
       params.harmonics.value = 5.0;
       params.symmetryType.value = 0.0;
       params.swirl.value = 1.3;
-      params.petalMorph.value = 1.1;
-      params.curlStrength.value = 0.6;
+      params.petalMorph.value = 1.25;
+      params.curlStrength.value = 0.55;
       params.paletteId.value = 1.0;
     } else if (id === 'wings') {
+      // Alas Cósmicas 3D: lóbulos de mariposa con simetría bilateral
       params.harmonics.value = 2.0;
-      params.symmetryType.value = 1.0; // Simetría bilateral
+      params.symmetryType.value = 1.0;
       params.swirl.value = 0.9;
-      params.petalMorph.value = 1.35;
-      params.curlStrength.value = 0.75;
+      params.petalMorph.value = 1.45;
+      params.curlStrength.value = 0.65;
       params.paletteId.value = 3.0;
     } else if (id === 'nebulaVortex') {
+      // Vórtice Toroidal 3D: toroide y circulación poloidal
       params.harmonics.value = 3.0;
-      params.symmetryType.value = 0.0;
-      params.swirl.value = 2.6;
-      params.petalMorph.value = 0.7;
-      params.curlStrength.value = 1.1;
+      params.symmetryType.value = 2.0;
+      params.swirl.value = 2.4;
+      params.petalMorph.value = 0.8;
+      params.curlStrength.value = 0.95;
       params.paletteId.value = 2.0;
     } else if (id === 'supernova') {
+      // Supernova 3D: radiación esférica con ondulación armónica
       params.harmonics.value = 8.0;
-      params.symmetryType.value = 0.0;
+      params.symmetryType.value = 3.0;
       params.swirl.value = 0.4;
-      params.petalMorph.value = 1.4;
-      params.curlStrength.value = 0.5;
+      params.petalMorph.value = 1.5;
+      params.curlStrength.value = 0.45;
       params.paletteId.value = 0.0;
     } else if (id === 'causticRays') {
+      // Rayos Helicoidales 3D: corrientes helicoidales en el eje vertical
       params.harmonics.value = 1.0;
-      params.symmetryType.value = 0.0;
-      params.swirl.value = 0.2;
-      params.petalMorph.value = 0.5;
-      params.curlStrength.value = 1.3;
+      params.symmetryType.value = 4.0;
+      params.swirl.value = 0.3;
+      params.petalMorph.value = 0.6;
+      params.curlStrength.value = 1.1;
       params.paletteId.value = 4.0;
     }
     simulation.resetVisuals();
@@ -126,9 +139,10 @@ async function main() {
     mode = next;
     const lab = mode === 'LAB';
     panel.setVisible(lab);
+    simulation.setSphereHelperVisible(lab);
     hud.innerHTML = lab
-      ? '<strong>LAB</strong> · P: performance · R: mutar (sin pausar música) · Espacio: acento · Flechas: ajustar forma'
-      : '<strong>PERFORMANCE</strong> · P: lab · Espacio: acento · Arrastrar: conducir · Flechas: modular';
+      ? '<strong>LAB</strong> · P: performance · R: mutar 3D · T: velocidad · Shift: turbo · Flechas: forma'
+      : '<strong>PERFORMANCE</strong> · P: lab · Espacio: acento · Shift: turbo · T: velocidad · Rotar: orbitar 3D';
   };
 
   const hud = document.createElement('div');
@@ -140,24 +154,37 @@ async function main() {
     audioManager,
     onResetVisuals: () => simulation.resetVisuals(),
     onApplyPreset: applyPreset,
-    onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB')
+    onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
+    onSpeedChange: (mult) => setSpeedMultiplier(mult)
   });
 
   setMode('LAB');
 
   // MAPEO DE TECLADO PARA TOCAR EL INSTRUMENTO EN VIVO ----------------------
+  let shiftPressed = false;
   window.addEventListener('keydown', (event) => {
-    if (event.repeat) return;
-
-    if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
+    if (event.code === 'KeyP' && !event.repeat) setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
 
     // R: Mutar visuales sin reiniciar la música
-    if (event.code === 'KeyR') {
+    if (event.code === 'KeyR' && !event.repeat) {
       simulation.resetVisuals();
       panel.refresh();
     }
 
-    // 1-5: Cambios de sección y morfología armónica
+    // T: Ciclar velocidad entre Lenta, Moderada y Rápida
+    if (event.code === 'KeyT' && !event.repeat) {
+      speedLevel = (speedLevel + 1) % 3;
+      setSpeedMultiplier(speedMultipliers[speedLevel]);
+      panel.refresh();
+    }
+
+    // Shift: Turbo / acelerador momentáneo mientras se mantiene presionado
+    if ((event.code === 'ShiftLeft' || event.code === 'ShiftRight') && !shiftPressed) {
+      shiftPressed = true;
+      params.speedMultiplier.value = speedMultipliers[speedLevel] * 2.2;
+    }
+
+    // 1-5: Cambios de sección y morfología armónica 3D
     if (event.code === 'Digit1') { applyPreset('silkFlower'); panel.refresh(); }
     if (event.code === 'Digit2') { applyPreset('wings'); panel.refresh(); }
     if (event.code === 'Digit3') { applyPreset('nebulaVortex'); panel.refresh(); }
@@ -165,24 +192,24 @@ async function main() {
     if (event.code === 'Digit5') { applyPreset('causticRays'); panel.refresh(); }
 
     // C: Ciclar paleta de color
-    if (event.code === 'KeyC') {
+    if (event.code === 'KeyC' && !event.repeat) {
       params.paletteId.value = (params.paletteId.value + 1) % 5;
       panel.refresh();
     }
 
     // F: Invertir sentido del flujo (implosión vs expansión)
-    if (event.code === 'KeyF') {
+    if (event.code === 'KeyF' && !event.repeat) {
       params.flowDirection.value *= -1.0;
       panel.refresh();
     }
 
-    // Espacio: Acento musical manual del intérprete
-    if (event.code === 'Space') {
+    // Espacio: Acento musical manual
+    if (event.code === 'Space' && !event.repeat) {
       event.preventDefault();
       params.userPulse.value = 1.0;
     }
 
-    // Flechas Arriba/Abajo: Modular torsión/vorticidad en vivo
+    // Flechas Arriba/Abajo: Modular torsión/vorticidad
     if (event.code === 'ArrowUp') {
       params.swirl.value = Math.min(4.0, params.swirl.value + 0.2);
       panel.refresh();
@@ -192,7 +219,7 @@ async function main() {
       panel.refresh();
     }
 
-    // Flechas Izquierda/Derecha: Modular armónicos / pétalos en vivo
+    // Flechas Izquierda/Derecha: Modular armónicos / pétalos 3D
     if (event.code === 'ArrowRight') {
       params.harmonics.value = Math.min(9.0, params.harmonics.value + 1.0);
       panel.refresh();
@@ -207,6 +234,10 @@ async function main() {
     if (event.code === 'Space') {
       params.userPulse.value = 0.0;
     }
+    if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+      shiftPressed = false;
+      params.speedMultiplier.value = speedMultipliers[speedLevel];
+    }
   });
 
   window.addEventListener('resize', () => {
@@ -219,22 +250,18 @@ async function main() {
 
   // FRAME ANIMATION LOOP ---------------------------------------------------
   renderer.setAnimationLoop(() => {
-    // 1. Extraer datos de la música
     const audio = audioManager.update();
 
-    // 2. ÚNICAMENTE modular brillo y fulgor sutil con el audio (CERO FUERZA FÍSICA)
+    // El audio modula únicamente iluminación y fulgor sutil
     params.audioGlow.value = audio.bass * 0.7 + audio.energy * 0.4;
     params.audioShimmer.value = audio.treble;
 
-    // 3. Vúmetros en modo LAB
     if (mode === 'LAB') {
       panel.updateAudioMeters(audio);
     }
 
-    // 4. Paso de simulación de agentes en compute shaders
     simulation.stepSimulation();
 
-    // 5. Renderizado
     orbit.update();
     renderer.render(scene, camera);
   });

@@ -3,6 +3,7 @@ import {
   Fn,
   If,
   abs,
+  asin,
   atan,
   clamp,
   color,
@@ -15,7 +16,7 @@ import {
   max,
   min,
   mix,
-  mod,
+  modelViewMatrix,
   normalize,
   pow,
   sign,
@@ -28,11 +29,11 @@ import {
 } from 'three/tsl';
 
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
-  // ESTADO DE AGENTES EN GPU (Buffers instanciados) --------------------------
+  // ESTADO DE AGENTES EN GPU (Buffers instanciados 3D) ------------------------
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
 
-  // INICIALIZACIÓN DE AGENTES -----------------------------------------------
+  // INICIALIZACIÓN DE AGENTES DENTRO DE LA ESFERA 3D -------------------------
   const initParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
@@ -43,23 +44,23 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r3 = hash(i.add(uint(47)));
     const r4 = hash(i.add(uint(61)));
 
-    // Distribución armónica inicial para que emerjan las líneas de flujo
-    const angle = r1.mul(6.2831853);
-    const radius = pow(r2, 0.65).mul(4.0).add(0.08);
+    // Distribución tridimensional dentro de la esfera
+    const theta = r1.mul(6.2831853);
+    const phi = asin(r2.mul(2.0).sub(1.0)); // Elevación uniforme en la esfera
+    const rad = pow(r3, 0.45).mul(params.sphereRadius.mul(0.85)).add(0.15);
 
-    const x = cos(angle).mul(radius);
-    const y = sin(angle).mul(radius);
-    const z = r3.sub(0.5).mul(0.2);
+    const x = rad.mul(cos(phi)).mul(cos(theta));
+    const y = rad.mul(cos(phi)).mul(sin(theta));
+    const z = rad.mul(sin(phi));
 
     p.assign(vec3(x, y, z));
 
-    const speed = params.initialSpeed.mul(r4.mul(0.5).add(0.75));
-    v.assign(vec3(sin(angle).negate(), cos(angle), 0.0).mul(speed));
-  })().compute(count).setName('Init Agents');
+    // Velocidad tangencial suave 3D inicial
+    const spd = params.initialSpeed.mul(r4.mul(0.4).add(0.8));
+    v.assign(vec3(sin(theta).negate(), cos(theta), cos(phi.mul(2.0)).mul(0.3)).mul(spd));
+  })().compute(count).setName('Init Agents 3D');
 
-  // COMPUTE PASS: CAMPO DE FLUJO Y STEERING CONDUCIDO POR EL INTÉRPRETE ------
-  // IMPORTANTE: El movimiento y las fuerzas físicas son 100% decididos
-  // por el usuario y los parámetros del instrumento. El audio NO mueve las partículas.
+  // COMPUTE PASS: CAMPO DE FLUJO 3D, CONFINAMIENTO ESFÉRICO Y STEERING --------
   const updateParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
@@ -67,87 +68,130 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const dt = params.dt.mul(params.timeScale);
 
-    // Coordenadas polares percibidas por el agente autónomo
-    const r = length(p.xy).max(0.001);
-    const theta = atan(p.y, p.x);
+    // Coordenadas esféricas y cilíndricas 3D percibidas por el agente
+    const rSph = length(p).max(0.001);          // Distancia al centro de la esfera
+    const rho = length(p.xy).max(0.001);        // Radio cilíndrico en plano XY
+    const theta = atan(p.y, p.x);               // Ángulo azimutal
+    const phi = atan(p.z, rho);                 // Ángulo de elevación
 
-    // 1. Simetría y armónicos del campo (Flor vs Alas vs Vórtice)
-    const thetaWing = atan(p.y, abs(p.x).sub(0.6).max(0.001));
-    const isWing = params.symmetryType.greaterThan(0.5).and(params.symmetryType.lessThan(1.5));
-    const effTheta = isWing.select(thetaWing, theta);
-
-    // Ondulación armónica de los pétalos/alas fijada por el intérprete
-    const harm = sin(effTheta.mul(params.harmonics).add(params.seed));
-    const dynHarm = harm.mul(params.petalMorph);
-
-    // Vectores base en plano 2D: radial y tangencial
+    // Vectores base en plano 2D radial y tangencial
     const radial = vec3(cos(theta), sin(theta), 0.0);
     const tangent = vec3(sin(theta).negate(), cos(theta), 0.0);
 
-    // Campo de flujo armónico (Flow Field)
-    const flowRadial = radial.mul(dynHarm.mul(params.flowDirection));
-    const flowSwirl = tangent.mul(params.swirl.add(dynHarm.mul(0.35)));
+    // 1. GENERACIÓN DE CAMPOS DE FLUJO 3D POR ARQUETIPO ----------------------
+    // Flow Field para Flor de Seda 3D (Arquetipo 0):
+    // Los pétalos se pliegan y ondulan en el espacio tridimensional como un cáliz floral
+    const harmFlower = sin(theta.mul(params.harmonics).add(params.seed));
+    const zCup = harmFlower.mul(rho).mul(0.4).mul(params.petalMorph);
+    const flowFlower = radial.mul(harmFlower.mul(params.petalMorph).mul(params.flowDirection))
+      .add(tangent.mul(params.swirl.add(harmFlower.mul(0.35))))
+      .add(vec3(0.0, 0.0, zCup.sub(p.z).mul(1.5)));
 
-    // Turbulencia curl orgánica suave (filamentos de seda)
-    const curlX = sin(p.y.mul(1.2).add(params.seed)).add(cos(p.x.mul(0.8)));
-    const curlY = cos(p.x.mul(1.2).add(params.seed)).negate().add(sin(p.y.mul(0.8)));
-    const curlVec = vec3(curlX, curlY, 0.0).mul(params.curlStrength);
+    // Flow Field para Alas Cósmicas 3D (Arquetipo 1):
+    // Dos lóbulos orbitales tridimensionales con simetría bilateral (mariposa/Lorenz)
+    const xSym = abs(p.x);
+    const thetaWing = atan(p.y, xSym.sub(0.8));
+    const rWing = length(vec2(xSym.sub(0.8), p.y)).max(0.001);
+    const zWing = sin(thetaWing.mul(2.0)).mul(rWing).mul(0.55).mul(params.petalMorph);
+    const flowWing = vec3(
+      sin(thetaWing).negate().mul(sign(p.x)).mul(1.4),
+      cos(thetaWing).mul(1.4),
+      zWing.sub(p.z).mul(1.8)
+    );
 
-    // Vector objetivo del campo de flujo
-    const flowField = flowRadial.add(flowSwirl).add(curlVec);
+    // Flow Field para Vórtice Toroidal 3D (Arquetipo 2):
+    // Circulación toroidal 3D (giro azimutal + rotación en el plano poloidal)
+    const flowTorus = tangent.mul(params.swirl.mul(1.6))
+      .add(vec3(0.0, 0.0, sin(rho.mul(1.1)).negate().mul(1.5)))
+      .add(radial.mul(cos(p.z.mul(1.1)).mul(1.1)));
 
-    // 2. Craig Reynolds Steering Behavior:
-    // Desired Velocity: vector deseado según el campo de flujo
-    const desiredSpeed = params.maxSpeed;
-    const desiredVelocity = normalize(flowField).mul(desiredSpeed);
+    // Flow Field para Supernova 3D (Arquetipo 3):
+    // Expansión radial esférica con ondulación armónica tridimensional
+    const sphHarm = sin(theta.mul(params.harmonics)).mul(cos(phi.mul(3.0)));
+    const flowSupernova = normalize(p).mul(sphHarm.mul(params.petalMorph).add(1.2).mul(params.flowDirection))
+      .add(tangent.mul(params.swirl.mul(0.5)));
 
-    // Fuerza de maniobra calculada por el agente autónomo
+    // Flow Field para Rayos Cáusticos 3D (Arquetipo 4):
+    // Corrientes helicoidales que ascienden por el eje Z de la esfera
+    const flowCaustic = vec3(
+      sin(p.z.mul(1.4).add(theta)).negate().mul(0.9),
+      cos(p.z.mul(1.4).add(theta)).mul(0.9),
+      float(1.5).mul(params.flowDirection)
+    );
+
+    // Selección del campo 3D según params.symmetryType
+    const flowField3D = flowFlower.toVar();
+    If(params.symmetryType.equal(1.0), () => { flowField3D.assign(flowWing); });
+    If(params.symmetryType.equal(2.0), () => { flowField3D.assign(flowTorus); });
+    If(params.symmetryType.equal(3.0), () => { flowField3D.assign(flowSupernova); });
+    If(params.symmetryType.equal(4.0), () => { flowField3D.assign(flowCaustic); });
+
+    // Turbulencia curl 3D orgánica suave
+    const curlX = sin(p.y.mul(1.2).add(params.seed)).add(cos(p.z.mul(0.9)));
+    const curlY = cos(p.x.mul(1.2).add(params.seed)).negate().add(sin(p.z.mul(0.9)));
+    const curlZ = sin(p.x.mul(0.9)).negate().add(cos(p.y.mul(0.9)));
+    flowField3D.addAssign(vec3(curlX, curlY, curlZ).mul(params.curlStrength));
+
+    // 2. CONFINAMIENTO DENTRO DE LA GRAN ESFERA 3D ----------------------------
+    // Si el agente se acerca al borde de la esfera, una fuerza suave y elástica
+    // lo devuelve hacia el interior, manteniéndolo siempre dentro de la esfera.
+    const sphereRadius = params.sphereRadius;
+    const outsideDist = rSph.sub(sphereRadius);
+    const sphereNormal = normalize(p);
+    const sphereContainmentForce = sphereNormal.mul(outsideDist.max(0.0).mul(-14.0));
+
+    // 3. STEERING BEHAVIORS (CRAIG REYNOLDS) EN 3D ---------------------------
+    // Velocidad deseada modulada por el multiplicador de velocidad
+    const currentMaxSpeed = params.maxSpeed.mul(params.speedMultiplier);
+    const desiredVelocity = normalize(flowField3D).mul(currentMaxSpeed);
+
+    // Fuerza de maniobra
     const steerForce = desiredVelocity.sub(v);
     const steerLen = length(steerForce).max(0.001);
     const clampedSteer = steerForce.div(steerLen).mul(min(steerLen, params.steerStrength));
 
-    // Fuerza resultante total
     const totalForce = clampedSteer.toVar();
+    totalForce.addAssign(sphereContainmentForce);
 
-    // Fuerza de arrastre viscoso (Drag): F_drag = -c * v
+    // Arrastre viscoso (Drag): F_drag = -c * v
     totalForce.addAssign(v.mul(params.dragCoefficient).negate());
 
-    // Interacción manual en vivo: Conducción con el ratón / gestos
+    // Conducción manual con el puntero en 3D
     const toPointer = params.attractor.sub(p);
     const pointerDist = length(toPointer).max(0.3);
     const pointerDir = toPointer.div(pointerDist);
     totalForce.addAssign(pointerDir.mul(params.attractorStrength).div(pointerDist));
 
-    // Acento manual del intérprete (Barra Espaciadora: onda de choque física)
-    const userPulseForce = normalize(p.xy).mul(params.userPulse.mul(7.0));
-    totalForce.addAssign(vec3(userPulseForce.x, userPulseForce.y, 0.0));
+    // Acento manual de energía (Espacio)
+    const userPulseForce = normalize(p).mul(params.userPulse.mul(7.0));
+    totalForce.addAssign(userPulseForce);
 
-    // 3. Integración física (Euler semi-implícito)
+    // 4. INTEGRACIÓN FÍSICA (Semi-implicit Euler) ----------------------------
     v.addAssign(totalForce.mul(dt));
 
-    // Limitación de velocidad máxima
+    // Limitar a la velocidad máxima actual
     const curSpeed = length(v);
-    If(curSpeed.greaterThan(params.maxSpeed), () => {
-      v.assign(v.normalize().mul(params.maxSpeed));
+    If(curSpeed.greaterThan(currentMaxSpeed), () => {
+      v.assign(v.normalize().mul(currentMaxSpeed));
     });
 
     p.addAssign(v.mul(dt));
 
-    // Reciclaje suave continuo de agentes al salir de los límites
-    const maxBound = params.boundsSize.mul(0.5);
-    const tooFar = r.greaterThan(maxBound).or(abs(p.x).greaterThan(maxBound)).or(abs(p.y).greaterThan(maxBound));
-
-    If(tooFar, () => {
-      const respawnAngle = hash(i.add(uint(91))).mul(6.2831853);
-      const respawnRadius = hash(i.add(uint(97))).mul(0.65).add(0.05);
-      p.assign(vec3(cos(respawnAngle).mul(respawnRadius), sin(respawnAngle).mul(respawnRadius), 0.0));
-      v.assign(vec3(sin(respawnAngle).negate(), cos(respawnAngle), 0.0).mul(params.initialSpeed));
+    // Reciclaje si escapa accidentalmente de la esfera
+    If(rSph.greaterThan(sphereRadius.mul(1.25)), () => {
+      const respawnTheta = hash(i.add(uint(91))).mul(6.2831853);
+      const respawnPhi = asin(hash(i.add(uint(93))).mul(2.0).sub(1.0));
+      const respawnRad = hash(i.add(uint(97))).mul(0.65).add(0.1);
+      p.assign(vec3(
+        respawnRad.mul(cos(respawnPhi)).mul(cos(respawnTheta)),
+        respawnRad.mul(cos(respawnPhi)).mul(sin(respawnTheta)),
+        respawnRad.mul(sin(respawnPhi))
+      ));
+      v.assign(vec3(sin(respawnTheta).negate(), cos(respawnTheta), 0.0).mul(params.initialSpeed));
     });
-  })().compute(count).setName('Update Agents');
+  })().compute(count).setName('Update Agents 3D');
 
-  // RENDER PASS: FILAMENTOS ORIENTADOS CON BRILLO MODULADO POR AUDIO ----------
-  // Aquí es donde el audio interviene de manera puramente visual:
-  // modificando el brillo, fulgor y destellos de color sin mover las partículas.
+  // RENDER PASS: FILAMENTOS ORIENTADOS EN EL ESPACIO DE VISTA ----------------
   const material = new THREE.SpriteNodeMaterial({
     blending: THREE.AdditiveBlending,
     depthWrite: false,
@@ -156,28 +200,29 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
   material.positionNode = positionBuffer.toAttribute();
 
-  // 1. Orientación del filamento: alineado con la velocidad del agente
+  // Transformar la velocidad 3D al espacio de vista de la cámara
+  // para que el filamento se alinee con su dirección aparente en pantalla
   const vAttr = velocityBuffer.toAttribute();
-  material.rotationNode = atan(vAttr.y, vAttr.x);
+  const vView = modelViewMatrix.mul(vec4(vAttr, 0.0)).xy;
+  material.rotationNode = atan(vView.y, vView.x);
 
-  // 2. Elongación en forma de filamento fino
+  // Elongación nítida del filamento
   material.scaleNode = Fn(() => {
-    const spd = length(vAttr);
-    const len = params.lineLength.mul(spd.clamp(0.2, 3.0));
+    const spdView = length(vView);
+    // Longitud proporcional al movimiento proyectado
+    const len = params.lineLength.mul(spdView.clamp(0.15, 2.5));
     return vec2(len, params.lineWidth);
   })();
 
-  // 3. Dispersión cromática y brillo reactivo al audio
+  // Dispersión cromática y brillo reactivo al audio
   material.colorNode = Fn(() => {
     const spd = length(vAttr);
     const pAttr = positionBuffer.toAttribute();
-    const ang = atan(vAttr.y, vAttr.x).div(6.2831853).add(0.5);
-    const rDist = length(pAttr.xy).mul(0.12);
+    const rDist = length(pAttr).mul(0.1);
+    const ang = atan(vView.y, vView.x).div(6.2831853).add(0.5);
 
-    // Fase espectral con destello sutil del audio
     const t = ang.add(rDist).add(params.chromaShift).add(params.audioShimmer.mul(0.2));
 
-    // Paletas cosenoidales
     const c0 = cos(t.mul(6.2831853).add(vec3(0.0, 2.094, 4.188))).mul(0.5).add(0.5);
     const c1 = cos(t.mul(6.2831853).add(vec3(0.5, 0.2, 0.9))).mul(0.45).add(0.55);
     const c2 = vec3(
@@ -202,30 +247,40 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     If(params.paletteId.equal(3.0), () => { baseCol.assign(c3); });
     If(params.paletteId.equal(4.0), () => { baseCol.assign(c4); });
 
-    // Modulación de fulgor/brillo por la música:
-    // El audio incrementa el resplandor blanco y la intensidad luminosa
-    const audioLuminance = params.audioGlow.mul(0.75);
-    const coreGlow = spd.div(params.maxSpeed).pow(2.0).mul(0.6).add(audioLuminance);
+    // Fulgor y saturación central
+    const audioLuminance = params.audioGlow.mul(0.8);
+    const coreGlow = spd.div(params.maxSpeed.mul(params.speedMultiplier).max(0.1)).pow(1.8).mul(0.65).add(audioLuminance);
     const finalCol = mix(baseCol, vec3(1.0, 1.0, 1.0), coreGlow.clamp(0.0, 0.95));
 
-    // Multiplicador de brillo general modulado sutilmente por la música
-    const brightness = float(1.0).add(params.audioGlow.mul(0.6));
+    const brightness = float(1.0).add(params.audioGlow.mul(0.5));
     return vec4(finalCol.mul(brightness), 1.0);
   })();
 
-  // 4. Perfil elíptico suave para unir los filamentos en velos de seda
+  // Perfil elíptico de opacidad
   material.opacityNode = Fn(() => {
     const coords = uv().sub(0.5);
-    const ellipseDist = coords.x.mul(coords.x).mul(1.5).add(coords.y.mul(coords.y).mul(5.0));
-    // Suavizado con opacidad sensible al brillo musical
-    const baseOpacity = float(1.0).sub(ellipseDist.mul(1.8)).clamp(0.0, 1.0).pow(1.6);
-    return baseOpacity.mul(float(0.85).add(params.audioGlow.mul(0.35)));
+    const ellipseDist = coords.x.mul(coords.x).mul(1.4).add(coords.y.mul(coords.y).mul(4.5));
+    const baseOpacity = float(1.0).sub(ellipseDist.mul(1.7)).clamp(0.0, 1.0).pow(1.5);
+    return baseOpacity.mul(float(0.9).add(params.audioGlow.mul(0.3)));
   })();
 
   const geometry = new THREE.PlaneGeometry(1, 1);
   const mesh = new THREE.InstancedMesh(geometry, material, count);
   mesh.frustumCulled = false;
   scene.add(mesh);
+
+  // Representación visual sutil del contorno de la esfera contenedora en modo LAB
+  const sphereWireframe = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 32, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0x388bfd,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.08
+    })
+  );
+  sphereWireframe.scale.setScalar(params.sphereRadius.value);
+  scene.add(sphereWireframe);
 
   function reset() {
     renderer.compute(initParticles);
@@ -237,13 +292,21 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   }
 
   function stepSimulation() {
+    sphereWireframe.scale.setScalar(params.sphereRadius.value);
     renderer.compute(updateParticles);
+  }
+
+  function setSphereHelperVisible(visible) {
+    sphereWireframe.visible = visible;
   }
 
   function dispose() {
     geometry.dispose();
     material.dispose();
+    sphereWireframe.geometry.dispose();
+    sphereWireframe.material.dispose();
     scene.remove(mesh);
+    scene.remove(sphereWireframe);
   }
 
   return {
@@ -253,6 +316,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     reset,
     resetVisuals,
     stepSimulation,
+    setSphereHelperVisible,
     dispose
   };
 }
