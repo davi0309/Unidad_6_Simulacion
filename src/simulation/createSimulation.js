@@ -8,6 +8,7 @@ import {
   clamp,
   color,
   cos,
+  floor,
   float,
   hash,
   instanceIndex,
