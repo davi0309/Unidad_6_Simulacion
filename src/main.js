@@ -22,8 +22,9 @@ async function main() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#000000');
 
-  const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 100);
-  camera.position.set(0, 0, 8.5);
+  const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
+  camera.position.set(0, 0, 7.8);
+  camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGPURenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -31,10 +32,9 @@ async function main() {
   mount.appendChild(renderer.domElement);
   await renderer.init();
 
+  // CÁMARA TOTALMENTE FIJA (Desactivada la rotación con ratón para fijar la perspectiva)
   const orbit = new OrbitControls(camera, renderer.domElement);
-  orbit.enableDamping = true;
-  orbit.dampingFactor = 0.05;
-  orbit.target.set(0, 0, 0);
+  orbit.enabled = false;
 
   // MÓDULO DE AUDIO Y PARÁMETROS -------------------------------------------
   const audioManager = createAudioManager();
@@ -207,8 +207,8 @@ async function main() {
     panel.setVisible(lab);
     simulation.setSphereHelperVisible(lab);
     hud.innerHTML = lab
-      ? '<strong>LAB</strong> · P: performance · R: mutar 3D · T: velocidad · Shift: turbo · Flechas: forma'
-      : '<strong>PERFORMANCE</strong> · P: lab · Espacio: acento · Shift: turbo · T: velocidad · Rotar: orbitar 3D';
+      ? '<strong>LAB</strong> · P: performance · 1–5: figuras · Ratón: conducir agentes · R: mutar · T: velocidad'
+      : '<strong>PERFORMANCE</strong> · P: lab · 1–5: figuras · Ratón: conducir agentes · Espacio: acento · T: velocidad';
   };
 
   const hud = document.createElement('div');
@@ -309,11 +309,24 @@ async function main() {
     }
   });
 
-  window.addEventListener('resize', () => {
-    camera.aspect = innerWidth / innerHeight;
+  function updateCameraFraming() {
+    const aspect = innerWidth / innerHeight;
+    camera.aspect = aspect;
+    camera.fov = 50;
+    // Encuadre exacto para que los agentes cubran el 100% de la pantalla de esquina a esquina
+    const cornerFactor = Math.sqrt(1 + aspect * aspect);
+    const targetCornerDist = 7.5;
+    const radFov = (camera.fov * 0.5 * Math.PI) / 180;
+    const optimalZ = targetCornerDist / (Math.tan(radFov) * cornerFactor);
+    const zPos = Math.max(6.2, Math.min(8.2, optimalZ));
+    camera.position.set(0, 0, zPos);
+    camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
-  });
+  }
+
+  window.addEventListener('resize', updateCameraFraming);
+  updateCameraFraming();
 
   simulation.reset();
 

@@ -103,12 +103,12 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // ARQUETIPO 0 (Tecla 1 - Ref: media_1790969082305.png):
     // Red Celular Bioluminiscente / Alvéolos y Anillos Vasculares Concéntricos
     // Anillos vasculares discretos con 18 septos radiales que pulsan con el bombo/bajo
-    const ringWave0 = cos(rho.mul(2.6).sub(params.audioBass.mul(1.4)).sub(params.elapsedTime.mul(0.5)));
+    const ringWave0 = cos(rho.mul(2.2).sub(params.audioBass.mul(1.4)).sub(params.elapsedTime.mul(0.5)));
     const septa0 = cos(theta.mul(18.0));
     const ringForce0 = radial.mul(ringWave0.negate().mul(1.3));
     const ringCirc0 = tangent.mul(params.swirl.mul(1.1).add(septa0.mul(0.45)));
     const septaCross0 = radial.mul(septa0.mul(0.65).mul(params.flowDirection));
-    const zCellular0 = vec3(0.0, 0.0, p.z.negate().mul(1.8).add(sin(rho.mul(2.2)).mul(0.25)));
+    const zCellular0 = vec3(0.0, 0.0, p.z.negate().mul(1.8).add(sin(rho.mul(2.0)).mul(0.25)));
     const flowCellular = ringForce0.add(ringCirc0).add(septaCross0).add(zCellular0);
 
     // ARQUETIPO 1 (Tecla 2 - Ref: media_1790969096547.png):
@@ -117,11 +117,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const pupilR = float(1.8).add(params.audioBass.mul(0.65));
     const inPupil = rho.lessThan(pupilR);
     const pupilRepel = radial.mul(pupilR.sub(rho).max(0.0).mul(6.0).add(inPupil.select(3.2, 0.0)));
-    const fingerWave1 = cos(theta.mul(48.0).add(sin(rho.mul(3.2))));
-    const fingerShear1 = sin(rho.mul(4.0).add(params.audioTreble.mul(3.5)));
+    const fingerWave1 = cos(theta.mul(48.0).add(sin(rho.mul(2.8))));
+    const fingerShear1 = sin(rho.mul(3.5).add(params.audioTreble.mul(3.5)));
     const plumeRadial1 = radial.mul(float(1.7).add(fingerWave1.mul(0.95)).add(params.audioEnergy.mul(1.3)));
     const plumeTangential1 = tangent.mul(params.swirl.mul(0.55).add(fingerShear1.mul(0.65)));
-    const outerBrake1 = radial.mul(rho.sub(8.0).max(0.0).mul(-4.5));
+    const outerBrake1 = radial.mul(rho.sub(params.sphereRadius.mul(0.92)).max(0.0).mul(-4.5));
     const zIris1 = vec3(0.0, 0.0, p.z.negate().mul(1.7).add(fingerWave1.mul(0.25)));
     const flowIris = pupilRepel.add(plumeRadial1).add(plumeTangential1).add(outerBrake1).add(zIris1);
 
@@ -130,7 +130,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // Espiral logarítmica con niveles superpuestos y 56 costillas radiales
     const logRho2 = log(rho.max(0.15));
     const coralSpiralCoord2 = theta.sub(logRho2.mul(1.75));
-    const tierWave2 = sin(rho.mul(3.4).sub(coralSpiralCoord2));
+    const tierWave2 = sin(rho.mul(2.8).sub(coralSpiralCoord2));
     const ribWave2 = cos(coralSpiralCoord2.mul(56.0)).mul(0.22);
     const zTargetCoral2 = tierWave2.mul(float(1.25).add(params.audioMid.mul(0.85))).mul(smoothstep(0.4, 2.5, rho)).add(ribWave2);
     const coralRadial2 = radial.mul(tierWave2.mul(0.75).add(params.flowDirection.mul(0.4)));
@@ -141,7 +141,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // ARQUETIPO 3 (Tecla 4 - Ref: media_1790969169603.jpg):
     // Helecho Fractal / Nautilus Jade (Golden Spiral Fronds)
     // Espiral áurea con báculos enroscados auto-similares y ojo central de vórtice
-    const fernCoord3 = theta.sub(log(rho.div(0.7).max(0.1)).mul(2.35));
+    const fernCoord3 = theta.sub(log(rho.div(0.75).max(0.1)).mul(2.35));
     const frondWave3 = sin(fernCoord3.mul(14.0).add(theta.mul(2.0)));
     const tipRipple3 = cos(fernCoord3.mul(28.0).add(params.audioTreble.mul(4.0))).mul(0.3);
     const eyeSuction3 = float(-1.1).mul(smoothstep(1.3, 0.25, rho));
@@ -156,7 +156,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const angle36_4 = theta.mul(36.0);
     const orbitOsc4 = sin(angle36_4);
     const spiroTangent4 = tangent.mul(float(1.9).add(params.audioEnergy.mul(0.85)).mul(params.swirl.mul(0.7).add(0.4)));
-    const spiroRadial4 = radial.mul(orbitOsc4.mul(0.85).add(sin(rho.mul(2.2)).mul(0.35)));
+    const spiroRadial4 = radial.mul(orbitOsc4.mul(0.85).add(sin(rho.mul(1.8)).mul(0.35)));
     const zSpiro4 = vec3(0.0, 0.0, cos(theta.mul(18.0)).mul(0.3).sub(p.z.mul(1.6)));
     const flowSpirograph = spiroRadial4.add(spiroTangent4).add(zSpiro4);
 
@@ -168,14 +168,14 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       const qTheta = atan(q.y, q.x);
 
       // Evaluación del potencial escalar según el arquetipo
-      const r0 = cos(qRho.mul(2.6).sub(params.audioBass.mul(1.4))).mul(0.55).add(cos(qTheta.mul(18.0)).mul(0.45));
-      const r1 = cos(qTheta.mul(48.0).add(sin(qRho.mul(3.2)))).mul(0.5).add(sin(qRho.mul(2.0)).mul(0.5));
+      const r0 = cos(qRho.mul(2.2).sub(params.audioBass.mul(1.4))).mul(0.55).add(cos(qTheta.mul(18.0)).mul(0.45));
+      const r1 = cos(qTheta.mul(48.0).add(sin(qRho.mul(2.8)))).mul(0.5).add(sin(qRho.mul(1.8)).mul(0.5));
       const qLogRho = log(qRho.max(0.15));
       const qCoralCoord = qTheta.sub(qLogRho.mul(1.75));
-      const r2 = sin(qRho.mul(3.4).sub(qCoralCoord)).mul(0.65).add(cos(qCoralCoord.mul(56.0)).mul(0.35));
-      const qFernCoord = qTheta.sub(log(qRho.div(0.7).max(0.1)).mul(2.35));
+      const r2 = sin(qRho.mul(2.8).sub(qCoralCoord)).mul(0.65).add(cos(qCoralCoord.mul(56.0)).mul(0.35));
+      const qFernCoord = qTheta.sub(log(qRho.div(0.75).max(0.1)).mul(2.35));
       const r3 = sin(qFernCoord.mul(14.0).add(qTheta.mul(2.0))).mul(0.7).add(cos(qFernCoord.mul(2.0)).mul(0.3));
-      const r4 = cos(qTheta.mul(36.0)).mul(0.6).add(cos(qRho.mul(2.2)).mul(0.4));
+      const r4 = cos(qTheta.mul(36.0)).mul(0.6).add(cos(qRho.mul(1.8)).mul(0.4));
 
       const sIdx = floor(sId.add(0.5));
       const res = r0.toVar();

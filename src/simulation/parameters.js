@@ -14,8 +14,8 @@ export function createParameters() {
     speedMultiplier: uniform(1.0),     // Modulador dinámico (1.0 = Lenta, 1.8 = Normal, 2.8 = Rápida)
 
     // Cobertura total de la pantalla (Full-screen canvas)
-    sphereRadius: uniform(8.5),        // Radio ampliado para cubrir la pantalla de esquina a esquina
-    boundsSize: uniform(20.0),
+    sphereRadius: uniform(11.5),       // Radio ampliado para cubrir la pantalla completa de esquina a esquina
+    boundsSize: uniform(24.0),
 
     // Reactividad a la música (Audio-reactivity)
     audioBass: uniform(0.0),           // Graves / Bombo (modula dilatación y pulsos radiales)

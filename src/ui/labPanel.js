@@ -242,7 +242,7 @@ export function createLabPanel({
   refreshers.push(rangeRow(agentGroup, 'Pétalos / Septos (← →)', simState, 'harmonics', 1, 9, 1, (v) => params.harmonics.value = v, () => params.harmonics.value));
   refreshers.push(rangeRow(agentGroup, 'Vórtice / Giro (↑ ↓)', simState, 'swirl', -4, 4, 0.1, (v) => params.swirl.value = v, () => params.swirl.value));
   refreshers.push(rangeRow(agentGroup, 'Pliegues y Frondas 3D', simState, 'petalMorph', 0.2, 2.5, 0.05, (v) => params.petalMorph.value = v, () => params.petalMorph.value));
-  refreshers.push(rangeRow(agentGroup, 'Radio Pantalla Completa', simState, 'sphereRadius', 4.0, 12.0, 0.1, (v) => params.sphereRadius.value = v, () => params.sphereRadius.value));
+  refreshers.push(rangeRow(agentGroup, 'Radio Pantalla Completa', simState, 'sphereRadius', 6.0, 16.0, 0.1, (v) => params.sphereRadius.value = v, () => params.sphereRadius.value));
   refreshers.push(rangeRow(agentGroup, 'Fuerza Maniobra (Steering)', simState, 'steerStrength', 2, 20, 0.5, (v) => params.steerStrength.value = v, () => params.steerStrength.value));
 
   panel.append(agentGroup);
@@ -322,7 +322,7 @@ export function createLabPanel({
     • <strong>F</strong>: Invertir sentido del flujo.<br>
     • <strong>↑ / ↓</strong>: Modular giro/vórtice en vivo.<br>
     • <strong>← / →</strong>: Modular número de pétalos/septos.<br>
-    • <strong>Arrastrar ratón</strong>: Orbitar la cámara en 360°.
+    • <strong>Ratón / Clic</strong>: Conducir los agentes (cámara fija).
   `;
   actionGroup.append(guide);
   panel.append(actionGroup);
