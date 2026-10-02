@@ -122,12 +122,12 @@ async function main() {
     },
     tornado: {
       id: 1,
-      label: 'Vórtice de Plasma / Tornado',
+      label: 'Red de Micro-Vórtices y Eyectores 3D',
       harmonics: 2.0,
-      swirl: 3.4,
+      swirl: 3.2,
       petalMorph: 1.1,
-      curlStrength: 0.85,
-      palette: 3.0
+      curlStrength: 0.55,
+      palette: 1.0
     },
     cosmicVeil: {
       id: 2,

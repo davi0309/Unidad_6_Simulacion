@@ -198,7 +198,7 @@ export function createLabPanel({
 
   const presets = [
     { id: 'astrolabe', label: '🌌 1. Astrolabio de Cristal (Órbitas 3D)' },
-    { id: 'tornado', label: '🌀 2. Vórtice de Plasma (Tornado de Seda)' },
+    { id: 'tornado', label: '🌀 2. Micro-Vórtices (Captura y Lanzamiento 3D)' },
     { id: 'cosmicVeil', label: '🌊 3. Velo Cósmico (Membrana Fractal)' },
     { id: 'celestialLotus', label: '🪽 4. Loto Celestial (Alas de Serafín)' },
     { id: 'astralPillar', label: '🕯️ 5. Pilar Astral (Alma Ascendente)' }

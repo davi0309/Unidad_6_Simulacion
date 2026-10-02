@@ -136,16 +136,52 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
       .add(lobeCirculation)
       .add(flareMask.select(flareForce, vec3(0.0)));
 
-    // ARQUETIPO 1 (Tecla 2): Vórtice de Plasma / Tornado de Seda (Ref: Imagen 2)
-    // Reloj de arena hiperbólico con succión vorticial y cintas helicoidales
-    const waistRadius = float(1.1).add(agentLayer.mul(0.4));
-    const hypTargetR = waistRadius.mul(waistRadius).add(p.z.mul(p.z).mul(0.42)).sqrt();
-    const hypAttract = radial.mul(hypTargetR.sub(rho).mul(1.8));
-    const vortexSuctionZ = p.z.mul(0.65).add(sign(p.z).mul(0.8));
-    const helixRibbon = sin(p.z.mul(2.2).add(theta.mul(2.0))).mul(0.6);
-    const flowTornado = tangent.mul(params.swirl.mul(2.2).add(helixRibbon))
-      .add(hypAttract)
-      .add(vec3(0.0, 0.0, vortexSuctionZ.mul(params.flowDirection)));
+    // ARQUETIPO 1 (Tecla 2): Red de Micro-Vórtices y Eyectores 3D (Ref: Imagen 2)
+    // Pequeños vórtices que amarran los agentes en anillos rotatorios concentrados
+    // y luego los eyectan mediante haces parabólicos ("los sacan por otro lado") en un circuito cerrado continuo.
+    const calcVortex = (center, axis, spinSpd, ringR, exitTarget) => {
+      const r = p.sub(center);
+      const h = r.dot(axis);
+      const rPerp = r.sub(axis.mul(h));
+      const rhoV = length(rPerp).max(0.001);
+      const d = length(r).max(0.001);
+      const perpDir = rPerp.div(rhoV);
+      const spinDir = cross(axis, perpDir);
+
+      // 1. Fuerza de amarre: sujeta y confina los agentes en un anillo circular definido
+      const trapForce = perpDir.mul(ringR.sub(rhoV).mul(2.6));
+
+      // 2. Giro vorticial veloz alrededor del eje polar del vórtice
+      const spinForce = spinDir.mul(spinSpd.mul(params.swirl.mul(0.6).add(0.4)));
+
+      // 3. Transporte helicoidal axial a lo largo del filamento
+      const axialForce = axis.mul(sign(h).mul(1.3).mul(params.flowDirection));
+
+      // 4. Eyección / Haces de lanzamiento: cuando superan el límite axial, son catapultados hacia otro lado
+      const toNext = normalize(exitTarget.sub(p));
+      const ejectJet = toNext.mul(3.8).add(spinDir.mul(1.4));
+      const ejectMix = smoothstep(float(0.38), float(1.15), h.abs().div(1.3));
+
+      const vLocal = mix(trapForce.add(spinForce).add(axialForce), ejectJet, ejectMix);
+      const weight = float(1.0).div(d.pow(2.2).add(0.25));
+      return { v: vLocal.mul(weight), w: weight };
+    };
+
+    // V0: Gran Vórtice Púrpura/Magenta Central (Luz principal inferior derecha)
+    const v0 = calcVortex(vec3(0.7, -0.5, 0.2), normalize(vec3(0.3, 0.2, 0.95)), float(2.8), float(1.35), vec3(-2.0, 1.9, 0.7));
+    // V1: Micro-vórtice Ámbar Superior Izquierdo (Burbuja circular dorada densa)
+    const v1 = calcVortex(vec3(-2.0, 1.9, 0.7), normalize(vec3(-0.25, 0.35, 0.9)), float(3.4), float(0.85), vec3(-0.95, 2.4, -0.45));
+    // V2: Micro-vórtice Secundario Ámbar (Burbuja satélite adyacente)
+    const v2 = calcVortex(vec3(-0.95, 2.4, -0.45), normalize(vec3(0.35, -0.2, 0.9)), float(3.6), float(0.65), vec3(-1.3, -1.6, -0.3));
+    // V3: Disco Espiral Turquesa / Cian (Amplio remolino con peines radiales)
+    const v3 = calcVortex(vec3(-1.3, -1.6, -0.3), normalize(vec3(-0.15, 0.15, 0.98)), float(-2.6), float(2.1), vec3(2.2, 1.5, -0.5));
+    // V4: Lazo de Retorno Esmeralda Periférico (Conecta de vuelta con V0)
+    const v4 = calcVortex(vec3(2.2, 1.5, -0.5), normalize(vec3(0.5, -0.4, 0.77)), float(2.5), float(1.15), vec3(0.7, -0.5, 0.2));
+
+    const totalVortexForce = v0.v.add(v1.v).add(v2.v).add(v3.v).add(v4.v);
+    const totalVortexWeight = v0.w.add(v1.w).add(v2.w).add(v3.w).add(v4.w).max(0.001);
+    const silkRipple = sin(p.x.mul(1.8).add(p.y.mul(1.8)).add(params.elapsedTime.mul(1.5))).mul(0.35);
+    const flowMicroVortices = totalVortexForce.div(totalVortexWeight).add(vec3(silkRipple, silkRipple.negate(), silkRipple.mul(0.5)));
 
     // ARQUETIPO 2 (Tecla 3): Velo Cósmico Multicapa (Ref: Imagen 3)
     // Membranas y pliegues de seda ondulantes en múltiples niveles en 3D
@@ -192,7 +228,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const sampleArchetype = (shapeIdNode) => {
       const sIdx = floor(shapeIdNode.add(0.5));
       const res = flowAstrolabe.toVar();
-      If(sIdx.equal(1.0), () => { res.assign(flowTornado); });
+      If(sIdx.equal(1.0), () => { res.assign(flowMicroVortices); });
       If(sIdx.equal(2.0), () => { res.assign(flowVeil); });
       If(sIdx.equal(3.0), () => { res.assign(flowLotus); });
       If(sIdx.equal(4.0), () => { res.assign(flowAstralPillar); });

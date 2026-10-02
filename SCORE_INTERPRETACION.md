@@ -39,11 +39,11 @@ CRONOLOGÍA MUSICAL:
 *«Stop sending letters... / Letters always get burned...»*
 - **Clima Sonoro:** Entran las notas graves y profundas del contrabajo; el espacio se dilata.
 - **Configuración del Instrumento:**
-  - Presiona `2` (**Vórtice de Plasma / Tornado de Seda**) o `3` (**Velo Cósmico Multicapa**).
-  - Observa cómo los agentes autónomos maniobran mediante fuerzas de dirección (*Reynolds steering*), migrando suavemente durante 5 segundos hacia el reloj de arena vorticial.
-  - La paleta se funde de manera ultra lenta (20 segundos) hacia **Seda Ópalo y Amatista**.
+  - Presiona `2` (**Red de Micro-Vórtices y Eyectores 3D**).
+  - Observa cómo múltiples vórtices y burbujas estelares amarran a los agentes en anillos rotatorios densos y los eyectan por haces parabólicos hacia otros vórtices en un circuito continuo tridimensional (Ref: Imagen 2).
+  - La paleta se funde suavemente hacia **Seda Ópalo y Amatista** (turquesa profundo, magenta eléctrico y ámbar estelar).
 - **Gesto de Interpretación:**
-  - Rota suavemente la cámara con el ratón para revelar la succión helicoidal tridimensional del vórtice.
+  - Rota suavemente la cámara con el ratón para apreciar la red de pequeños remolinos y las cintas eyectoras interconectadas en el volumen de la esfera.
 
 ### Etapa 3: El Gran Florecimiento Celestial – Arpa y Coros (1:30 – 2:20)
 *«I think you're crazy, maybe... / I will see you in the next life...»*
