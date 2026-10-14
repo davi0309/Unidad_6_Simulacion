@@ -1,31 +1,14 @@
 /**
  * flowField.ts
- * Motor de Campo de Flujo (Flow Field) orgánico con Curl Noise para "Heal".
- *
- * Inspirado directamente en la Imagen de Referencia 4:
- * - Espacio ambiente de filamentos sedosos en movimiento continuo perpetuo.
- * - Gran cañón / fisura de herida orgánica por donde convergen las líneas de flujo.
- * - Crecimiento orgánico de la herida conforme avanza la canción de Tom Odell.
- * - Perturbaciones musicales en las partículas blancas (teclas Q a P).
- * - Protección estricta del flujo interno de la herida: las partículas dentro de la herida
- *   siguen exclusivamente la corriente arterial de la grieta.
+ * Motor de Campo de Flujo (Flow Field) con centros orbitales y Curl Noise:
+ * - Genera las trayectorias concéntricas, arcos y curvas sinuosas características de la Imagen 2.
+ * - Perturbaciones musicales en las figuras blancas y azules (teclas Q a P).
+ * - Fondo negro absoluto.
  */
 
 export interface Point2D {
   x: number;
   y: number;
-}
-
-export interface WoundInfluence {
-  isInside: boolean;
-  distance: number;
-  tangentX: number;
-  tangentY: number;
-  normalX: number;
-  normalY: number;
-  spineT: number;
-  woundWidth: number;
-  isHealed: boolean;
 }
 
 export interface KeyPerturbation {
@@ -40,24 +23,26 @@ export interface KeyPerturbation {
   swirlDir: number;
 }
 
+export interface OrbitalCenter {
+  x: number;
+  y: number;
+  radius: number;
+  speed: number;
+  dir: number; // 1 = horario, -1 = antihorario
+}
+
 export class FlowFieldEngine {
   public width: number;
   public height: number;
 
-  // Ruido pseudo-aleatorio reproducible para Curl Noise
+  // Ruido pseudo-aleatorio para Curl Noise
   private permTable: Uint8Array;
+
+  // Centros orbitales que crean los círculos y arcos concéntricos de la Imagen 2
+  public orbitalCenters: OrbitalCenter[] = [];
 
   // Perturbaciones activas generadas por las teclas Q a P
   public activePerturbations: KeyPerturbation[] = [];
-
-  // Parámetros de la espina dorsal de la herida
-  public woundSpine: Point2D[] = [];
-  public woundBranches: { parentT: number; points: Point2D[]; maxGrowth: number }[] = [];
-  public woundGrowth: number = 0.25; // 0.25 al inicio -> 1.0 hacia el final de la canción
-  public baseWoundWidth: number = 24.0;
-
-  // Control de curación de la espina (0 a 1 por segmento)
-  public spineHealedRatio: Float32Array;
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -69,89 +54,29 @@ export class FlowFieldEngine {
       this.permTable[i + 256] = this.permTable[i];
     }
 
-    this.spineHealedRatio = new Float32Array(64);
-    this.buildWoundGeometry();
+    this.initOrbitalCenters();
   }
 
   public resize(w: number, h: number) {
     this.width = w;
     this.height = h;
-    this.buildWoundGeometry();
+    this.initOrbitalCenters();
   }
 
   /**
-   * Genera la espina sinuosa de la herida que cruza elegantemente la pantalla
-   * y sus ramas secundarias fractales.
+   * Distribuye 6 centros orbitales que hacen girar las líneas en arcos concéntricos (Imagen 2).
    */
-  public buildWoundGeometry() {
-    this.woundSpine = [];
-    this.woundBranches = [];
-
-    const W = this.width;
-    const H = this.height;
-
-    // Puntos de control de la curva principal (diagonal orgánica de izquierda a derecha)
-    const steps = 36;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      // Progresión sinusoidal ondulada como en la imagen 4
-      const x = W * (0.16 + 0.68 * t);
-      const wave1 = Math.sin(t * Math.PI * 2.2 + 0.3) * (H * 0.11);
-      const wave2 = Math.cos(t * Math.PI * 4.5) * (H * 0.04);
-      const y = H * 0.50 + wave1 + wave2;
-
-      this.woundSpine.push({ x, y });
-    }
-
-    this.spineHealedRatio = new Float32Array(this.woundSpine.length);
-
-    // 4 ramas secundarias que brotan de la espina
-    const branchConfigs = [
-      { t: 0.28, angle: -0.75, length: H * 0.13, steps: 8 },
-      { t: 0.45, angle: 0.85, length: H * 0.16, steps: 10 },
-      { t: 0.64, angle: -0.80, length: H * 0.14, steps: 8 },
-      { t: 0.80, angle: 0.70, length: H * 0.11, steps: 6 }
+  public initOrbitalCenters() {
+    this.orbitalCenters = [
+      { x: this.width * 0.28, y: this.height * 0.36, radius: this.height * 0.28, speed: 1.4, dir: 1 },
+      { x: this.width * 0.74, y: this.height * 0.22, radius: this.height * 0.22, speed: 1.2, dir: -1 },
+      { x: this.width * 0.48, y: this.height * 0.18, radius: this.height * 0.18, speed: 1.1, dir: 1 },
+      { x: this.width * 0.18, y: this.height * 0.78, radius: this.height * 0.24, speed: 1.3, dir: -1 },
+      { x: this.width * 0.42, y: this.height * 0.72, radius: this.height * 0.26, speed: 1.2, dir: 1 },
+      { x: this.width * 0.80, y: this.height * 0.68, radius: this.height * 0.25, speed: 1.3, dir: -1 }
     ];
-
-    for (const b of branchConfigs) {
-      const parentIdx = Math.floor(b.t * steps);
-      const root = this.woundSpine[parentIdx];
-      const next = this.woundSpine[Math.min(steps, parentIdx + 1)];
-      const baseDir = Math.atan2(next.y - root.y, next.x - root.x);
-
-      const branchPts: Point2D[] = [{ x: root.x, y: root.y }];
-      let cx = root.x;
-      let cy = root.y;
-      const branchAngle = baseDir + b.angle;
-
-      for (let s = 1; s <= b.steps; s++) {
-        const segLen = (b.length / b.steps);
-        const curA = branchAngle + Math.sin(s * 0.8) * 0.28;
-        cx += Math.cos(curA) * segLen;
-        cy += Math.sin(curA) * segLen;
-        branchPts.push({ x: cx, y: cy });
-      }
-
-      this.woundBranches.push({
-        parentT: b.t,
-        points: branchPts,
-        maxGrowth: 1.0
-      });
-    }
   }
 
-  /**
-   * Actualiza el crecimiento de la herida en función de la duración de la canción.
-   */
-  public updateSongProgress(currentTime: number, duration: number) {
-    if (duration > 1.0) {
-      const songRatio = Math.max(0.0, Math.min(1.0, currentTime / duration));
-      // La herida comienza con un 30% de extensión y se desarrolla orgánicamente hasta el clímax
-      this.woundGrowth = 0.30 + songRatio * 0.70;
-    }
-  }
-
-  // Ruido 2D suave de Hermite
   private rawNoise(x: number, y: number): number {
     const X = Math.floor(x) & 255;
     const Y = Math.floor(y) & 255;
@@ -174,157 +99,42 @@ export class FlowFieldEngine {
     return x1 * (1.0 - v) + x2 * v;
   }
 
-  /**
-   * Curl Noise bidimensional: garantiza un campo no divergente (laminar),
-   * produciendo filamentos sedosos y continuos como en la Imagen 4.
-   */
   public curlNoise(x: number, y: number, time: number): { vx: number; vy: number } {
     const eps = 2.0;
     const scale = 0.0022;
     const nx = x * scale;
     const ny = y * scale;
-    const nt = time * 0.08;
+    const nt = time * 0.06;
 
     const nUp = this.rawNoise(nx, ny + eps * scale + nt);
     const nDown = this.rawNoise(nx, ny - eps * scale + nt);
     const nRight = this.rawNoise(nx + eps * scale, ny + nt);
     const nLeft = this.rawNoise(nx - eps * scale, ny + nt);
 
-    // curl = (dF/dy, -dF/dx)
     const dFdy = (nUp - nDown) / (2.0 * eps);
     const dFdx = (nRight - nLeft) / (2.0 * eps);
 
     return {
-      vx: dFdy * 450.0 + 0.8, // flujo dominante suave hacia la derecha
-      vy: -dFdx * 450.0
+      vx: dFdy * 380.0 + 0.6,
+      vy: -dFdx * 380.0
     };
   }
 
   /**
-   * Calcula la influencia de la herida en cualquier punto (x, y).
-   */
-  public getWoundInfluence(x: number, y: number): WoundInfluence {
-    const pts = this.woundSpine;
-    const activeCount = Math.floor(pts.length * this.woundGrowth);
-
-    let minDistSq = 1e9;
-    let closestT = 0;
-    let tangX = 1;
-    let tangY = 0;
-    let normX = 0;
-    let normY = 1;
-    let healed = false;
-
-    // Buscar el segmento más cercano en la espina activa
-    for (let i = 0; i < activeCount - 1; i++) {
-      const p0 = pts[i];
-      const p1 = pts[i + 1];
-
-      const dx = p1.x - p0.x;
-      const dy = p1.y - p0.y;
-      const lenSq = dx * dx + dy * dy;
-      if (lenSq < 1e-5) continue;
-
-      let u = ((x - p0.x) * dx + (y - p0.y) * dy) / lenSq;
-      u = Math.max(0, Math.min(1, u));
-
-      const projX = p0.x + u * dx;
-      const projY = p0.y + u * dy;
-      const rx = x - projX;
-      const ry = y - projY;
-      const dSq = rx * rx + ry * ry;
-
-      if (dSq < minDistSq) {
-        minDistSq = dSq;
-        closestT = (i + u) / pts.length;
-
-        const segLen = Math.sqrt(lenSq);
-        tangX = dx / segLen;
-        tangY = dy / segLen;
-
-        const dist = Math.sqrt(dSq);
-        if (dist > 1e-4) {
-          normX = -ry / dist;
-          normY = rx / dist;
-        }
-
-        healed = this.spineHealedRatio[i] > 0.45;
-      }
-    }
-
-    // Verificar también las ramas secundarias
-    for (let b = 0; b < this.woundBranches.length; b++) {
-      const branch = this.woundBranches[b];
-      if (branch.parentT > this.woundGrowth) continue;
-
-      const bPts = branch.points;
-      const bActiveCount = Math.max(2, Math.floor(bPts.length * this.woundGrowth));
-
-      for (let i = 0; i < bActiveCount - 1; i++) {
-        const p0 = bPts[i];
-        const p1 = bPts[i + 1];
-        const dx = p1.x - p0.x;
-        const dy = p1.y - p0.y;
-        const lenSq = dx * dx + dy * dy;
-        if (lenSq < 1e-5) continue;
-
-        let u = ((x - p0.x) * dx + (y - p0.y) * dy) / lenSq;
-        u = Math.max(0, Math.min(1, u));
-
-        const projX = p0.x + u * dx;
-        const projY = p0.y + u * dy;
-        const rx = x - projX;
-        const ry = y - projY;
-        const dSq = rx * rx + ry * ry;
-
-        if (dSq < minDistSq) {
-          minDistSq = dSq;
-          const segLen = Math.sqrt(lenSq);
-          tangX = dx / segLen;
-          tangY = dy / segLen;
-          const dist = Math.sqrt(dSq);
-          if (dist > 1e-4) {
-            normX = -ry / dist;
-            normY = rx / dist;
-          }
-        }
-      }
-    }
-
-    const dist = Math.sqrt(minDistSq);
-    // Ancho variable de la herida (más ancha en el centro, afinándose en los bordes)
-    const widthFactor = Math.sin(closestT * Math.PI) * 0.7 + 0.5;
-    const currentWoundWidth = this.baseWoundWidth * widthFactor;
-
-    return {
-      isInside: dist < currentWoundWidth,
-      distance: dist,
-      tangentX: tangX,
-      tangentY: tangY,
-      normalX: normX,
-      normalY: normY,
-      spineT: closestT,
-      woundWidth: currentWoundWidth,
-      isHealed: healed
-    };
-  }
-
-  /**
-   * Dispara una perturbación armónica musical en el espacio ambiente con las teclas Q a P.
+   * Dispara perturbación armónica con las teclas Q a P.
    */
   public triggerKeyPerturbation(x: number, y: number, keyCode: string) {
-    // Mapeo musical: de Q (grave, cálido, amplio) a P (agudo, rápido, ondulante)
     const keyMap: Record<string, { radius: number; freq: number; str: number; life: number }> = {
-      KeyQ: { radius: 240, freq: 1.5, str: 3.2, life: 2.4 },
-      KeyW: { radius: 220, freq: 1.8, str: 3.0, life: 2.2 },
-      KeyE: { radius: 200, freq: 2.2, str: 2.8, life: 2.0 },
-      KeyR: { radius: 180, freq: 2.5, str: 2.6, life: 1.9 },
-      KeyT: { radius: 160, freq: 2.8, str: 2.4, life: 1.8 },
-      KeyY: { radius: 150, freq: 3.2, str: 2.2, life: 1.7 },
-      KeyU: { radius: 140, freq: 3.6, str: 2.0, life: 1.6 },
-      KeyI: { radius: 130, freq: 4.0, str: 1.8, life: 1.5 },
-      KeyO: { radius: 120, freq: 4.4, str: 1.6, life: 1.4 },
-      KeyP: { radius: 110, freq: 4.8, str: 1.5, life: 1.3 }
+      KeyQ: { radius: 260, freq: 1.5, str: 3.5, life: 2.4 },
+      KeyW: { radius: 240, freq: 1.8, str: 3.2, life: 2.2 },
+      KeyE: { radius: 220, freq: 2.2, str: 3.0, life: 2.0 },
+      KeyR: { radius: 200, freq: 2.5, str: 2.8, life: 1.9 },
+      KeyT: { radius: 180, freq: 2.8, str: 2.6, life: 1.8 },
+      KeyY: { radius: 160, freq: 3.2, str: 2.4, life: 1.7 },
+      KeyU: { radius: 150, freq: 3.6, str: 2.2, life: 1.6 },
+      KeyI: { radius: 140, freq: 4.0, str: 2.0, life: 1.5 },
+      KeyO: { radius: 130, freq: 4.4, str: 1.8, life: 1.4 },
+      KeyP: { radius: 120, freq: 4.8, str: 1.6, life: 1.3 }
     };
 
     const cfg = keyMap[keyCode] || { radius: 180, freq: 2.5, str: 2.5, life: 1.8 };
@@ -332,7 +142,7 @@ export class FlowFieldEngine {
     this.activePerturbations.push({
       x,
       y,
-      radius: 10,
+      radius: 15,
       maxRadius: cfg.radius,
       frequency: cfg.freq,
       strength: cfg.str,
@@ -346,9 +156,6 @@ export class FlowFieldEngine {
     }
   }
 
-  /**
-   * Actualiza el ciclo de vida de las perturbaciones musicales activas.
-   */
   public update(dt: number) {
     for (let i = this.activePerturbations.length - 1; i >= 0; i--) {
       const p = this.activePerturbations[i];
@@ -362,43 +169,35 @@ export class FlowFieldEngine {
   }
 
   /**
-   * Muestrea el vector de velocidad total para una partícula en (x, y).
-   * REGLA CLAVE:
-   * Si está DENTRO de la herida, sigue estrictamente el flujo arterial de la grieta
-   * y no se ve afectada por las perturbaciones de Q a P.
+   * Muestrea el vector de velocidad combinando centros orbitales (arcos concéntricos de Imagen 2),
+   * curl noise de fondo y perturbaciones de teclas.
    */
-  public sampleVelocity(x: number, y: number, time: number): { vx: number; vy: number; inWound: boolean; woundInf: WoundInfluence } {
-    const wound = this.getWoundInfluence(x, y);
+  public sampleVelocity(x: number, y: number, time: number): { vx: number; vy: number } {
+    let vx = 0;
+    let vy = 0;
 
-    // CASO 1: PARTÍCULA DENTRO DE LA HERIDA
-    if (wound.isInside) {
-      // Flujo arterial rápido y alineado a lo largo de la grieta
-      const arterialSpeed = 3.6;
-      return {
-        vx: wound.tangentX * arterialSpeed,
-        vy: wound.tangentY * arterialSpeed,
-        inWound: true,
-        woundInf: wound
-      };
-    }
-
-    // CASO 2: PARTÍCULA EN EL ESPACIO AMBIENTE
-    // 1. Campo base Curl Noise (filamentos sedosos continuos)
+    // 1. Campo Curl Noise base
     const curl = this.curlNoise(x, y, time);
-    let vx = curl.vx;
-    let vy = curl.vy;
+    vx += curl.vx * 0.45;
+    vy += curl.vy * 0.45;
 
-    // 2. Atracción gravitacional suave hacia la grieta (forma el río de filamentos de la Imagen 4)
-    const pullDist = 180.0;
-    if (wound.distance < pullDist) {
-      const pullFactor = (1.0 - wound.distance / pullDist);
-      const pullStrength = pullFactor * pullFactor * 1.6;
-      // Empujar en dirección al centro de la herida
-      vx += wound.normalX * pullStrength;
-      vy += wound.normalY * pullStrength;
+    // 2. Influencia de los centros orbitales (Imagen 2: arcos concéntricos y pistas circulares)
+    for (const c of this.orbitalCenters) {
+      const dx = x - c.x;
+      const dy = y - c.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < c.radius && dist > 1.0) {
+        const factor = (1.0 - dist / c.radius);
+        const tanX = -dy / dist;
+        const tanY = dx / dist;
+
+        vx += tanX * c.speed * c.dir * factor * 2.8;
+        vy += tanY * c.speed * c.dir * factor * 2.8;
+      }
     }
 
-    // 3. Modificaciones armónicas por teclas Q a P (SÓLO afectan a las partículas blancas ambiente)
+    // 3. Perturbaciones de teclas Q a P
     for (const p of this.activePerturbations) {
       const dx = x - p.x;
       const dy = y - p.y;
@@ -408,20 +207,14 @@ export class FlowFieldEngine {
         const falloff = (1.0 - dist / p.radius) * (p.life / p.maxLife);
         const wave = Math.sin(dist * 0.08 * p.frequency) * p.strength * falloff;
 
-        // Vórtice tangencial + onda radial
         const perpX = -dy / dist;
         const perpY = dx / dist;
 
-        vx += perpX * wave * p.swirlDir * 2.2;
-        vy += perpY * wave * p.swirlDir * 2.2;
+        vx += perpX * wave * p.swirlDir * 2.4;
+        vy += perpY * wave * p.swirlDir * 2.4;
       }
     }
 
-    return {
-      vx,
-      vy,
-      inWound: false,
-      woundInf: wound
-    };
+    return { vx, vy };
   }
 }

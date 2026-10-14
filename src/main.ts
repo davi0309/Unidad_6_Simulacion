@@ -2,12 +2,11 @@
  * main.ts
  * Instrumento Visual "Heal" — Orquestador principal.
  *
- * Diseñado exclusivamente para acompañar la canción "Heal" de Tom Odell.
- * Kintsugi, tejido en flujo sedoso (Flow Field) y cicatriz dorada permanente.
- *
- * Estética inspirada en las referencias:
- * - Imagen 4: Filamentos sedosos orgánicos que convergen en un río carmesí/magenta ardiente.
- * - Imagen 5: Fondo de porcelana obsidiana con grietas de oro metálico 24K puro.
+ * Transformación estética solicitada:
+ * - Fondo negro puro (#000000) sin viñeta.
+ * - Curación: líneas doradas de oro Kintsugi sobre fondo negro (Imagen 1), sin pelotas.
+ * - Partículas: figuras geométricas estilizadas en tonos blancos y azules (Imagen 2)
+ *   (líneas/píldoras con borde de color, anillos concéntricos, cadenas de cuentas).
  */
 
 import * as THREE from 'three/webgpu';
@@ -32,7 +31,7 @@ async function main() {
     throw new Error('Este instrumento visual requiere WebGPU.');
   }
 
-  // 1. CONFIGURACIÓN DEL CANVAS Y RENDERER WEBGPU
+  // 1. RENDERER WEBGPU
   const renderer = new THREE.WebGPURenderer({
     antialias: true,
     powerPreference: 'high-performance'
@@ -47,16 +46,16 @@ async function main() {
   let screenW = window.innerWidth;
   let screenH = window.innerHeight;
 
-  // 2. PARÁMETROS Y MOTORES DE SIMULACIÓN
+  // 2. PARÁMETROS Y MOTORES
   const params = createDefaultParameters();
+  params.vignette = 0.0;
+  params.filmGrain = 0.0;
+
   const flowEngine = new FlowFieldEngine(screenW, screenH);
   const kintsugiLayer = new KintsugiLayer(screenW, screenH);
-  const particleSystem = new FlowParticleSystem(screenW, screenH, 10000);
+  const particleSystem = new FlowParticleSystem(screenW, screenH, 850);
   const stressSystem = new StressSystem();
   const heartbeatSystem = new HeartbeatSystem();
-
-  // Precargar cicatrices antiguas periféricas en la porcelana (reveladas en el zoom de Enter)
-  kintsugiLayer.paintAncientScars(screenW * 0.5, screenH * 0.5, screenW * 0.45, screenH * 0.45);
 
   // 3. PASO DE COMPOSICIÓN WEBGPU FINAL
   const compositePass = new CompositePass(
@@ -66,9 +65,7 @@ async function main() {
 
   // 4. FUNCIÓN DE REINICIO
   const resetExperience = () => {
-    flowEngine.buildWoundGeometry();
     kintsugiLayer.clear();
-    kintsugiLayer.paintAncientScars(screenW * 0.5, screenH * 0.5, screenW * 0.45, screenH * 0.45);
     heartbeatSystem.clear();
     params.healingProgress = 0.0;
     params.stress = 0.0;
@@ -90,8 +87,7 @@ async function main() {
     params,
     () => resetExperience(),
     () => {
-      // Disparar crecimiento forzado de la herida en debug
-      flowEngine.woundGrowth = Math.min(1.0, flowEngine.woundGrowth + 0.15);
+      kintsugiLayer.addHealingEnergy(screenW * 0.5, screenH * 0.5, 0.2);
     }
   );
 
@@ -102,18 +98,14 @@ async function main() {
     mouse.y = e.clientY;
   });
 
-  // Clic directo también libera células sanadoras en el cursor
+  // Al hacer clic, se vierte oro líquido directamente en las grietas cercanas
   window.addEventListener('pointerdown', (e: PointerEvent) => {
     if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.closest('.start-card') || (e.target as HTMLElement)?.closest('.heal-hud')) return;
 
     mouse.x = e.clientX;
     mouse.y = e.clientY;
-    const woundInf = flowEngine.getWoundInfluence(mouse.x, mouse.y);
-    const targetIdx = Math.floor(woundInf.spineT * (flowEngine.woundSpine.length - 1));
-    const targetPt = flowEngine.woundSpine[targetIdx] || { x: screenW * 0.5, y: screenH * 0.5 };
-
     flowEngine.triggerKeyPerturbation(mouse.x, mouse.y, 'KeyG');
-    particleSystem.spawnHealingCells(mouse.x, mouse.y, params.isClimax ? 30 : 12, targetPt);
+    kintsugiLayer.addHealingEnergy(mouse.x, mouse.y, params.isClimax ? 0.16 : 0.08);
   });
 
   // 7. TECLADO: INTERPRETACIÓN MUSICAL
@@ -125,21 +117,21 @@ async function main() {
 
     const now = performance.now();
 
-    // Espacio (mantener): Sustain (persistencia extendida de filamentos sedosos)
+    // Espacio (mantener): Sustain (persistencia extendida de figuras)
     if (e.code === 'Space') {
       params.isSustain = true;
       e.preventDefault();
       return;
     }
 
-    // Shift (mantener): Clímax (desactiva estrés, flujo generoso y bloom)
+    // Shift (mantener): Clímax (desactiva estrés, flujo veloz y oro abundante)
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
       params.isClimax = true;
       params.stress = 0.0;
       return;
     }
 
-    // Enter: Coda final (zoom cinematográfico de 1.0 a 0.35 en 8s con easing)
+    // Enter: Coda final (zoom de 1.0 a 0.35 en 8s)
     if (e.code === 'Enter' && !e.repeat) {
       params.isFinalZooming = true;
       params.finalZoomProgress = 0.0;
@@ -152,24 +144,20 @@ async function main() {
       return;
     }
 
-    // Teclas agudas Q–P: Modifican el flujo ambiente y liberan oro sanador
+    // Teclas agudas Q–P: Ondulan figuras blancas/azules y llenan las grietas con líneas de oro (Imagen 1)
     if (HEALING_KEYS.has(e.code)) {
       stressSystem.registerKeyPress(now, params.isClimax, params);
 
-      // 1. Perturba el flujo de las partículas blancas ambiente
+      // 1. Modifica el movimiento de las figuras blancas y azules
       flowEngine.triggerKeyPerturbation(mouse.x, mouse.y, e.code);
 
-      // 2. Libera células sanadoras doradas que buscan la herida
-      const woundInf = flowEngine.getWoundInfluence(mouse.x, mouse.y);
-      const targetIdx = Math.floor(woundInf.spineT * (flowEngine.woundSpine.length - 1));
-      const targetPt = flowEngine.woundSpine[targetIdx] || { x: screenW * 0.5, y: screenH * 0.5 };
-
-      const cellCount = params.isClimax ? 40 : 12;
-      particleSystem.spawnHealingCells(mouse.x, mouse.y, cellCount, targetPt);
+      // 2. Vierte oro líquido directamente en las grietas (sin pelotas flotantes)
+      const healAmount = params.isClimax ? 0.14 : 0.06;
+      kintsugiLayer.addHealingEnergy(mouse.x, mouse.y, healAmount);
       return;
     }
 
-    // Teclas Z–M: Latidos y respiración radial
+    // Teclas Z–M: Latidos radiales
     if (HEARTBEAT_KEYS.has(e.code)) {
       stressSystem.registerKeyPress(now, params.isClimax, params);
       const center = { x: screenW * 0.5, y: screenH * 0.5 };
@@ -207,7 +195,6 @@ async function main() {
     renderer.setSize(screenW, screenH);
     flowEngine.resize(screenW, screenH);
     kintsugiLayer.resize(screenW, screenH);
-    kintsugiLayer.paintAncientScars(screenW * 0.5, screenH * 0.5, screenW * 0.45, screenH * 0.45);
     particleSystem.resize(screenW, screenH);
   });
 
@@ -220,13 +207,7 @@ async function main() {
     lastTime = now;
     const timeSec = now * 0.001;
 
-    // A. Actualizar progreso de la canción y crecimiento de la herida
-    const audioEl = startScreen.audioElement;
-    if (audioEl && !audioEl.paused && audioEl.duration) {
-      flowEngine.updateSongProgress(audioEl.currentTime, audioEl.duration);
-    }
-
-    // B. Zoom final de Enter (de 1.0 a 0.35 en 8s con easing suave)
+    // A. Zoom final de Enter (de 1.0 a 0.35 en 8s con easing)
     if (params.isFinalZooming) {
       params.finalZoomProgress = Math.min(1.0, params.finalZoomProgress + dt / 8.0);
       const t = params.finalZoomProgress;
@@ -234,34 +215,24 @@ async function main() {
       params.zoom = 1.0 + (0.35 - 1.0) * ease;
     }
 
-    // C. Clímax (Shift)
-    if (params.isClimax) {
-      params.climaxIntensity = Math.min(1.0, params.climaxIntensity + dt / 1.5);
-      params.bloomStrength = 0.6 + 0.8 * params.climaxIntensity;
-    } else {
-      params.climaxIntensity = Math.max(0.0, params.climaxIntensity - dt / 1.5);
-      params.bloomStrength = 0.6 + 0.8 * params.climaxIntensity;
-    }
-
-    // D. Actualizar dinámicas
+    // B. Dinámicas
     stressSystem.update(dt, params);
     heartbeatSystem.update(dt, params);
     flowEngine.update(dt);
 
-    // E. Actualizar y renderizar filamentos de flujo de partículas (Imagen 4)
-    particleSystem.updateAndRender(dt, timeSec, flowEngine, kintsugiLayer, params);
+    // C. Actualizar y renderizar las figuras geométricas blancas y azules (Imagen 2)
+    particleSystem.updateAndRender(dt, timeSec, flowEngine, params);
 
-    // F. Dibujar destellos estelares (✦) de los nodos de oro (Imagen 5)
-    kintsugiLayer.drawGlints(particleSystem.ctx, dt);
+    // D. Actualizar y renderizar las grietas de oro puro Kintsugi (Imagen 1)
+    kintsugiLayer.updateAndRender(dt);
 
-    // G. Calcular progreso de curación real basado en las vetas de oro consolidadas
-    const goldHealing = kintsugiLayer.getHealingProgress();
-    params.healingProgress = Math.max(params.healingProgress, goldHealing);
+    // E. Progreso de curación real (0.0 a 1.0) medido por las líneas de oro selladas
+    params.healingProgress = kintsugiLayer.getHealingProgress();
 
-    // Actualizar HUD
+    // F. Actualizar HUD dinámico
     startScreen.updateHud(params.healingProgress, params.stress, params.showParticles);
 
-    // H. Composición final en WebGPU con tonemapping, bloom, grano analógico y viñeta
+    // G. Composición WebGPU en pantalla completa sin viñeta sobre fondo negro puro
     compositePass.update(params, timeSec);
     compositePass.render(renderer);
   });

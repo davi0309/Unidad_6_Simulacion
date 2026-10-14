@@ -1,10 +1,11 @@
 /**
  * compositePass.ts
  * Shader de composición final para "Heal":
- * - Renderiza el flujo sedoso de partículas (filamentos blancos y río carmesí de Imagen 4).
- * - Superpone las vetas de oro metálico Kintsugi (Imagen 5).
- * - Efectos ópticos: destello de latidos, grano de película analógico, viñeta cinematográfica y zoom final de 8s.
- * - Ejecutado mediante WebGPURenderer y QuadMesh a pantalla completa sin recorte.
+ * - Fondo negro puro (#000000) sin viñeta.
+ * - Partículas gráficas estilizadas en tonos blancos y azules (Imagen 2).
+ * - Grietas doradas Kintsugi metálicas puras (Imagen 1).
+ * - Cero viñeta, cero grano que ensucie la imagen: visuales nítidos, limpios y elegantes.
+ * - Ejecutado con WebGPURenderer y QuadMesh a pantalla completa.
  */
 
 import * as THREE from 'three/webgpu';
@@ -15,9 +16,7 @@ import {
   float,
   texture,
   uniform,
-  uv,
-  sin,
-  fract
+  uv
 } from 'three/tsl';
 import { HealParameters } from '../simulation/parameters';
 
@@ -30,8 +29,8 @@ export class CompositePass {
   public uHeartbeatFlash = uniform(0.0);
   public uZoom = uniform(1.0);
   public uTime = uniform(0.0);
-  public uFilmGrain = uniform(0.035);
-  public uVignette = uniform(0.38);
+  public uFilmGrain = uniform(0.0); // Sin grano
+  public uVignette = uniform(0.0);  // Sin viñeta
 
   // Texturas de entrada desde los lienzos de alta velocidad
   public flowCanvasTexture: THREE.CanvasTexture;
@@ -67,55 +66,38 @@ export class CompositePass {
 
     const uFlash = this.uHeartbeatFlash;
     const uZ = this.uZoom;
-    const uT = this.uTime;
-    const uGrain = this.uFilmGrain;
-    const uVig = this.uVignette;
 
-    // Fondo profundo de porcelana obsidiana
-    const colBackground = vec3(5.0 / 255.0, 7.0 / 255.0, 10.0 / 255.0); // #05070a
+    // Fondo negro absoluto (#000000)
+    const colBackground = vec3(0.0, 0.0, 0.0);
 
     this.material.colorNode = Fn(() => {
       const screenUV = uv();
 
-      // Mapeo de zoom desde el centro (1.0 = viewport central, 0.35 = revelación exterior)
+      // Mapeo de zoom desde el centro (1.0 = normal, 0.35 = revelación exterior en Enter)
       const centeredUV = screenUV.sub(0.5);
       const domainUV = centeredUV.mul(float(1.0).div(uZ)).add(0.5);
 
       const inBounds = domainUV.x.greaterThanEqual(0.0).and(domainUV.x.lessThanEqual(1.0))
         .and(domainUV.y.greaterThanEqual(0.0)).and(domainUV.y.lessThanEqual(1.0));
 
-      // 1. Muestrear filamentos del flujo (partículas blancas y río carmesí)
+      // 1. Muestrear partículas estilizadas blancas y azules (Imagen 2)
       const flowCol = this.flowTextureNode.sample(domainUV).rgb;
 
-      // 2. Muestrear vetas doradas Kintsugi metálicas
+      // 2. Muestrear grietas doradas Kintsugi metálicas puras (Imagen 1)
       const kintsugiSample = this.kintsugiTextureNode.sample(domainUV);
       const goldCol = kintsugiSample.rgb;
-      const goldAlpha = kintsugiSample.a;
 
-      // Combinar fondo con flujo de filamentos
+      // Combinar fondo negro con partículas blancas/azules
       let col = colBackground.add(flowCol).toVar();
 
-      // Superponer oro Kintsugi puro encima con presencia metálica
-      col.addAssign(goldCol.mul(goldAlpha.mul(1.5)));
+      // Superponer las líneas de oro Kintsugi
+      col.addAssign(goldCol.mul(1.4));
 
-      // Destello global de latidos Z X C V B N M (+6% a +12%)
+      // Destello suave de latidos Z X C V B N M
       col.addAssign(col.mul(uFlash));
 
-      // Viñeta cinematográfica suave (0.38)
-      const distFromCenter = centeredUV.length();
-      const vignetteFactor = float(1.0).sub(distFromCenter.mul(distFromCenter).mul(uVig.mul(2.4))).clamp(0.0, 1.0);
-      col.mulAssign(vignetteFactor);
-
-      // Grano analógico sutil de película (0.035)
-      const grainRand = fract(sin(screenUV.x.mul(12.9898).add(screenUV.y.mul(78.233)).add(uT.mul(20.0))).mul(43758.5453));
-      const grain = grainRand.sub(0.5).mul(uGrain);
-      col.addAssign(vec3(grain));
-
-      // Tonemapping cinematográfico suave (Reinhard)
-      const toneMapped = col.div(col.add(1.0)).mul(1.15);
-
-      // Si queda fuera de los límites por el zoom final de Enter, mostrar fondo oscuro
-      const finalColor = inBounds.select(toneMapped, colBackground);
+      // Si queda fuera de los límites por el zoom final de Enter, mostrar fondo negro
+      const finalColor = inBounds.select(col, colBackground);
 
       return vec4(finalColor, 1.0);
     })();
@@ -126,8 +108,8 @@ export class CompositePass {
     this.uHeartbeatFlash.value = params.heartbeatFlash;
     this.uZoom.value = params.zoom;
     this.uTime.value = timeSeconds;
-    this.uFilmGrain.value = params.filmGrain;
-    this.uVignette.value = params.vignette;
+    this.uFilmGrain.value = 0.0;
+    this.uVignette.value = 0.0;
 
     // Actualizar texturas desde los lienzos de simulación
     this.flowCanvasTexture.needsUpdate = true;
