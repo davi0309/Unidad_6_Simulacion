@@ -79,8 +79,8 @@ export class StartScreen {
             <div class="control-item">
               <span class="key-badge">Q — P</span>
               <div class="control-text">
-                <strong>Melodía & Células</strong>
-                <span>Nacen en el cursor (de cálidas a frías) y buscan la grieta</span>
+                <strong>10 Gestos & Oro Kintsugi</strong>
+                <span>Q a P: 10 dinámicas únicas (vórtices, ondas, cometas) y vierten oro</span>
               </div>
             </div>
             <div class="control-item">

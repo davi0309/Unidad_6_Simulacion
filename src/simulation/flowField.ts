@@ -1,11 +1,19 @@
 /**
  * flowField.ts
- * Motor de Campo de Flujo (Flow Field) 100% divergencia-cero (Divergence-Free):
- * - Movimiento ultra-fluido que conserva el área: las partículas NUNCA se amontonan
- *   ni dejan vacíos en el centro.
- * - Vortices orbitales y arcos concéntricos suaves (Imagen 2).
- * - Espina dorsal orgánica de la herida para guiar el desgarro carmesí y la curación de oro.
- * - Ondas armónicas reactivas y visibles al presionar las teclas Q a P.
+ * Motor de Campo de Flujo (Flow Field) 100% activo en toda la pantalla:
+ * - Campo continuo sin zonas muertas: velocidad garantizada en el 100% del lienzo.
+ * - Sin atascos en bordes ni congelamiento de partículas.
+ * - 10 comportamientos completamente distintos para cada tecla de Q a P:
+ *   Q: Onda expansiva de bajo profundo (Radial Shockwave)
+ *   W: Vórtice ciclónico horario (Cyclone Spiral)
+ *   E: Torrente horizontal cometa (Jet Stream)
+ *   R: Onda serpentina transversal (Snake Undulation)
+ *   T: Vórtice antihorario invertido (Counter-Cyclone)
+ *   Y: Dispersión y turbulencia de chispas (Chaos Jitter)
+ *   U: Atracción gravitacional magnética (Magnetic Attractor)
+ *   I: Ascenso vertical géiser (Upward Lift)
+ *   O: Doble hélice / Vórtices binarios (Twin Orbit)
+ *   P: Vibración cristalina de alta frecuencia (Crystal Shimmer)
  */
 
 export interface Point2D {
@@ -13,25 +21,15 @@ export interface Point2D {
   y: number;
 }
 
-export interface KeyPulse {
+export interface DynamicImpulse {
+  type: string; // 'shockwave' | 'cyclone' | 'jet' | 'sine' | 'counter_cyclone' | 'chaos' | 'magnet' | 'lift' | 'twin' | 'shimmer'
   x: number;
   y: number;
   radius: number;
   maxRadius: number;
-  speed: number;
   strength: number;
   life: number;
   maxLife: number;
-  freq: number;
-  swirl: number;
-}
-
-export interface WoundSegment {
-  p0: Point2D;
-  p1: Point2D;
-  width: number;
-  branchLevel: number;
-  healed: number; // 0.0 (abierta) a 1.0 (sellada con oro)
 }
 
 export class FlowFieldEngine {
@@ -40,14 +38,11 @@ export class FlowFieldEngine {
 
   private permTable: Uint8Array;
 
-  // Centros de vórtice suaves (función de corriente)
-  public vortexCenters: { x: number; y: number; radius: number; strength: number }[] = [];
-
-  // Pulsos y ondas de teclado activas
-  public activePulses: KeyPulse[] = [];
-
-  // Red de la herida (geometría de la fractura)
-  public woundSegments: WoundSegment[] = [];
+  // Impulsos activos de las 10 teclas distintas
+  public activeImpulses: DynamicImpulse[] = [];
+  public get activePulses(): DynamicImpulse[] {
+    return this.activeImpulses;
+  }
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -55,127 +50,17 @@ export class FlowFieldEngine {
 
     this.permTable = new Uint8Array(512);
     for (let i = 0; i < 256; i++) {
-      this.permTable[i] = Math.floor(Math.sin(i * 127.1 + 311.7) * 43758.5453) & 255;
+      this.permTable[i] = Math.floor(Math.sin(i * 91.3 + 17.5) * 43758.5453) & 255;
       this.permTable[i + 256] = this.permTable[i];
     }
-
-    this.initVortices();
-    this.buildWoundSegments();
   }
 
   public resize(w: number, h: number) {
     this.width = w;
     this.height = h;
-    this.initVortices();
-    this.buildWoundSegments();
   }
 
-  /**
-   * Inicializa centros de vórtice suaves distribuidos para que las líneas formen
-   * arcos fluidos y curvas concéntricas (Imagen 2) sin acumular partículas en ningún punto.
-   */
-  public initVortices() {
-    this.vortexCenters = [
-      { x: this.width * 0.25, y: this.height * 0.35, radius: this.height * 0.35, strength: 1.8 },
-      { x: this.width * 0.72, y: this.height * 0.28, radius: this.height * 0.32, strength: -1.6 },
-      { x: this.width * 0.50, y: this.height * 0.52, radius: this.height * 0.38, strength: 1.5 },
-      { x: this.width * 0.22, y: this.height * 0.75, radius: this.height * 0.34, strength: -1.7 },
-      { x: this.width * 0.78, y: this.height * 0.70, radius: this.height * 0.36, strength: 1.6 }
-    ];
-  }
-
-  /**
-   * Construye la red de la herida orgánica visible con fractalidad suave.
-   */
-  public buildWoundSegments() {
-    this.woundSegments = [];
-    const W = this.width;
-    const H = this.height;
-
-    // Tronco principal diagonal (de izquierda-abajo a derecha-arriba)
-    const pts: Point2D[] = [
-      { x: W * 0.08, y: H * 0.85 },
-      { x: W * 0.22, y: H * 0.76 },
-      { x: W * 0.36, y: H * 0.62 },
-      { x: W * 0.48, y: H * 0.50 },
-      { x: W * 0.62, y: H * 0.40 },
-      { x: W * 0.76, y: H * 0.25 },
-      { x: W * 0.92, y: H * 0.12 }
-    ];
-
-    // Subdividir con perturbación suave
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i];
-      const p1 = pts[i + 1];
-      const midX = (p0.x + p1.x) * 0.5 + (Math.sin(i * 3.7) * (W * 0.02));
-      const midY = (p0.y + p1.y) * 0.5 + (Math.cos(i * 2.9) * (H * 0.025));
-
-      this.woundSegments.push({
-        p0,
-        p1: { x: midX, y: midY },
-        width: 6.0,
-        branchLevel: 0,
-        healed: 0.0
-      });
-      this.woundSegments.push({
-        p0: { x: midX, y: midY },
-        p1,
-        width: 5.5,
-        branchLevel: 0,
-        healed: 0.0
-      });
-    }
-
-    // Ramas secundarias
-    const branch1: Point2D[] = [
-      { x: W * 0.36, y: H * 0.62 },
-      { x: W * 0.26, y: H * 0.54 },
-      { x: W * 0.16, y: H * 0.50 }
-    ];
-    for (let i = 0; i < branch1.length - 1; i++) {
-      this.woundSegments.push({
-        p0: branch1[i],
-        p1: branch1[i + 1],
-        width: 3.8 - i * 0.8,
-        branchLevel: 1,
-        healed: 0.0
-      });
-    }
-
-    const branch2: Point2D[] = [
-      { x: W * 0.62, y: H * 0.40 },
-      { x: W * 0.58, y: H * 0.22 },
-      { x: W * 0.52, y: H * 0.10 }
-    ];
-    for (let i = 0; i < branch2.length - 1; i++) {
-      this.woundSegments.push({
-        p0: branch2[i],
-        p1: branch2[i + 1],
-        width: 3.5 - i * 0.8,
-        branchLevel: 1,
-        healed: 0.0
-      });
-    }
-
-    const branch3: Point2D[] = [
-      { x: W * 0.48, y: H * 0.50 },
-      { x: W * 0.60, y: H * 0.64 },
-      { x: W * 0.74, y: H * 0.68 },
-      { x: W * 0.88, y: H * 0.65 }
-    ];
-    for (let i = 0; i < branch3.length - 1; i++) {
-      this.woundSegments.push({
-        p0: branch3[i],
-        p1: branch3[i + 1],
-        width: 3.2 - i * 0.6,
-        branchLevel: 1,
-        healed: 0.0
-      });
-    }
-  }
-
-  // Ruido pseudo-perlin suave
-  private rawNoise(x: number, y: number): number {
+  private noise2D(x: number, y: number): number {
     const X = Math.floor(x) & 255;
     const Y = Math.floor(y) & 255;
     const xf = x - Math.floor(x);
@@ -198,141 +83,288 @@ export class FlowFieldEngine {
   }
 
   /**
-   * Función de Corriente Escalar Ψ(x, y, t):
-   * Derivando este potencial escalar mediante (dΨ/dy, -dΨ/dx) se obtiene un campo
-   * de velocidad MATEMÁTICAMENTE DIVERGENCIA-CERO (∇·v = 0).
-   * Conserva el área en cada punto: NUNCA amontona agentes ni deja el centro vacío.
-   */
-  public streamFunction(x: number, y: number, t: number): number {
-    const scale = 0.0016;
-    let psi = this.rawNoise(x * scale, y * scale + t * 0.05) * 120.0;
-
-    // Aporte suave de los vórtices
-    for (const v of this.vortexCenters) {
-      const dx = x - v.x;
-      const dy = y - v.y;
-      const rSq = dx * dx + dy * dy;
-      const rMaxSq = v.radius * v.radius;
-      if (rSq < rMaxSq) {
-        const factor = 1.0 - rSq / rMaxSq;
-        psi += v.strength * factor * factor * 90.0;
-      }
-    }
-
-    // Aporte de las ondas de teclas activas
-    for (const p of this.activePulses) {
-      const dx = x - p.x;
-      const dy = y - p.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < p.radius && dist > 1.0) {
-        const wave = Math.sin((dist - p.radius * 0.5) * 0.06 * p.freq);
-        const falloff = (1.0 - dist / p.radius) * (p.life / p.maxLife);
-        psi += wave * p.strength * falloff * p.swirl * 70.0;
-      }
-    }
-
-    return psi;
-  }
-
-  /**
-   * Muestreo del vector de velocidad mediante derivadas centrales de la función de corriente.
+   * Muestreo del campo de velocidad base:
+   * Garantiza que CADA punto del lienzo (centro, bordes, esquinas) tenga un flujo activo
+   * de 1.8 a 3.0 px/frame. ¡Las partículas NUNCA se detienen!
    */
   public sampleVelocity(x: number, y: number, time: number): { vx: number; vy: number } {
-    const eps = 3.0;
+    const W = this.width;
+    const H = this.height;
 
-    const psiUp = this.streamFunction(x, y + eps, time);
-    const psiDown = this.streamFunction(x, y - eps, time);
-    const psiRight = this.streamFunction(x + eps, y, time);
-    const psiLeft = this.streamFunction(x - eps, y, time);
+    // 1. Campo de ángulo continuo que abarca todo el lienzo
+    const scale1 = 0.0022;
+    const scale2 = 0.0055;
+    const angle1 = this.noise2D(x * scale1, y * scale1 + time * 0.04) * Math.PI * 3.5;
+    const angle2 = this.noise2D(x * scale2 + 50.0, y * scale2 + time * 0.08) * Math.PI * 1.5;
+    const finalAngle = angle1 + angle2 * 0.4;
 
-    // v = (dΨ/dy, -dΨ/dx)
-    const vx = (psiUp - psiDown) / (2.0 * eps);
-    const vy = -(psiRight - psiLeft) / (2.0 * eps);
+    let vx = Math.cos(finalAngle) * 2.2;
+    let vy = Math.sin(finalAngle) * 2.2;
+
+    // 2. Corrientes orbitales suaves distribuidas por todo el espacio (Imagen 2)
+    const centers = [
+      { cx: W * 0.28, cy: H * 0.35, R: H * 0.32, dir: 1 },
+      { cx: W * 0.72, cy: H * 0.28, R: H * 0.30, dir: -1 },
+      { cx: W * 0.50, cy: H * 0.55, R: H * 0.36, dir: 1 },
+      { cx: W * 0.22, cy: H * 0.75, R: H * 0.30, dir: -1 },
+      { cx: W * 0.78, cy: H * 0.72, R: H * 0.32, dir: 1 }
+    ];
+
+    for (const c of centers) {
+      const dx = x - c.cx;
+      const dy = y - c.cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 1.0) {
+        // Falloff suave continuo sin corte abrupto
+        const factor = 1.0 / (1.0 + (dist / c.R) * (dist / c.R));
+        vx += (-dy / dist) * factor * c.dir * 2.4;
+        vy += (dx / dist) * factor * c.dir * 2.4;
+      }
+    }
+ 
+    // 2.5 Nudge suave continuo para alejar partículas de los bordes y mantener el centro vivo
+    const margin = 80;
+    if (x < margin) vx += (1.0 - Math.max(0, x) / margin) * 2.8;
+    if (x > W - margin) vx -= (1.0 - Math.max(0, W - x) / margin) * 2.8;
+    if (y < margin) vy += (1.0 - Math.max(0, y) / margin) * 2.8;
+    if (y > H - margin) vy -= (1.0 - Math.max(0, H - y) / margin) * 2.8;
+
+    // 3. Modificaciones dinámicas según los 10 tipos de impulsos de teclado
+    for (const imp of this.activeImpulses) {
+      const dx = x - imp.x;
+      const dy = y - imp.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const lifeRatio = imp.life / imp.maxLife;
+
+      switch (imp.type) {
+        // Q: Onda expansiva radial (Radial Shockwave)
+        case 'shockwave': {
+          if (Math.abs(dist - imp.radius) < 70.0) {
+            const push = (1.0 - Math.abs(dist - imp.radius) / 70.0) * imp.strength * lifeRatio;
+            vx += (dx / (dist || 1)) * push * 4.5;
+            vy += (dy / (dist || 1)) * push * 4.5;
+          }
+          break;
+        }
+
+        // W: Vórtice ciclónico horario (Cyclone Spiral)
+        case 'cyclone': {
+          if (dist < imp.radius && dist > 1.0) {
+            const spin = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
+            vx += (-dy / dist) * spin * 5.0 - (dx / dist) * spin * 1.5;
+            vy += (dx / dist) * spin * 5.0 - (dy / dist) * spin * 1.5;
+          }
+          break;
+        }
+
+        // E: Torrente horizontal cometa (Jet Stream)
+        case 'jet': {
+          if (dist < imp.radius) {
+            const jet = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
+            vx += jet * 6.5;
+            vy += Math.sin(x * 0.03) * jet * 1.2;
+          }
+          break;
+        }
+
+        // R: Onda serpentina transversal (Snake Undulation)
+        case 'sine': {
+          if (dist < imp.radius) {
+            const s = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
+            vy += Math.sin(x * 0.04 + imp.radius * 0.05) * s * 6.0;
+            vx += Math.cos(y * 0.04) * s * 2.0;
+          }
+          break;
+        }
+
+        // T: Vórtice antihorario invertido (Counter-Cyclone)
+        case 'counter_cyclone': {
+          if (dist < imp.radius && dist > 1.0) {
+            const spin = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
+            vx += (dy / dist) * spin * 5.0;
+            vy += (-dx / dist) * spin * 5.0;
+          }
+          break;
+        }
+
+        // Y: Dispersión caótica (Chaos Jitter)
+        case 'chaos': {
+          if (dist < imp.radius) {
+            const c = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
+            const rAng = this.noise2D(x * 0.05, y * 0.05) * Math.PI * 4;
+            vx += Math.cos(rAng) * c * 5.5;
+            vy += Math.sin(rAng) * c * 5.5;
+          }
+          break;
+        }
+
+        // U: Atracción gravitacional magnética (Magnetic Attractor)
+        case 'magnet': {
+          if (dist < imp.radius && dist > 10.0) {
+            const pull = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
+            vx -= (dx / dist) * pull * 4.8;
+            vy -= (dy / dist) * pull * 4.8;
+          }
+          break;
+        }
+
+        // I: Ascenso vertical géiser (Upward Lift)
+        case 'lift': {
+          if (dist < imp.radius) {
+            const lift = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
+            vy -= lift * 6.0;
+            vx += (Math.random() - 0.5) * lift * 1.5;
+          }
+          break;
+        }
+
+        // O: Doble hélice / Vórtices binarios (Twin Orbit)
+        case 'twin': {
+          const d1 = Math.hypot(x - (imp.x - 60), y - imp.y);
+          const d2 = Math.hypot(x - (imp.x + 60), y - imp.y);
+          if (d1 < imp.radius && d1 > 2) {
+            const p1 = (1.0 - d1 / imp.radius) * imp.strength * lifeRatio;
+            vx += (-(y - imp.y) / d1) * p1 * 4.0;
+            vy += ((x - (imp.x - 60)) / d1) * p1 * 4.0;
+          }
+          if (d2 < imp.radius && d2 > 2) {
+            const p2 = (1.0 - d2 / imp.radius) * imp.strength * lifeRatio;
+            vx += ((y - imp.y) / d2) * p2 * 4.0;
+            vy += (-(x - (imp.x + 60)) / d2) * p2 * 4.0;
+          }
+          break;
+        }
+
+        // P: Vibración cristalina de alta frecuencia (Crystal Shimmer)
+        case 'shimmer': {
+          if (dist < imp.radius) {
+            const shim = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
+            vx += Math.sin(time * 50.0 + x * 0.1) * shim * 4.5;
+            vy += Math.cos(time * 50.0 + y * 0.1) * shim * 4.5;
+          }
+          break;
+        }
+      }
+    }
+
+    // 4. Garantizar velocidad mínima permanente: ¡NINGUNA PARTÍCULA SE DETIENE JAMÁS!
+    const curSpeed = Math.sqrt(vx * vx + vy * vy);
+    if (curSpeed < 1.6) {
+      const heading = curSpeed > 0.01 ? Math.atan2(vy, vx) : finalAngle;
+      vx = Math.cos(heading) * 1.8;
+      vy = Math.sin(heading) * 1.8;
+    } else if (curSpeed > 8.0) {
+      vx = (vx / curSpeed) * 8.0;
+      vy = (vy / curSpeed) * 8.0;
+    }
 
     return { vx, vy };
   }
 
   /**
-   * Dispara una onda armónica reactiva claramente visible al presionar teclas Q a P.
+   * Dispara el comportamiento específico único para cada tecla de Q a P.
    */
   public triggerKeyPulse(x: number, y: number, keyCode: string) {
-    const keyMap: Record<string, { maxR: number; speed: number; str: number; freq: number; life: number }> = {
-      KeyQ: { maxR: 380, speed: 280, str: 4.8, freq: 1.5, life: 2.2 },
-      KeyW: { maxR: 350, speed: 300, str: 4.5, freq: 1.8, life: 2.0 },
-      KeyE: { maxR: 320, speed: 320, str: 4.2, freq: 2.2, life: 1.9 },
-      KeyR: { maxR: 300, speed: 340, str: 4.0, freq: 2.5, life: 1.8 },
-      KeyT: { maxR: 280, speed: 360, str: 3.8, freq: 2.8, life: 1.7 },
-      KeyY: { maxR: 260, speed: 380, str: 3.6, freq: 3.2, life: 1.6 },
-      KeyU: { maxR: 240, speed: 400, str: 3.4, freq: 3.6, life: 1.5 },
-      KeyI: { maxR: 220, speed: 420, str: 3.2, freq: 4.0, life: 1.4 },
-      KeyO: { maxR: 200, speed: 440, str: 3.0, freq: 4.4, life: 1.3 },
-      KeyP: { maxR: 190, speed: 460, str: 2.8, freq: 4.8, life: 1.2 }
-    };
+    this.triggerKeyAction(x, y, keyCode);
+  }
 
-    const cfg = keyMap[keyCode] || { maxR: 300, speed: 350, str: 4.0, freq: 2.5, life: 1.8 };
+  public triggerKeyAction(x: number, y: number, keyCode: string) {
+    let type = 'shockwave';
+    let maxR = 340;
+    let str = 4.5;
+    let life = 2.0;
 
-    this.activePulses.push({
+    switch (keyCode) {
+      case 'KeyQ':
+        type = 'shockwave';
+        maxR = 450;
+        str = 6.0;
+        life = 2.4;
+        break;
+      case 'KeyW':
+        type = 'cyclone';
+        maxR = 320;
+        str = 5.5;
+        life = 2.2;
+        break;
+      case 'KeyE':
+        type = 'jet';
+        maxR = 400;
+        str = 6.5;
+        life = 2.0;
+        break;
+      case 'KeyR':
+        type = 'sine';
+        maxR = 360;
+        str = 5.0;
+        life = 2.2;
+        break;
+      case 'KeyT':
+        type = 'counter_cyclone';
+        maxR = 320;
+        str = 5.5;
+        life = 2.2;
+        break;
+      case 'KeyY':
+        type = 'chaos';
+        maxR = 350;
+        str = 5.5;
+        life = 1.9;
+        break;
+      case 'KeyU':
+        type = 'magnet';
+        maxR = 380;
+        str = 6.0;
+        life = 2.5;
+        break;
+      case 'KeyI':
+        type = 'lift';
+        maxR = 380;
+        str = 6.2;
+        life = 2.0;
+        break;
+      case 'KeyO':
+        type = 'twin';
+        maxR = 340;
+        str = 5.5;
+        life = 2.4;
+        break;
+      case 'KeyP':
+        type = 'shimmer';
+        maxR = 300;
+        str = 5.0;
+        life = 1.6;
+        break;
+      default:
+        type = 'shockwave';
+        break;
+    }
+
+    this.activeImpulses.push({
+      type,
       x,
       y,
-      radius: 10,
-      maxRadius: cfg.maxR,
-      speed: cfg.speed,
-      strength: cfg.str,
-      life: cfg.life,
-      maxLife: cfg.life,
-      freq: cfg.freq,
-      swirl: Math.random() > 0.5 ? 1 : -1
+      radius: 12,
+      maxRadius: maxR,
+      strength: str,
+      life,
+      maxLife: life
     });
 
-    if (this.activePulses.length > 15) {
-      this.activePulses.shift();
+    if (this.activeImpulses.length > 20) {
+      this.activeImpulses.shift();
     }
   }
 
   public update(dt: number) {
-    for (let i = this.activePulses.length - 1; i >= 0; i--) {
-      const p = this.activePulses[i];
-      p.life -= dt;
-      p.radius += p.speed * dt;
+    for (let i = this.activeImpulses.length - 1; i >= 0; i--) {
+      const imp = this.activeImpulses[i];
+      imp.life -= dt;
+      imp.radius += (imp.maxRadius - imp.radius) * (dt * 3.5);
 
-      if (p.life <= 0 || p.radius >= p.maxRadius) {
-        this.activePulses.splice(i, 1);
+      if (imp.life <= 0) {
+        this.activeImpulses.splice(i, 1);
       }
     }
-  }
-
-  /**
-   * Busca la distancia a la herida y si está sanada en ese punto.
-   */
-  public getWoundDistance(x: number, y: number): { dist: number; isHealed: boolean } {
-    let minDistSq = 1e9;
-    let healedRatio = 0.0;
-
-    for (let i = 0; i < this.woundSegments.length; i++) {
-      const seg = this.woundSegments[i];
-      const dx = seg.p1.x - seg.p0.x;
-      const dy = seg.p1.y - seg.p0.y;
-      const lenSq = dx * dx + dy * dy;
-      if (lenSq < 1e-5) continue;
-
-      let u = ((x - seg.p0.x) * dx + (y - seg.p0.y) * dy) / lenSq;
-      u = Math.max(0, Math.min(1, u));
-
-      const px = seg.p0.x + u * dx;
-      const py = seg.p0.y + u * dy;
-      const rx = x - px;
-      const ry = y - py;
-      const dSq = rx * rx + ry * ry;
-
-      if (dSq < minDistSq) {
-        minDistSq = dSq;
-        healedRatio = seg.healed;
-      }
-    }
-
-    return {
-      dist: Math.sqrt(minDistSq),
-      isHealed: healedRatio > 0.35
-    };
   }
 }

@@ -2,14 +2,15 @@
  * particleSystem.ts
  * Sistema de partículas gráficas estilizadas (Imagen 2):
  * - Tonos BLANCOS Y AZULES CLAROS LUMINOSOS (Cian neón #00f0ff, azul cielo #38bdf8, agua #67e8f9, blanco #ffffff).
- * - Las partículas NUNCA se eliminan: circulan eternamente con envoltura toroidal suave.
- * - Cobertura uniforme en todo el lienzo (incluido el centro).
+ * - Fondo 100% LIMPIO NEGRO PURO (#000000): Cada frame se limpia sin dejar manchas, estelas sucias ni residuos.
+ * - Sombra / halo sutil directo detrás de cada partícula sin ensuciar el lienzo.
+ * - ¡LAS PARTÍCULAS NUNCA SE DETIENEN!: Velocidad mínima garantizada en todo momento.
+ * - Cobertura uniforme en toda la pantalla sin vacíos ni atascos en bordes.
  * - Figuras geométricas estilizadas:
  *   1. Píldoras / líneas con doble borde (borde cian luminoso + núcleo blanco puro).
  *   2. Anillos concéntricos (anillo exterior cian + punto central blanco).
  *   3. Cadenas de cuentas punteadas en cian y blanco.
  *   4. Arcos circulares suaves.
- * - Reacción visual inmediata y fluida a los pulsos de las teclas Q a P.
  */
 
 import { FlowFieldEngine } from './flowField';
@@ -53,7 +54,7 @@ export class FlowParticleSystem {
     '#22d3ee'  // Turquesa cian radiante
   ];
 
-  constructor(w: number, h: number, count: number = 1100) {
+  constructor(w: number, h: number, count: number = 1300) {
     this.width = w;
     this.height = h;
     this.count = count;
@@ -95,7 +96,6 @@ export class FlowParticleSystem {
     let created = 0;
     for (let r = 0; r < rows && created < this.count; r++) {
       for (let c = 0; c < cols && created < this.count; c++) {
-        // Posición dentro de la celda con dispersión aleatoria suave
         const px = (c + Math.random()) * cellW;
         const py = (r + Math.random()) * cellH;
         const shapeType = shapes[created % shapes.length];
@@ -106,8 +106,8 @@ export class FlowParticleSystem {
           y: py,
           prevX: px,
           prevY: py,
-          vx: (Math.random() - 0.5) * 0.4,
-          vy: (Math.random() - 0.5) * 0.4,
+          vx: (Math.random() - 0.5) * 1.5,
+          vy: (Math.random() - 0.5) * 1.5,
           heading: Math.random() * Math.PI * 2,
           shapeType,
           length: 16.0 + Math.random() * 26.0,
@@ -115,7 +115,7 @@ export class FlowParticleSystem {
           dotCount: 3 + Math.floor(Math.random() * 3),
           outerColor: cyanColor,
           speed: 0.95 + Math.random() * 0.45,
-          trail: [{ x: px, y: py }]
+          trail: []
         });
 
         created++;
@@ -124,7 +124,10 @@ export class FlowParticleSystem {
   }
 
   /**
-   * Actualiza el movimiento de los agentes sin eliminarlos nunca, con envoltura toroidal.
+   * Actualiza y renderiza los agentes:
+   * - Fondo 100% limpio (#000000) en cada fotograma.
+   * - Sombra suave detrás de cada partícula sin manchar el fondo.
+   * - NUNCA se detienen ni se congelan tras ser empujadas.
    */
   public updateAndRender(
     dt: number,
@@ -136,70 +139,90 @@ export class FlowParticleSystem {
     const W = this.width;
     const H = this.height;
 
-    // Desvanecimiento suave sobre fondo negro puro (#000000)
-    // Con Sustain (Espacio) la persistencia se prolonga
-    const fadeAlpha = params.isSustain ? 0.07 : 0.18;
-    ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
+    // 1. Limpieza TOTAL del lienzo: Cero manchas, cero residuos, fondo negro azabache puro
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, W, H);
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
     const numParticles = this.particles.length;
+    const timeScale = dt * 60.0;
 
     for (let i = 0; i < numParticles; i++) {
       const p = this.particles[i];
       p.prevX = p.x;
       p.prevY = p.y;
 
-      // Muestrear velocidad del campo de flujo divergencia-cero
+      // Guardar posición en el rastro para la sombrita inmediata
+      p.trail.unshift({ x: p.x, y: p.y });
+      if (p.trail.length > 4) {
+        p.trail.pop();
+      }
+
+      // Muestrear velocidad del campo de flujo (que ya incluye las 10 teclas Q-P)
       const flow = flowEngine.sampleVelocity(p.x, p.y, time);
 
-      // Inercia fluida (filamentos suaves sin saltos bruscos)
-      const inertia = 0.88;
+      // Inercia fluida
+      const inertia = 0.86;
       p.vx = p.vx * inertia + flow.vx * (1.0 - inertia) * p.speed;
       p.vy = p.vy * inertia + flow.vy * (1.0 - inertia) * p.speed;
 
-      // Respuesta dinámica adicional si una onda de tecla pasa sobre la partícula
-      for (const pulse of flowEngine.activePulses) {
-        const dx = p.x - pulse.x;
-        const dy = p.y - pulse.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (Math.abs(dist - pulse.radius) < 35.0) {
-          const push = (1.0 - Math.abs(dist - pulse.radius) / 35.0) * (pulse.life / pulse.maxLife);
-          p.vx += (dx / (dist || 1)) * push * 2.5;
-          p.vy += (dy / (dist || 1)) * push * 2.5;
-        }
+      // ¡GARANTIZAR QUE NUNCA SE QUEDEN QUIETAS!:
+      // Si la velocidad cae por debajo del umbral mínimo, relanzarla suavemente
+      const curSpd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+      if (curSpd < 1.4) {
+        const h = curSpd > 0.05 ? Math.atan2(p.vy, p.vx) : p.heading;
+        p.vx = Math.cos(h) * 1.8 * p.speed;
+        p.vy = Math.sin(h) * 1.8 * p.speed;
       }
 
-      p.x += p.vx * (dt * 60.0);
-      p.y += p.vy * (dt * 60.0);
+      // Integrar posición
+      p.x += p.vx * timeScale;
+      p.y += p.vy * timeScale;
 
-      // Envoltura toroidal suave: NUNCA se eliminan ni se destruyen agentes
-      if (p.x < 0) {
-        p.x += W;
-        p.prevX = p.x;
-        p.trail = [{ x: p.x, y: p.y }];
-      } else if (p.x > W) {
-        p.x -= W;
-        p.prevX = p.x;
-        p.trail = [{ x: p.x, y: p.y }];
+      // Recirculación suave en los bordes con margen para evitar atascos y vacíos
+      const pad = 25;
+      if (p.x < -pad) {
+        p.x = W + pad * 0.4;
+        p.trail = [];
+      } else if (p.x > W + pad) {
+        p.x = -pad * 0.4;
+        p.trail = [];
       }
 
-      if (p.y < 0) {
-        p.y += H;
-        p.prevY = p.y;
-        p.trail = [{ x: p.x, y: p.y }];
-      } else if (p.y > H) {
-        p.y -= H;
-        p.prevY = p.y;
-        p.trail = [{ x: p.x, y: p.y }];
+      if (p.y < -pad) {
+        p.y = H + pad * 0.4;
+        p.trail = [];
+      } else if (p.y > H + pad) {
+        p.y = -pad * 0.4;
+        p.trail = [];
       }
 
-      // Orientación según la velocidad
-      const spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-      if (spd > 0.05) {
+      // Orientación según el vector de movimiento
+      if (curSpd > 0.05) {
         p.heading = Math.atan2(p.vy, p.vx);
+      }
+
+      // ==============================================================
+      // SOMBRITA SUAVE ATRÁS (NO ENSUCIA EL FONDO PORQUE SE LIMPIA CADA FRAME)
+      // ==============================================================
+      if (p.trail.length >= 2) {
+        ctx.beginPath();
+        ctx.moveTo(p.trail[1].x, p.trail[1].y);
+        ctx.lineTo(p.x, p.y);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+
+        if (p.trail.length >= 3) {
+          ctx.beginPath();
+          ctx.moveTo(p.trail[2].x, p.trail[2].y);
+          ctx.lineTo(p.trail[1].x, p.trail[1].y);
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.10)';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+        }
       }
 
       // ==============================================================
@@ -214,7 +237,7 @@ export class FlowParticleSystem {
       switch (p.shapeType) {
         // FIGURA 1: PÍLDORA / LÍNEA CON DOBLE BORDE (Azul claro exterior, Blanco puro interior)
         case 'pill': {
-          const w = 4.0;
+          const w = 4.2;
           // 1. Trazo exterior azul claro brillante / cian neón
           ctx.beginPath();
           ctx.moveTo(-hLen, 0);
