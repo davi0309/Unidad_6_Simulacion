@@ -54,7 +54,9 @@ export class DebugPanel {
     fCells.close();
 
     // 5. POST-PROCESO Y VISTA
-    const fRender = this.gui.addFolder('Visuales y Cámara');
+    const fRender = this.gui.addFolder('Visuales y Partículas');
+    fRender.add(params, 'showParticles').name('Ver Partículas (V)').listen();
+    fRender.add(params, 'particleBrightness', 0.1, 2.0, 0.05).name('Brillo Partículas');
     fRender.add(params, 'zoom', 0.25, 1.5, 0.01).name('Zoom').listen();
     fRender.add(params, 'filmGrain', 0.0, 0.15, 0.005).name('Grano Película');
     fRender.add(params, 'vignette', 0.0, 0.8, 0.02).name('Viñeta');

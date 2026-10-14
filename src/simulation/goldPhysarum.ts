@@ -296,6 +296,33 @@ export class GoldPhysarumSystem {
     this.depositPoints = new THREE.Points(geometry, mat);
     this.depositPoints.frustumCulled = false;
     this.depositScene.add(this.depositPoints);
+
+    // Escena para visualizar los agentes dorados vivos en pantalla
+    this.swarmScene = new THREE.Scene();
+    const goldSwarmMat = new THREE.PointsNodeMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false
+    });
+    goldSwarmMat.positionNode = Fn(() => {
+      const p = pBuf.element(instanceIndex);
+      return vec4(p.x, p.y, 0.0, 1.0);
+    })();
+    goldSwarmMat.colorNode = Fn(() => {
+      const p = pBuf.element(instanceIndex);
+      const isAlive = p.w.greaterThan(0.0).select(float(1.0), float(0.0));
+      return vec4(1.0, 0.86, 0.40, 0.85).mul(isAlive);
+    })();
+    this.swarmPoints = new THREE.Points(geometry, goldSwarmMat);
+    this.swarmPoints.frustumCulled = false;
+    this.swarmScene.add(this.swarmPoints);
+  }
+
+  public renderSwarm(renderer: any, target: THREE.RenderTarget) {
+    if (this.activeCount === 0) return;
+    renderer.setRenderTarget(target);
+    renderer.render(this.swarmScene, this.depositCamera);
   }
 
   private setupDiffusePass() {

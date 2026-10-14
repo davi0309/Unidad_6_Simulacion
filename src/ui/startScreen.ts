@@ -1,156 +1,355 @@
 /**
  * startScreen.ts
- * Pantalla inicial minimalista y poética para "Heal".
+ * Pantalla inicial minimalista y poética inspirada en el Kintsugi (金継ぎ),
+ * junto con HUD sutil para el acompañamiento de "Heal" de Tom Odell.
  *
- * - Muestra la metáfora y el mapa de teclas.
- * - Incluye un reproductor opcional para cargar un archivo de audio local
- *   (SOLO para reproducirlo de fondo, SIN análisis de audio).
- * - Desaparece suavemente con la primera pulsación de tecla.
- * - Sin interfaz visible durante la interpretación.
+ * - Carga por defecto el audio "Tom Odell - Heal (Official Audio).mp3".
+ * - Reproduce automáticamente al comenzar la interpretación con cualquier tecla o clic.
+ * - Sin análisis de audio (respetando la regla de no-audioreactividad).
+ * - HUD translúcido y no invasivo en la parte inferior durante la interpretación.
  */
 
 export class StartScreen {
   private container: HTMLDivElement;
-  private audioElement: HTMLAudioElement;
+  private hudContainer: HTMLDivElement;
+  public audioElement: HTMLAudioElement;
   private isDismissed: boolean = false;
+  private isAudioPlaying: boolean = false;
   private onDismissCallback?: () => void;
+  private onParticleToggleCallback?: () => void;
 
-  constructor(onDismiss?: () => void) {
+  constructor(
+    onDismiss?: () => void,
+    onParticleToggle?: () => void
+  ) {
     this.onDismissCallback = onDismiss;
+    this.onParticleToggleCallback = onParticleToggle;
+
+    // 1. Inicializar elemento de audio con la canción por defecto
     this.audioElement = new Audio();
     this.audioElement.loop = true;
+    this.audioElement.crossOrigin = 'anonymous';
+    // Ruta por defecto en public/audio/heal.mp3 con fallback directo
+    this.audioElement.src = './audio/heal.mp3';
+    this.audioElement.addEventListener('error', () => {
+      // Fallback a la raíz si la subcarpeta no estuviera disponible
+      if (!this.audioElement.src.includes('Tom%20Odell')) {
+        this.audioElement.src = './Tom Odell - Heal (Official Audio).mp3';
+      }
+    });
 
+    // 2. Pantalla inicial (overlay)
     this.container = document.createElement('div');
     this.container.className = 'start-screen';
-    this.render();
+    this.renderStartScreen();
     document.body.appendChild(this.container);
 
-    window.addEventListener('keydown', this.handleFirstKey, { once: false });
+    // 3. HUD durante la interpretación (en la parte inferior, sutil y minimalista)
+    this.hudContainer = document.createElement('div');
+    this.hudContainer.className = 'heal-hud hidden';
+    this.renderHud();
+    document.body.appendChild(this.hudContainer);
+
+    // Escuchar primera tecla para iniciar experiencia
+    window.addEventListener('keydown', this.handleFirstInteraction, { once: false });
   }
 
-  private render() {
+  private renderStartScreen() {
     this.container.innerHTML = `
       <div class="start-card">
+        <div class="kintsugi-watermark">金継ぎ</div>
+
         <header class="start-header">
-          <span class="start-kicker">INSTRUMENTO VISUAL</span>
+          <span class="start-kicker">KINTSUGI · ARTE DE LA RESILIENCIA</span>
           <h1 class="start-title">HEAL</h1>
-          <p class="start-subtitle">Inspirado en la canción de Tom Odell · Kintsugi y Resiliencia</p>
+          <p class="start-subtitle">Instrumento visual para la obra de Tom Odell</p>
         </header>
 
         <section class="start-metaphor">
           <p>
-            Un tejido vivo con una herida abierta. Curarlo requiere calma y paciencia.<br>
-            La herida se cierra con <strong>hilos dorados</strong>: la cicatriz nunca desaparece, queda luminosa.<br>
-            Si tocas con prisa, el estrés reabrirá la herida.<br>
+            Una herida abierta en el tejido vivo. Curarla requiere calma y escucha.<br>
+            La fractura se cierra con <strong>hilos dorados</strong>: la cicatriz no se oculta, queda luminosa.<br>
+            Si tocas con prisa, la herida se reabre.<br>
             <em>Sanar no se puede forzar.</em>
           </p>
         </section>
 
         <section class="start-controls-grid">
-          <div class="control-item">
-            <span class="key-badge">Q W E R T Y U I O P</span>
-            <span class="control-desc">Liberan células sanadoras en el cursor (tinte cálido a frío)</span>
+          <div class="control-col">
+            <div class="control-item">
+              <span class="key-badge">Q — P</span>
+              <div class="control-text">
+                <strong>Melodía & Células</strong>
+                <span>Nacen en el cursor (de cálidas a frías) y buscan la grieta</span>
+              </div>
+            </div>
+            <div class="control-item">
+              <span class="key-badge">Z — M</span>
+              <div class="control-text">
+                <strong>Respiración & Latidos</strong>
+                <span>Ondas radiales desde el centro que pulsan el tejido y destellan</span>
+              </div>
+            </div>
+            <div class="control-item">
+              <span class="key-badge">Ratón</span>
+              <div class="control-text">
+                <strong>Conducción</strong>
+                <span>Proyecta la curación sobre la grieta viva</span>
+              </div>
+            </div>
           </div>
-          <div class="control-item">
-            <span class="key-badge">Z X C V B N M</span>
-            <span class="control-desc">Latidos: onda radial desde la herida y destello de brillo</span>
-          </div>
-          <div class="control-item">
-            <span class="key-badge">Ratón</span>
-            <span class="control-desc">Proyecta el objetivo de curación sobre la grieta</span>
-          </div>
-          <div class="control-item">
-            <span class="key-badge">Espacio (mantener)</span>
-            <span class="control-desc">Sustain: extiende la persistencia del tejido y la vida del oro</span>
-          </div>
-          <div class="control-item">
-            <span class="key-badge">Shift (mantener)</span>
-            <span class="control-desc">Clímax: sin estrés, flujo abundante, turbulencia curl y bloom</span>
-          </div>
-          <div class="control-item">
-            <span class="key-badge">Enter</span>
-            <span class="control-desc">Final: zoom exterior hacia las cicatrices antiguas del pasado</span>
-          </div>
-          <div class="control-item">
-            <span class="key-badge">Escape</span>
-            <span class="control-desc">Reiniciar con una herida nueva</span>
-          </div>
-          <div class="control-item">
-            <span class="key-badge">D</span>
-            <span class="control-desc">Panel de debug (lil-gui)</span>
+
+          <div class="control-col">
+            <div class="control-item">
+              <span class="key-badge">Espacio</span>
+              <div class="control-text">
+                <strong>Sustain (Mantener)</strong>
+                <span>Extiende la persistencia del tejido y prolonga el oro a 20s</span>
+              </div>
+            </div>
+            <div class="control-item">
+              <span class="key-badge">Shift</span>
+              <div class="control-text">
+                <strong>Clímax (Mantener)</strong>
+                <span>Flujo generoso sin estrés, turbulencia curl y bloom</span>
+              </div>
+            </div>
+            <div class="control-item">
+              <span class="key-badge">Enter</span>
+              <div class="control-text">
+                <strong>Coda Final</strong>
+                <span>Zoom cinemático que revela las cicatrices del pasado</span>
+              </div>
+            </div>
           </div>
         </section>
 
         <footer class="start-footer">
-          <div class="audio-loader-box">
-            <label class="audio-button" for="heal-audio-input">
-              🎵 Cargar canción "Heal" (audio local opcional)
+          <!-- Reproductor de audio por defecto integrado -->
+          <div class="audio-pill">
+            <button class="audio-play-btn" id="start-audio-toggle" type="button" aria-label="Reproducir o pausar">
+              <span id="start-audio-icon">▶</span>
+            </button>
+            <div class="audio-track-info">
+              <span class="audio-song-name">Tom Odell — Heal</span>
+              <span class="audio-song-desc" id="start-audio-status">Audio de acompañamiento cargado</span>
+            </div>
+            <label class="audio-change-label" title="Cargar otro archivo de audio">
+              ↺ Cambiar
+              <input type="file" id="custom-audio-input" accept="audio/*" class="audio-hidden-input">
             </label>
-            <input type="file" id="heal-audio-input" accept="audio/*" class="audio-file-input">
-            <span class="audio-status" id="heal-audio-status">Sin audio · puedes reproducir tu música de fondo</span>
           </div>
 
-          <div class="start-prompt">
+          <button class="start-begin-btn" id="start-begin-action" type="button">
             <span class="pulse-dot"></span>
-            <span>Presiona cualquier tecla para comenzar a interpretar</span>
-          </div>
+            <span>Comenzar interpretación</span>
+          </button>
         </footer>
       </div>
     `;
 
-    this.setupAudioInput();
+    this.setupStartScreenEvents();
   }
 
-  private setupAudioInput() {
-    const input = this.container.querySelector('#heal-audio-input') as HTMLInputElement;
-    const status = this.container.querySelector('#heal-audio-status') as HTMLElement;
+  private renderHud() {
+    this.hudContainer.innerHTML = `
+      <div class="hud-capsule">
+        <div class="hud-section hud-healing">
+          <span class="hud-kanji">金</span>
+          <span class="hud-label">CURACIÓN</span>
+          <div class="hud-bar-track">
+            <div class="hud-bar-fill" id="hud-fill"></div>
+          </div>
+          <span class="hud-val" id="hud-hp">0%</span>
+        </div>
 
-    if (!input || !status) return;
+        <div class="hud-sep"></div>
 
-    input.addEventListener('change', (e: Event) => {
+        <div class="hud-section hud-stress">
+          <span class="hud-dot" id="hud-stress-indicator"></span>
+          <span class="hud-label" id="hud-stress-text">Calma</span>
+        </div>
+
+        <div class="hud-sep"></div>
+
+        <button class="hud-btn" id="hud-particles-toggle" type="button" title="Presiona V para ver enjambre de partículas">
+          <span class="hud-key-tag">V</span>
+          <span id="hud-particles-text">Partículas</span>
+        </button>
+
+        <div class="hud-sep"></div>
+
+        <button class="hud-btn hud-audio-btn" id="hud-audio-toggle" type="button" title="Pausar / Reproducir música">
+          <span id="hud-audio-icon">♫</span>
+          <span id="hud-audio-label">Pausar</span>
+        </button>
+
+        <div class="hud-sep"></div>
+
+        <span class="hud-tip" title="H oculta el HUD · D abre ajustes">H: Ocultar · D: Ajustes</span>
+      </div>
+    `;
+
+    this.setupHudEvents();
+  }
+
+  private setupStartScreenEvents() {
+    const playBtn = this.container.querySelector('#start-audio-toggle') as HTMLButtonElement;
+    const beginBtn = this.container.querySelector('#start-begin-action') as HTMLButtonElement;
+    const customInput = this.container.querySelector('#custom-audio-input') as HTMLInputElement;
+
+    // Toggle de audio antes de comenzar
+    playBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleAudio();
+    });
+
+    // Botón comenzar
+    beginBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.startPerformance();
+    });
+
+    // Cargar archivo personalizado opcional
+    customInput?.addEventListener('change', (e: Event) => {
       const target = e.target as HTMLInputElement;
       if (target.files && target.files[0]) {
         const file = target.files[0];
-        const url = URL.createObjectURL(file);
-        this.audioElement.src = url;
-        this.audioElement.play().then(() => {
-          status.textContent = `▶ Reproduciendo: ${file.name} (solo acompañamiento)`;
-        }).catch(() => {
-          status.textContent = `✓ Archivo listo: ${file.name} (se reproducirá al tocar)`;
-        });
+        this.audioElement.src = URL.createObjectURL(file);
+        const nameEl = this.container.querySelector('.audio-song-name');
+        if (nameEl) nameEl.textContent = file.name;
+        this.playAudio();
+      }
+    });
+
+    // Clic en la tarjeta exterior para comenzar
+    this.container.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('.start-card') && !(e.target as HTMLElement).closest('.audio-pill')) {
+        this.startPerformance();
       }
     });
   }
 
-  private handleFirstKey = (event: KeyboardEvent) => {
-    // Evitar ocultar si el usuario está interactuando con el input de archivo
-    if ((event.target as HTMLElement)?.tagName === 'INPUT') return;
+  private setupHudEvents() {
+    const particlesBtn = this.hudContainer.querySelector('#hud-particles-toggle');
+    const audioBtn = this.hudContainer.querySelector('#hud-audio-toggle');
 
-    if (!this.isDismissed) {
-      this.dismiss();
-      // Si había audio cargado pero en pausa por interacción de navegador, reproducirlo
-      if (this.audioElement.src && this.audioElement.paused) {
-        this.audioElement.play().catch(() => {});
-      }
-    }
-  };
+    particlesBtn?.addEventListener('click', () => {
+      if (this.onParticleToggleCallback) this.onParticleToggleCallback();
+    });
 
-  public dismiss() {
-    if (this.isDismissed) return;
-    this.isDismissed = true;
-    this.container.classList.add('fade-out');
-
-    setTimeout(() => {
-      this.container.style.display = 'none';
-      if (this.onDismissCallback) {
-        this.onDismissCallback();
-      }
-    }, 800);
+    audioBtn?.addEventListener('click', () => {
+      this.toggleAudio();
+    });
   }
 
-  public show() {
-    this.isDismissed = false;
-    this.container.style.display = 'flex';
-    this.container.classList.remove('fade-out');
+  public toggleAudio() {
+    if (this.isAudioPlaying) {
+      this.pauseAudio();
+    } else {
+      this.playAudio();
+    }
+  }
+
+  public playAudio() {
+    this.audioElement.play().then(() => {
+      this.isAudioPlaying = true;
+      this.updateAudioIcons(true);
+    }).catch(() => {
+      // Si el navegador bloquea autoplay, se reproducirá con la siguiente interacción
+    });
+  }
+
+  public pauseAudio() {
+    this.audioElement.pause();
+    this.isAudioPlaying = false;
+    this.updateAudioIcons(false);
+  }
+
+  private updateAudioIcons(playing: boolean) {
+    const startIcon = this.container.querySelector('#start-audio-icon');
+    const startStatus = this.container.querySelector('#start-audio-status');
+    const hudLabel = this.hudContainer.querySelector('#hud-audio-label');
+    const hudIcon = this.hudContainer.querySelector('#hud-audio-icon');
+
+    if (startIcon) startIcon.textContent = playing ? '❚❚' : '▶';
+    if (startStatus) startStatus.textContent = playing ? 'Reproduciendo música' : 'Pausado';
+    if (hudLabel) hudLabel.textContent = playing ? 'Pausar' : 'Reanudar';
+    if (hudIcon) hudIcon.textContent = playing ? '♫' : '▷';
+  }
+
+  private handleFirstInteraction = (event: KeyboardEvent) => {
+    // Si la pantalla ya desapareció o se interactúa con un input, ignorar
+    if (this.isDismissed || (event.target as HTMLElement)?.tagName === 'INPUT') return;
+    this.startPerformance();
+  };
+
+  public startPerformance() {
+    if (this.isDismissed) return;
+    this.isDismissed = true;
+
+    // Asegurar que la canción de Tom Odell comience a sonar
+    if (!this.isAudioPlaying) {
+      this.playAudio();
+    }
+
+    // Desvanecimiento suave de la pantalla inicial
+    this.container.classList.add('fade-out');
+    setTimeout(() => {
+      this.container.style.display = 'none';
+      // Mostrar HUD sutil
+      this.hudContainer.classList.remove('hidden');
+      if (this.onDismissCallback) this.onDismissCallback();
+    }, 700);
+  }
+
+  /**
+   * Actualiza los datos dinámicos en el HUD minimalista
+   */
+  public updateHud(healingProgress: number, stress: number, showParticles: boolean) {
+    if (!this.hudContainer) return;
+
+    // 1. Barra de progreso de curación
+    const fillEl = this.hudContainer.querySelector('#hud-fill') as HTMLElement;
+    const hpEl = this.hudContainer.querySelector('#hud-hp') as HTMLElement;
+    const pct = Math.round(healingProgress * 100);
+    if (fillEl) fillEl.style.width = `${pct}%`;
+    if (hpEl) hpEl.textContent = `${pct}%`;
+
+    // 2. Indicador de estrés / serenidad
+    const dot = this.hudContainer.querySelector('#hud-stress-indicator') as HTMLElement;
+    const stressText = this.hudContainer.querySelector('#hud-stress-text') as HTMLElement;
+    if (dot && stressText) {
+      if (stress > 1.0) {
+        dot.className = 'hud-dot hud-dot-danger';
+        stressText.textContent = '¡Tensión!';
+        stressText.style.color = '#ff8080';
+      } else if (stress > 0.4) {
+        dot.className = 'hud-dot hud-dot-warning';
+        stressText.textContent = 'Acelerando';
+        stressText.style.color = '#ffd27a';
+      } else {
+        dot.className = 'hud-dot hud-dot-calm';
+        stressText.textContent = 'Calma';
+        stressText.style.color = '#a0d2be';
+      }
+    }
+
+    // 3. Estado de partículas visibles
+    const partText = this.hudContainer.querySelector('#hud-particles-text') as HTMLElement;
+    const partBtn = this.hudContainer.querySelector('#hud-particles-toggle') as HTMLElement;
+    if (partText && partBtn) {
+      if (showParticles) {
+        partText.textContent = 'Partículas: ON';
+        partBtn.classList.add('active');
+      } else {
+        partText.textContent = 'Partículas: OFF';
+        partBtn.classList.remove('active');
+      }
+    }
+  }
+
+  public toggleHud() {
+    this.hudContainer.classList.toggle('hidden');
   }
 }

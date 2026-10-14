@@ -254,6 +254,30 @@ export class TissuePhysarumSystem {
     this.depositPoints = new THREE.Points(geometry, mat);
     this.depositPoints.frustumCulled = false;
     this.depositScene.add(this.depositPoints);
+
+    // Escena para visualizar el enjambre de partículas vivas directamente
+    this.swarmScene = new THREE.Scene();
+    const swarmMat = new THREE.PointsNodeMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false
+    });
+    swarmMat.positionNode = Fn(() => {
+      const p = pBuf.element(instanceIndex);
+      return vec4(p.x, p.y, 0.0, 1.0);
+    })();
+    swarmMat.colorNode = Fn(() => {
+      return vec4(0.16, 0.32, 0.55, 0.35);
+    })();
+    this.swarmPoints = new THREE.Points(geometry, swarmMat);
+    this.swarmPoints.frustumCulled = false;
+    this.swarmScene.add(this.swarmPoints);
+  }
+
+  public renderSwarm(renderer: any, target: THREE.RenderTarget) {
+    renderer.setRenderTarget(target);
+    renderer.render(this.swarmScene, this.depositCamera);
   }
 
   private setupDiffusePass() {

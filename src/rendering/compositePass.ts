@@ -42,12 +42,14 @@ export class CompositePass {
   public uFilmGrain = uniform(0.04);
   public uVignette = uniform(0.35);
   public uDomainRatio = uniform(1.6); // Relación entre dominio de simulación y viewport
+  public uSwarmAlpha = uniform(0.0);
 
   // Texturas de entrada
   private tissueTexture: any;
   private goldTexture: any;
   private scarTexture: any;
   private sdfTexture: any;
+  private swarmTexture: any;
   public overlayTexture: THREE.CanvasTexture;
 
   constructor(
@@ -55,7 +57,8 @@ export class CompositePass {
     goldRT: THREE.RenderTarget,
     scarRT: THREE.RenderTarget,
     sdfTex: THREE.DataTexture,
-    overlayCanvas: HTMLCanvasElement
+    overlayCanvas: HTMLCanvasElement,
+    swarmRT: THREE.RenderTarget
   ) {
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -64,6 +67,7 @@ export class CompositePass {
     this.goldTexture = goldRT.texture;
     this.scarTexture = scarRT.texture;
     this.sdfTexture = sdfTex;
+    this.swarmTexture = swarmRT.texture;
 
     this.overlayTexture = new THREE.CanvasTexture(overlayCanvas);
     this.overlayTexture.minFilter = THREE.LinearFilter;
@@ -152,6 +156,10 @@ export class CompositePass {
       const goldFinal = gold2.mul(totalGold.mul(1.6).clamp(0.0, 2.0));
       col.addAssign(goldFinal);
 
+      // Superponer enjambre de partículas visibles si está activo (tecla V)
+      const swarmCol = texture(this.swarmTexture, domainUV).rgb;
+      col.addAssign(swarmCol.mul(this.uSwarmAlpha));
+
       // Superponer células sanadoras y fragmentos de fractura (overlay canvas)
       col.addAssign(overlay.rgb.mul(overlay.a));
 
@@ -188,6 +196,7 @@ export class CompositePass {
     this.uTime.value = timeSeconds;
     this.uFilmGrain.value = params.filmGrain;
     this.uVignette.value = params.vignette;
+    this.uSwarmAlpha.value = params.showParticles ? params.particleBrightness : 0.0;
     this.overlayTexture.needsUpdate = true;
   }
 

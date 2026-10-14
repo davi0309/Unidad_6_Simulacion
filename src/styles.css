@@ -1,5 +1,5 @@
 :root {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   color: #e6edf3;
   background-color: #07090c;
   color-scheme: dark;
@@ -7,13 +7,13 @@
 
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 html, body, #app {
   width: 100%;
   height: 100%;
-  margin: 0;
-  padding: 0;
   overflow: hidden;
   background-color: #07090c;
   user-select: none;
@@ -29,7 +29,7 @@ canvas {
 }
 
 /* ==========================================================================
-   PANTALLA INICIAL POÉTICA Y MINIMALISTA
+   PANTALLA INICIAL · KINTSUGI (金継ぎ) MINIMALISTA
    ========================================================================== */
 .start-screen {
   position: fixed;
@@ -37,69 +37,87 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, rgba(12, 16, 24, 0.94) 0%, rgba(7, 9, 12, 0.98) 100%);
-  backdrop-filter: blur(14px);
+  background: radial-gradient(circle at center, rgba(14, 18, 25, 0.90) 0%, rgba(7, 9, 12, 0.98) 100%);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   z-index: 100;
   opacity: 1;
-  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1), transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 24px;
 }
 
 .start-screen.fade-out {
   opacity: 0;
-  transform: scale(1.03);
+  transform: scale(1.025);
   pointer-events: none;
 }
 
 .start-card {
-  max-width: 680px;
+  position: relative;
+  max-width: 720px;
   width: 100%;
-  background: rgba(14, 18, 26, 0.75);
-  border: 1px solid rgba(255, 210, 122, 0.16);
-  border-radius: 18px;
-  padding: 32px 36px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 40px rgba(200, 144, 46, 0.08);
+  background: rgba(13, 17, 23, 0.72);
+  border: 1px solid rgba(255, 215, 120, 0.16);
+  border-radius: 20px;
+  padding: 36px 40px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.85), 0 0 60px rgba(212, 175, 55, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
+  overflow: hidden;
+}
+
+/* Marca de agua sutil en Kanji (金継ぎ = Kintsugi) */
+.kintsugi-watermark {
+  position: absolute;
+  top: -15px;
+  right: 18px;
+  font-size: 110px;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Songti SC", serif;
+  font-weight: 200;
+  color: rgba(255, 215, 120, 0.035);
+  letter-spacing: 0.1em;
+  pointer-events: none;
+  line-height: 1;
 }
 
 .start-header {
-  text-align: center;
+  text-align: left;
 }
 
 .start-kicker {
-  font-size: 11px;
-  letter-spacing: 0.22em;
+  font-size: 10.5px;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
   color: #ffd27a;
   opacity: 0.9;
-  font-weight: 600;
+  font-weight: 500;
+  display: block;
 }
 
 .start-title {
-  font-size: 42px;
+  font-size: 40px;
   font-weight: 300;
-  letter-spacing: 0.15em;
-  margin: 6px 0 2px 0;
-  color: #fff6e6;
-  text-shadow: 0 0 20px rgba(255, 210, 122, 0.3);
+  letter-spacing: 0.18em;
+  margin: 4px 0 2px 0;
+  color: #fff8ed;
+  text-shadow: 0 0 25px rgba(255, 210, 122, 0.25);
 }
 
 .start-subtitle {
-  font-size: 13px;
+  font-size: 12.5px;
   color: #8fa3b8;
-  margin: 0;
+  letter-spacing: 0.04em;
 }
 
 .start-metaphor {
-  background: rgba(90, 15, 23, 0.12);
-  border-left: 3px solid #ffd27a;
-  padding: 14px 18px;
-  border-radius: 0 10px 10px 0;
-  font-size: 13px;
+  background: rgba(90, 15, 23, 0.10);
+  border-left: 2px solid #ffd27a;
+  padding: 12px 18px;
+  border-radius: 0 8px 8px 0;
+  font-size: 12.8px;
   line-height: 1.6;
-  color: #d1d9e2;
+  color: #ccd7e2;
 }
 
 .start-metaphor strong {
@@ -109,110 +127,343 @@ canvas {
 
 .start-metaphor em {
   display: block;
-  margin-top: 6px;
+  margin-top: 4px;
   color: #f0d2bf;
   font-style: italic;
+  font-size: 12px;
 }
 
+/* Grilla de controles ordenada y poética */
 .start-controls-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 28px;
+  padding: 8px 0;
+}
+
+@media (max-width: 600px) {
+  .start-controls-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.control-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .control-item {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 12.5px;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .key-badge {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 215, 120, 0.25);
   border-radius: 6px;
   padding: 3px 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: #ffd27a;
   white-space: nowrap;
-  min-width: 140px;
+  min-width: 68px;
   text-align: center;
+  box-shadow: inset 0 0 8px rgba(255, 215, 120, 0.05);
 }
 
-.control-desc {
-  color: #9cb0c5;
-}
-
-.start-footer {
+.control-text {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 6px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 1px;
 }
 
-.audio-loader-box {
+.control-text strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: #f2f5f8;
+}
+
+.control-text span {
+  font-size: 11px;
+  color: #8b9baa;
+  line-height: 1.35;
+}
+
+/* Pie de pantalla y reproductor minimalista */
+.start-footer {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 4px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
   flex-wrap: wrap;
 }
 
-.audio-button {
-  background: rgba(200, 144, 46, 0.15);
-  border: 1px solid rgba(255, 210, 122, 0.35);
-  color: #ffd27a;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: inline-block;
+/* Reproductor tipo pastilla (Pill) */
+.audio-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 215, 120, 0.22);
+  border-radius: 40px;
+  padding: 6px 14px 6px 8px;
+  backdrop-filter: blur(10px);
 }
 
-.audio-button:hover {
-  background: rgba(200, 144, 46, 0.28);
+.audio-play-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #ffd27a;
+  color: #0a0d13;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 12px rgba(255, 210, 122, 0.35);
+}
+
+.audio-play-btn:hover {
+  transform: scale(1.08);
+  background: #fff0d0;
+}
+
+.audio-track-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.audio-song-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #eaf0f6;
+}
+
+.audio-song-desc {
+  font-size: 10px;
+  color: #8fa3b8;
+}
+
+.audio-change-label {
+  font-size: 10.5px;
+  color: #d4af37;
+  cursor: pointer;
+  opacity: 0.75;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: opacity 0.2s;
+}
+
+.audio-change-label:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.audio-hidden-input {
+  display: none;
+}
+
+.start-begin-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 30px;
+  color: #fff6e6;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.start-begin-btn:hover {
+  border-color: #ffd27a;
+  background: rgba(255, 215, 120, 0.08);
+  box-shadow: 0 0 20px rgba(255, 215, 120, 0.15);
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffd27a;
+  box-shadow: 0 0 8px #ffd27a;
+  animation: pulseAnim 2.2s infinite ease-in-out;
+}
+
+@keyframes pulseAnim {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+
+/* ==========================================================================
+   HUD MINIMALISTA EN PANTALLA (DURANTE LA INTERPRETACIÓN)
+   ========================================================================== */
+.heal-hud {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  pointer-events: auto;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.heal-hud.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(14px);
+  pointer-events: none;
+}
+
+.hud-capsule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(10, 13, 19, 0.65);
+  border: 1px solid rgba(255, 215, 120, 0.18);
+  border-radius: 30px;
+  padding: 6px 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  font-size: 11px;
+  color: #c9d5e2;
+}
+
+.hud-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-kanji {
+  color: #ffd27a;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.hud-label {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8da1b5;
+}
+
+.hud-bar-track {
+  width: 70px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hud-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #d4af37, #fff3d1);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 6px #ffd27a;
+}
+
+.hud-val {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: #ffd27a;
+  min-width: 28px;
+}
+
+.hud-sep {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hud-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a0d2be;
+  box-shadow: 0 0 6px #a0d2be;
+  transition: all 0.3s ease;
+}
+
+.hud-dot.hud-dot-calm {
+  background: #a0d2be;
+  box-shadow: 0 0 6px #a0d2be;
+}
+
+.hud-dot.hud-dot-warning {
+  background: #ffd27a;
+  box-shadow: 0 0 6px #ffd27a;
+}
+
+.hud-dot.hud-dot-danger {
+  background: #ff7575;
+  box-shadow: 0 0 8px #ff7575;
+  animation: pulseDanger 0.8s infinite alternate;
+}
+
+@keyframes pulseDanger {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.4); opacity: 1; }
+}
+
+.hud-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 3px 9px;
+  color: #c9d5e2;
+  font-size: 10.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hud-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
   border-color: #ffd27a;
   color: #fff;
 }
 
-.audio-file-input {
-  display: none;
+.hud-btn.active {
+  border-color: #ffd27a;
+  color: #ffd27a;
+  background: rgba(255, 215, 120, 0.12);
 }
 
-.audio-status {
-  font-size: 11.5px;
-  color: #728498;
+.hud-key-tag {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 9px;
+  font-family: monospace;
 }
 
-.start-prompt {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 13px;
-  color: #f0d2bf;
+.hud-audio-btn {
+  border-color: rgba(255, 215, 120, 0.25);
+  color: #ffd27a;
+}
+
+.hud-tip {
+  font-size: 9.5px;
+  color: #637688;
   letter-spacing: 0.04em;
-  padding: 8px 0;
-}
-
-.pulse-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ffd27a;
-  box-shadow: 0 0 10px #ffd27a;
-  animation: pulseAnim 2s infinite ease-in-out;
-}
-
-@keyframes pulseAnim {
-  0%, 100% { opacity: 0.3; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1.2); }
 }
 
 /* lil-gui custom tweaks */
@@ -225,9 +476,10 @@ canvas {
   --focus-color: #ffd27a;
   --number-color: #ffd27a;
   --string-color: #8fa3b8;
-  border-radius: 10px;
-  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 210, 122, 0.2);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75);
   z-index: 50;
 }

@@ -50,6 +50,8 @@ export interface HealParameters {
   zoom: number;            // 1.0 inicial -> 0.35 al presionar Enter
   isFinalZooming: boolean;
   finalZoomProgress: number;
+  showParticles: boolean;  // Mostrar enjambre de partículas (tecla V)
+  particleBrightness: number;
 }
 
 export function createDefaultParameters(): HealParameters {
@@ -94,7 +96,9 @@ export function createDefaultParameters(): HealParameters {
     vignette: 0.35,
     zoom: 1.0,
     isFinalZooming: false,
-    finalZoomProgress: 0.0
+    finalZoomProgress: 0.0,
+    showParticles: false,
+    particleBrightness: 0.75
   };
 }
 

@@ -97,16 +97,25 @@ async function main() {
   overlayCanvas.height = screenH;
   const overlayCtx = overlayCanvas.getContext('2d')!;
 
-  // 8. PASO DE COMPOSICIÓN FINAL
+  // 8. RENDER TARGET PARA ENJAMBRE DE PARTÍCULAS VISIBLES (Tecla V)
+  const swarmRT = new THREE.RenderTarget(simW, simH, {
+    type: THREE.HalfFloatType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat
+  });
+
+  // 9. PASO DE COMPOSICIÓN FINAL
   const compositePass = new CompositePass(
     tissuePhysarum.trailRT_A,
     goldPhysarum.goldTrailRT_A,
     goldPhysarum.scarRT,
     (tissuePhysarum as any).woundSDFTexture,
-    overlayCanvas
+    overlayCanvas,
+    swarmRT
   );
 
-  // 9. REINICIO DE HERIDA
+  // 10. REINICIO DE HERIDA
   const resetWound = () => {
     woundSystem.generateProceduralWound();
     woundSystem.generateAncientScars();
@@ -124,8 +133,15 @@ async function main() {
     params.finalZoomProgress = 0.0;
   };
 
-  // 10. INTERFAZ Y PANTALLA INICIAL
-  new StartScreen();
+  // 11. INTERFAZ Y PANTALLA INICIAL (KINTSUGI)
+  const startScreen = new StartScreen(
+    undefined,
+    () => {
+      params.showParticles = !params.showParticles;
+      startScreen.updateHud(params.healingProgress, params.stress, params.showParticles);
+    }
+  );
+
   new DebugPanel(
     params,
     () => resetWound(),
@@ -203,6 +219,19 @@ async function main() {
       stressSystem.registerKeyPress(now, params.isClimax, params);
       const maxDist = Math.hypot(domainW, domainH) * 0.6;
       heartbeatSystem.triggerBeat(e.code, woundSystem.center, params, maxDist);
+      return;
+    }
+
+    // V: Alternar enjambre de partículas visibles
+    if (e.code === 'KeyV' && !e.repeat) {
+      params.showParticles = !params.showParticles;
+      startScreen.updateHud(params.healingProgress, params.stress, params.showParticles);
+      return;
+    }
+
+    // H: Alternar visibilidad del HUD
+    if (e.code === 'KeyH' && !e.repeat) {
+      startScreen.toggleHud();
       return;
     }
   });
@@ -347,6 +376,18 @@ async function main() {
     // G. Pasos de simulación en GPU
     tissuePhysarum.step(renderer);
     goldPhysarum.step(renderer);
+
+    // Si el modo partículas está activo (tecla V), renderizar enjambre de micro-agentes en swarmRT
+    if (params.showParticles) {
+      renderer.setRenderTarget(swarmRT);
+      renderer.clear();
+      tissuePhysarum.renderSwarm(renderer, swarmRT);
+      goldPhysarum.renderSwarm(renderer, swarmRT);
+      renderer.setRenderTarget(null);
+    }
+
+    // Actualizar HUD dinámico con curación, estrés y estado de partículas
+    startScreen.updateHud(params.healingProgress, params.stress, params.showParticles);
 
     // H. Renderizado de la composición final
     compositePass.update(params, now * 0.001);
