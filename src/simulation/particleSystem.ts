@@ -14,15 +14,55 @@
 import { FlowFieldEngine } from './flowField';
 import { HealParameters } from './parameters';
 
-export interface FlowAgent {
-  x: number;
-  y: number;
-  prevX: number;
-  prevY: number;
-  speed: number;
-  life: number;
-  maxLife: number;
-  bin: number;
+export class FlowAgent {
+  public x: number;
+  public y: number;
+  public speed: number;
+  public life: number;
+  public maxLife: number;
+  public bin: number;
+
+  public maxHistory: number;
+  public historyX: Float32Array;
+  public historyY: Float32Array;
+  public historyHead: number;
+  public historyCount: number;
+
+  constructor(x: number, y: number, maxHistory: number) {
+    this.x = x;
+    this.y = y;
+    this.speed = 2.0 + Math.random() * 1.1;
+    this.maxLife = 220 + Math.floor(Math.random() * 180);
+    this.life = Math.floor(Math.random() * this.maxLife);
+    this.bin = 0;
+
+    this.maxHistory = maxHistory;
+    this.historyX = new Float32Array(maxHistory);
+    this.historyY = new Float32Array(maxHistory);
+    this.historyHead = 0;
+    this.historyCount = 1;
+    this.historyX[0] = x;
+    this.historyY[0] = y;
+  }
+
+  public pushPosition(nx: number, ny: number) {
+    this.historyHead = (this.historyHead + 1) % this.maxHistory;
+    this.historyX[this.historyHead] = nx;
+    this.historyY[this.historyHead] = ny;
+    if (this.historyCount < this.maxHistory) {
+      this.historyCount++;
+    }
+  }
+
+  public reset(nx: number, ny: number) {
+    this.x = nx;
+    this.y = ny;
+    this.historyHead = 0;
+    this.historyCount = 1;
+    this.historyX[0] = nx;
+    this.historyY[0] = ny;
+    this.life = this.maxLife;
+  }
 }
 
 export class FlowParticleSystem {
@@ -36,25 +76,25 @@ export class FlowParticleSystem {
 
   // 16 colores armónicos exactos de la imagen de referencia (Verde Neón -> Cian -> Azul -> Púrpura -> Ámbar -> Chartreuse)
   private readonly palette = [
-    'rgba(57, 255, 20, 0.68)',   // 0: Verde neón eléctrico
-    'rgba(34, 197, 94, 0.68)',   // 1: Verde esmeralda vivo
-    'rgba(16, 185, 129, 0.68)',  // 2: Turquesa esmeralda
-    'rgba(20, 184, 166, 0.68)',  // 3: Aguamarina
-    'rgba(6, 182, 212, 0.70)',   // 4: Cian eléctrico intenso
-    'rgba(0, 240, 255, 0.72)',   // 5: Cian radiante
-    'rgba(56, 189, 248, 0.70)',  // 6: Azul cerúleo luminoso
-    'rgba(37, 99, 235, 0.68)',   // 7: Azul cobalto profundo
-    'rgba(79, 70, 229, 0.68)',   // 8: Azul índigo
-    'rgba(99, 102, 241, 0.70)',  // 9: Índigo eléctrico
-    'rgba(139, 92, 246, 0.70)',  // 10: Violeta / púrpura radiante
-    'rgba(168, 85, 247, 0.70)',  // 11: Púrpura orquídea
-    'rgba(217, 70, 239, 0.68)',  // 12: Magenta sutil
-    'rgba(245, 158, 11, 0.68)',  // 13: Ámbar dorado cálido
-    'rgba(234, 179, 8, 0.68)',   // 14: Oro / amarillo sol
-    'rgba(132, 204, 22, 0.68)'   // 15: Verde lima chartreuse
+    'rgba(57, 255, 20, 0.85)',   // 0: Verde neón eléctrico
+    'rgba(34, 197, 94, 0.85)',   // 1: Verde esmeralda vivo
+    'rgba(16, 185, 129, 0.85)',  // 2: Turquesa esmeralda
+    'rgba(20, 184, 166, 0.85)',  // 3: Aguamarina
+    'rgba(6, 182, 212, 0.88)',   // 4: Cian eléctrico intenso
+    'rgba(0, 240, 255, 0.90)',   // 5: Cian radiante
+    'rgba(56, 189, 248, 0.88)',  // 6: Azul cerúleo luminoso
+    'rgba(37, 99, 235, 0.85)',   // 7: Azul cobalto profundo
+    'rgba(79, 70, 229, 0.85)',   // 8: Azul índigo
+    'rgba(99, 102, 241, 0.88)',  // 9: Índigo eléctrico
+    'rgba(139, 92, 246, 0.88)',  // 10: Violeta / púrpura radiante
+    'rgba(168, 85, 247, 0.88)',  // 11: Púrpura orquídea
+    'rgba(217, 70, 239, 0.85)',  // 12: Magenta sutil
+    'rgba(245, 158, 11, 0.85)',  // 13: Ámbar dorado cálido
+    'rgba(234, 179, 8, 0.86)',   // 14: Oro / amarillo sol
+    'rgba(132, 204, 22, 0.85)'   // 15: Verde lima chartreuse
   ];
 
-  constructor(w: number, h: number, count: number = 3400) {
+  constructor(w: number, h: number, count: number = 2400) {
     this.width = w;
     this.height = h;
     this.count = count;
@@ -82,7 +122,7 @@ export class FlowParticleSystem {
   }
 
   /**
-   * Inicializa los agentes distribuidos de forma homogénea en la pantalla.
+   * Inicializa los agentes distribuidos de forma homogénea con cuerpos alargados.
    */
   public initAgents() {
     this.agents = [];
@@ -92,23 +132,14 @@ export class FlowParticleSystem {
     for (let i = 0; i < this.count; i++) {
       const px = Math.random() * W;
       const py = Math.random() * H;
-      const maxLife = 180 + Math.floor(Math.random() * 160);
-
-      this.agents.push({
-        x: px,
-        y: py,
-        prevX: px,
-        prevY: py,
-        speed: 1.8 + Math.random() * 1.2,
-        life: Math.floor(Math.random() * maxLife), // Vida inicial desfasada para respawn continuo
-        maxLife,
-        bin: 0
-      });
+      // Longitud del filamento: 26 a 40 puntos para que sean visiblemente más largos
+      const filamentLen = 26 + Math.floor(Math.random() * 15);
+      this.agents.push(new FlowAgent(px, py, filamentLen));
     }
   }
 
   /**
-   * Actualiza el movimiento y dibuja los filamentos con la estética de la imagen de referencia.
+   * Actualiza el movimiento y renderiza los agentes alargados sobre fondo negro limpio.
    */
   public updateAndRender(
     dt: number,
@@ -120,98 +151,111 @@ export class FlowParticleSystem {
     const W = this.width;
     const H = this.height;
 
-    // Desvanecimiento suave continuo: permite que los trazos de filamentos se acumulen en ríos brillantes
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.026)';
+    // =========================================================================
+    // FONDO LIMPIO (CERO SUCIEDAD):
+    // Limpiamos completamente el lienzo a negro puro (#000000) en cada frame.
+    // No quedan estelas viejas ni manchas acumuladas en el fondo.
+    // =========================================================================
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, W, H);
 
     ctx.lineCap = 'round';
-    ctx.lineWidth = 0.95;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 1.35;
 
     const timeScale = Math.min(dt * 60.0, 2.0);
     const numAgents = this.agents.length;
     const numBins = this.palette.length;
 
-    // Lotes de trazo (1 por cada color de la paleta) para máximo rendimiento a 60 FPS
-    const binStartsX: number[][] = Array.from({ length: numBins }, () => []);
-    const binStartsY: number[][] = Array.from({ length: numBins }, () => []);
-    const binEndsX: number[][] = Array.from({ length: numBins }, () => []);
-    const binEndsY: number[][] = Array.from({ length: numBins }, () => []);
+    // Agrupación de agentes por bin de color para un renderizado ultra-rápido en 16 trazos
+    const binAgents: FlowAgent[][] = Array.from({ length: numBins }, () => []);
 
     for (let i = 0; i < numAgents; i++) {
       const p = this.agents[i];
-      p.prevX = p.x;
-      p.prevY = p.y;
 
       // Muestrear dirección del campo vectorial en O(1)
       const flow = flowEngine.sampleVelocity(p.x, p.y);
 
-      // Desplazar el agente a lo largo de la corriente
+      // Desplazar el agente en la dirección del flujo
       p.x += flow.vx * p.speed * timeScale;
       p.y += flow.vy * p.speed * timeScale;
       p.life--;
 
       // =========================================================================
       // BORDES TOROIDALES CONTINUOS (SIN PAREDES):
-      // Si salen arriba, entran abajo; si salen a la derecha, entran por la izquierda.
+      // Si salen por un extremo, reaparecen por el opuesto sin chocar.
       // =========================================================================
-      let wrapped = false;
       if (p.x < 0) {
         p.x += W;
-        wrapped = true;
       } else if (p.x >= W) {
         p.x -= W;
-        wrapped = true;
       }
 
       if (p.y < 0) {
         p.y += H;
-        wrapped = true;
       } else if (p.y >= H) {
         p.y -= H;
-        wrapped = true;
       }
 
-      // Respawn suave al terminar su ciclo de vida para alimentar afluentes de forma infinita
+      // Almacenar la nueva posición en el historial del filamento
+      p.pushPosition(p.x, p.y);
+
+      // Respawn suave al terminar su ciclo de vida para poblar áreas de forma uniforme
       if (p.life <= 0) {
-        p.x = Math.random() * W;
-        p.y = Math.random() * H;
-        p.prevX = p.x;
-        p.prevY = p.y;
-        p.life = p.maxLife;
-        wrapped = true;
+        p.reset(Math.random() * W, Math.random() * H);
       }
 
-      // Si cruzó el borde o reapareció, no trazar línea entre los extremos
-      if (wrapped) {
-        p.prevX = p.x;
-        p.prevY = p.y;
-        continue;
-      }
-
-      // Determinar el color según el ángulo de flujo (Espectro cromático de la imagen)
+      // Determinar el bin de color según el ángulo de flujo (Espectro cromático continuo)
       const normAngle = (((flow.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2);
       const bin = Math.floor(normAngle * numBins) % numBins;
-
-      binStartsX[bin].push(p.prevX);
-      binStartsY[bin].push(p.prevY);
-      binEndsX[bin].push(p.x);
-      binEndsY[bin].push(p.y);
+      p.bin = bin;
+      binAgents[bin].push(p);
     }
 
-    // Dibujar los lotes por color
-    for (let b = 0; b < numBins; b++) {
-      const startsX = binStartsX[b];
-      if (startsX.length === 0) continue;
+    // Dibujar los filamentos alargados agrupados por color
+    const halfW = W * 0.5;
+    const halfH = H * 0.5;
 
-      const startsY = binStartsY[b];
-      const endsX = binEndsX[b];
-      const endsY = binEndsY[b];
+    for (let b = 0; b < numBins; b++) {
+      const list = binAgents[b];
+      if (list.length === 0) continue;
 
       ctx.beginPath();
-      for (let k = 0; k < startsX.length; k++) {
-        ctx.moveTo(startsX[k], startsY[k]);
-        ctx.lineTo(endsX[k], endsY[k]);
+      for (let i = 0; i < list.length; i++) {
+        const p = list[i];
+        const count = p.historyCount;
+        if (count < 2) continue;
+
+        const maxH = p.maxHistory;
+        const headIdx = p.historyHead;
+
+        // Comenzar desde la cabeza del filamento
+        let prevX = p.historyX[headIdx];
+        let prevY = p.historyY[headIdx];
+        ctx.moveTo(prevX, prevY);
+
+        // Trazar hacia atrás a lo largo del cuerpo alargado del filamento
+        for (let j = 1; j < count; j++) {
+          const idx = (headIdx - j + maxH) % maxH;
+          const currX = p.historyX[idx];
+          const currY = p.historyY[idx];
+
+          // Detección de salto toroidal: si los puntos cruzan la pantalla, romper el trazo
+          const dx = Math.abs(currX - prevX);
+          const dy = Math.abs(currY - prevY);
+
+          if (dx > halfW || dy > halfH) {
+            // No trazar línea entre los dos extremos de la pantalla
+            ctx.moveTo(currX, currY);
+          } else {
+            ctx.lineTo(currX, currY);
+          }
+
+          prevX = currX;
+          prevY = currY;
+        }
       }
+
       ctx.strokeStyle = this.palette[b];
       ctx.stroke();
     }
@@ -229,17 +273,15 @@ export class FlowParticleSystem {
   }
 
   public addHealingEnergy(x: number, y: number, _amount: number = 0.25) {
-    // Inyectar un racimo sutil de agentes en la posición del mouse/curación
-    const countToSpawn = 12;
+    // Inyectar filamentos de energía en la posición del ratón/interacción
+    const countToSpawn = 16;
     for (let i = 0; i < countToSpawn && i < this.agents.length; i++) {
       const idx = Math.floor(Math.random() * this.agents.length);
       const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * 30;
-      this.agents[idx].x = x + Math.cos(angle) * radius;
-      this.agents[idx].y = y + Math.sin(angle) * radius;
-      this.agents[idx].prevX = this.agents[idx].x;
-      this.agents[idx].prevY = this.agents[idx].y;
-      this.agents[idx].life = this.agents[idx].maxLife;
+      const radius = Math.random() * 35;
+      const nx = x + Math.cos(angle) * radius;
+      const ny = y + Math.sin(angle) * radius;
+      this.agents[idx].reset(nx, ny);
     }
   }
 
