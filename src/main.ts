@@ -104,8 +104,9 @@ async function main() {
 
     mouse.x = e.clientX;
     mouse.y = e.clientY;
-    flowEngine.triggerKeyPerturbation(mouse.x, mouse.y, 'KeyG');
-    kintsugiLayer.addHealingEnergy(mouse.x, mouse.y, params.isClimax ? 0.16 : 0.08);
+    flowEngine.triggerKeyPulse(mouse.x, mouse.y, 'KeyG');
+    kintsugiLayer.addHealingEnergy(mouse.x, mouse.y, params.isClimax ? 0.20 : 0.12);
+    params.heartbeatFlash = Math.max(params.heartbeatFlash, 0.04);
   });
 
   // 7. TECLADO: INTERPRETACIÓN MUSICAL
@@ -148,12 +149,15 @@ async function main() {
     if (HEALING_KEYS.has(e.code)) {
       stressSystem.registerKeyPress(now, params.isClimax, params);
 
-      // 1. Modifica el movimiento de las figuras blancas y azules
-      flowEngine.triggerKeyPerturbation(mouse.x, mouse.y, e.code);
+      // 1. Modifica visiblemente el movimiento de las figuras blancas y azules
+      flowEngine.triggerKeyPulse(mouse.x, mouse.y, e.code);
 
-      // 2. Vierte oro líquido directamente en las grietas (sin pelotas flotantes)
-      const healAmount = params.isClimax ? 0.14 : 0.06;
+      // 2. Vierte oro líquido directamente en las grietas visibles
+      const healAmount = params.isClimax ? 0.18 : 0.10;
       kintsugiLayer.addHealingEnergy(mouse.x, mouse.y, healAmount);
+
+      // 3. Resplandor reactivo musical
+      params.heartbeatFlash = Math.max(params.heartbeatFlash, 0.04);
       return;
     }
 
@@ -223,8 +227,8 @@ async function main() {
     // C. Actualizar y renderizar las figuras geométricas blancas y azules (Imagen 2)
     particleSystem.updateAndRender(dt, timeSec, flowEngine, params);
 
-    // D. Actualizar y renderizar las grietas de oro puro Kintsugi (Imagen 1)
-    kintsugiLayer.updateAndRender(dt);
+    // D. Actualizar y renderizar la herida visible y las grietas de oro puro Kintsugi (Imagen 1)
+    kintsugiLayer.updateAndRender(dt, timeSec);
 
     // E. Progreso de curación real (0.0 a 1.0) medido por las líneas de oro selladas
     params.healingProgress = kintsugiLayer.getHealingProgress();

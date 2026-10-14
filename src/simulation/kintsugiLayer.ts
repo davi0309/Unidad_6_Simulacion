@@ -1,28 +1,27 @@
 /**
  * kintsugiLayer.ts
- * Sistema de grietas doradas Kintsugi inspirado directamente en la Imagen 1:
- * - Fondo negro puro (#000000).
- * - Red orgánica de grietas con ramificaciones principales, secundarias y fracturas finas.
- * - Grosor variable: venas principales anchas rellenas de oro (3 a 6 px) y ramificaciones finas (0.8 a 1.5 px).
- * - Sin pelotas ni círculos flotantes: la curación es oro líquido que fluye y se consolida
- *   directamente dentro de las grietas.
- * - Colores metálicos de oro puro: base ocre (#9a741e), oro 24K brillante (#ffd700, #e5be57)
- *   y destellos especulares blanco-dorados (#fff6d6, #ffffff).
+ * Sistema visual de Herida Viva y Curación Kintsugi (Imagen 1):
+ * - LA HERIDA ES CLARAMENTE VISIBLE: Una fractura orgánica y viva con resplandor carmesí/rubí
+ *   profundo (#ff1744, #800020) que palpita suavemente en el fondo negro.
+ * - LA CURACIÓN ES ORO LÍQUIDO PURO: Al tocar las teclas Q a P o hacer clic, el oro fundido
+ *   fluye visiblemente por la herida, sellando el desgarro con oro metálico 24K (#ffd700, #ffea70)
+ *   y destellos especulares blancos (#ffffff).
+ * - Fracturas con rugosidad fractal orgánica realista (como en la Imagen 1), no líneas rectas rígidas.
+ * - Progreso de curación real medible (0% a 100%).
  */
 
-export interface CrackNode {
+export interface CrackPoint {
   x: number;
   y: number;
 }
 
-export interface CrackSegment {
-  p0: CrackNode;
-  p1: CrackNode;
-  p2?: CrackNode; // punto de control para curvas cuadráticas
+export interface FractalBranch {
+  points: CrackPoint[];
   width: number;
-  filled: number; // 0.0 (abierta/oscura) a 1.0 (completamente sellada de oro)
-  targetFill: number;
-  branchLevel: number; // 0 = principal, 1 = secundaria, 2 = fina
+  filledRatio: number;      // 0.0 (abierta/carmesí) a 1.0 (sellada de oro)
+  targetFilledRatio: number;
+  isMainTrunk: boolean;
+  glowPulse: number;
 }
 
 export class KintsugiLayer {
@@ -32,8 +31,10 @@ export class KintsugiLayer {
   public canvas: HTMLCanvasElement;
   public ctx: CanvasRenderingContext2D;
 
-  public segments: CrackSegment[] = [];
-  public totalSegments: number = 0;
+  public branches: FractalBranch[] = [];
+
+  // Ondas de destello dorado activo al presionar teclas
+  public goldFlashes: { x: number; y: number; radius: number; maxRadius: number; alpha: number }[] = [];
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -44,8 +45,7 @@ export class KintsugiLayer {
     this.canvas.height = h;
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: false })!;
 
-    this.buildCrackNetwork();
-    this.renderInitialCracks();
+    this.generateOrganicCrackSystem();
   }
 
   public resize(w: number, h: number) {
@@ -53,241 +53,173 @@ export class KintsugiLayer {
     this.height = h;
     this.canvas.width = w;
     this.canvas.height = h;
-    this.buildCrackNetwork();
-    this.renderInitialCracks();
+    this.generateOrganicCrackSystem();
   }
 
   /**
-   * Construye la red de fracturas exactamente con la distribución estética de la Imagen 1:
-   * - Gran grieta troncal que cruza en diagonal de abajo a la izquierda hacia arriba a la derecha.
-   * - Bifurcaciones que se abren y vuelven a juntarse creando islas.
-   * - Ramificaciones secundarias capilares que se extienden hacia los bordes.
+   * Genera una red de grietas con desplazamiento fractal orgánico (Midpoint Displacement)
+   * idéntica a las fracturas naturales de mármol/porcelana de la Imagen 1.
    */
-  public buildCrackNetwork() {
-    this.segments = [];
+  public generateOrganicCrackSystem() {
+    this.branches = [];
     const W = this.width;
     const H = this.height;
 
-    // 1. TRONCO PRINCIPAL (Diagonal inferior-izquierda a superior-derecha con ondulación)
-    const mainNodes: CrackNode[] = [
-      { x: W * 0.05, y: H * 0.88 },
-      { x: W * 0.18, y: H * 0.82 },
-      { x: W * 0.32, y: H * 0.65 },
-      { x: W * 0.44, y: H * 0.54 },
-      { x: W * 0.58, y: H * 0.42 },
-      { x: W * 0.72, y: H * 0.28 },
-      { x: W * 0.84, y: H * 0.16 },
-      { x: W * 0.95, y: H * 0.06 }
+    // Subdivisión fractal orgánica de un segmento
+    const fractalize = (p0: CrackPoint, p1: CrackPoint, depth: number, roughness: number): CrackPoint[] => {
+      if (depth === 0) return [p0, p1];
+
+      const midX = (p0.x + p1.x) * 0.5;
+      const midY = (p0.y + p1.y) * 0.5;
+      const dx = p1.x - p0.x;
+      const dy = p1.y - p0.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+
+      // Desplazamiento perpendicular orgánico
+      const perpX = -dy / (len || 1);
+      const perpY = dx / (len || 1);
+      const offset = (Math.random() - 0.5) * len * roughness;
+
+      const pMid: CrackPoint = {
+        x: midX + perpX * offset,
+        y: midY + perpY * offset
+      };
+
+      const left = fractalize(p0, pMid, depth - 1, roughness * 0.65);
+      const right = fractalize(pMid, p1, depth - 1, roughness * 0.65);
+
+      return left.slice(0, -1).concat(right);
+    };
+
+    // 1. TRONCO PRINCIPAL DE LA HERIDA (Diagonal sinuosa con fracturas)
+    const trunkNodes: CrackPoint[] = [
+      { x: W * 0.06, y: H * 0.88 },
+      { x: W * 0.22, y: H * 0.78 },
+      { x: W * 0.38, y: H * 0.62 },
+      { x: W * 0.52, y: H * 0.48 },
+      { x: W * 0.68, y: H * 0.36 },
+      { x: W * 0.82, y: H * 0.22 },
+      { x: W * 0.94, y: H * 0.08 }
     ];
 
-    for (let i = 0; i < mainNodes.length - 1; i++) {
-      const p0 = mainNodes[i];
-      const p1 = mainNodes[i + 1];
-      const midX = (p0.x + p1.x) * 0.5 + (Math.random() - 0.5) * (W * 0.03);
-      const midY = (p0.y + p1.y) * 0.5 + (Math.random() - 0.5) * (H * 0.03);
-
-      this.segments.push({
-        p0,
-        p1,
-        p2: { x: midX, y: midY },
-        width: 4.5 + Math.random() * 2.5,
-        filled: 0.0,
-        targetFill: 0.0,
-        branchLevel: 0
-      });
+    let fullMainPoints: CrackPoint[] = [];
+    for (let i = 0; i < trunkNodes.length - 1; i++) {
+      const segPts = fractalize(trunkNodes[i], trunkNodes[i + 1], 4, 0.22);
+      if (i > 0) segPts.shift();
+      fullMainPoints = fullMainPoints.concat(segPts);
     }
 
-    // 2. ISLAS Y BIFURCACIONES PARALELAS (como en la Imagen 1)
-    const island1: CrackNode[] = [
-      { x: W * 0.32, y: H * 0.65 },
-      { x: W * 0.38, y: H * 0.58 },
-      { x: W * 0.44, y: H * 0.54 }
-    ];
-    this.segments.push({
-      p0: island1[0],
-      p1: island1[1],
-      p2: { x: W * 0.34, y: H * 0.60 },
-      width: 2.8,
-      filled: 0.0,
-      targetFill: 0.0,
-      branchLevel: 1
+    this.branches.push({
+      points: fullMainPoints,
+      width: 5.5,
+      filledRatio: 0.0,
+      targetFilledRatio: 0.0,
+      isMainTrunk: true,
+      glowPulse: 0
     });
-    this.segments.push({
-      p0: island1[1],
-      p1: island1[2],
-      p2: { x: W * 0.42, y: H * 0.56 },
-      width: 2.5,
-      filled: 0.0,
-      targetFill: 0.0,
-      branchLevel: 1
+
+    // 2. RAMA SECUNDARIA IZQUIERDA
+    const branchL1 = fractalize({ x: W * 0.38, y: H * 0.62 }, { x: W * 0.20, y: H * 0.52 }, 3, 0.25);
+    const branchL2 = fractalize({ x: W * 0.20, y: H * 0.52 }, { x: W * 0.04, y: H * 0.48 }, 3, 0.22);
+    this.branches.push({
+      points: branchL1.concat(branchL2.slice(1)),
+      width: 3.2,
+      filledRatio: 0.0,
+      targetFilledRatio: 0.0,
+      isMainTrunk: false,
+      glowPulse: 0
     });
 
-    const island2: CrackNode[] = [
-      { x: W * 0.44, y: H * 0.54 },
-      { x: W * 0.52, y: H * 0.72 },
-      { x: W * 0.62, y: H * 0.74 },
-      { x: W * 0.68, y: H * 0.62 },
-      { x: W * 0.58, y: H * 0.42 }
-    ];
-    for (let i = 0; i < island2.length - 1; i++) {
-      this.segments.push({
-        p0: island2[i],
-        p1: island2[i + 1],
-        width: 2.2,
-        filled: 0.0,
-        targetFill: 0.0,
-        branchLevel: 1
-      });
-    }
+    // 3. RAMA SECUNDARIA SUPERIOR VERTICAL
+    const branchUp = fractalize({ x: W * 0.52, y: H * 0.48 }, { x: W * 0.48, y: H * 0.18 }, 4, 0.24);
+    const branchUpTip = fractalize({ x: W * 0.48, y: H * 0.18 }, { x: W * 0.42, y: H * 0.02 }, 2, 0.20);
+    this.branches.push({
+      points: branchUp.concat(branchUpTip.slice(1)),
+      width: 3.5,
+      filledRatio: 0.0,
+      targetFilledRatio: 0.0,
+      isMainTrunk: false,
+      glowPulse: 0
+    });
 
-    // 3. RAMAS SECUNDARIAS LATERALES (Hacia la izquierda y hacia la derecha)
-    // Rama izquierda superior
-    const leftBranch1: CrackNode[] = [
-      { x: W * 0.32, y: H * 0.65 },
-      { x: W * 0.22, y: H * 0.58 },
-      { x: W * 0.14, y: H * 0.52 },
-      { x: W * 0.02, y: H * 0.50 }
-    ];
-    for (let i = 0; i < leftBranch1.length - 1; i++) {
-      this.segments.push({
-        p0: leftBranch1[i],
-        p1: leftBranch1[i + 1],
-        width: 3.2 - i * 0.8,
-        filled: 0.0,
-        targetFill: 0.0,
-        branchLevel: 1
-      });
-    }
+    // 4. RAMA SECUNDARIA DERECHA INFERIOR
+    const branchR1 = fractalize({ x: W * 0.52, y: H * 0.48 }, { x: W * 0.68, y: H * 0.64 }, 3, 0.24);
+    const branchR2 = fractalize({ x: W * 0.68, y: H * 0.64 }, { x: W * 0.88, y: H * 0.68 }, 3, 0.20);
+    this.branches.push({
+      points: branchR1.concat(branchR2.slice(1)),
+      width: 3.0,
+      filledRatio: 0.0,
+      targetFilledRatio: 0.0,
+      isMainTrunk: false,
+      glowPulse: 0
+    });
 
-    // Rama vertical hacia arriba (centro)
-    const upBranch: CrackNode[] = [
-      { x: W * 0.58, y: H * 0.42 },
-      { x: W * 0.54, y: H * 0.24 },
-      { x: W * 0.48, y: H * 0.12 },
-      { x: W * 0.42, y: H * 0.02 }
-    ];
-    for (let i = 0; i < upBranch.length - 1; i++) {
-      this.segments.push({
-        p0: upBranch[i],
-        p1: upBranch[i + 1],
-        width: 3.5 - i * 0.8,
-        filled: 0.0,
-        targetFill: 0.0,
-        branchLevel: 1
-      });
-    }
+    // 5. FRACTURAS CAPILARES FINAS (Imagen 1)
+    const cap1 = fractalize({ x: W * 0.68, y: H * 0.36 }, { x: W * 0.84, y: H * 0.42 }, 3, 0.25);
+    const cap2 = fractalize({ x: W * 0.82, y: H * 0.22 }, { x: W * 0.94, y: H * 0.28 }, 2, 0.22);
+    const cap3 = fractalize({ x: W * 0.22, y: H * 0.78 }, { x: W * 0.14, y: H * 0.68 }, 2, 0.22);
 
-    // Rama capilar superior izquierda
-    const topCapillary: CrackNode[] = [
-      { x: W * 0.48, y: H * 0.12 },
-      { x: W * 0.32, y: H * 0.14 },
-      { x: W * 0.20, y: H * 0.06 },
-      { x: W * 0.18, y: H * 0.01 }
-    ];
-    for (let i = 0; i < topCapillary.length - 1; i++) {
-      this.segments.push({
-        p0: topCapillary[i],
-        p1: topCapillary[i + 1],
-        width: 1.8 - i * 0.4,
-        filled: 0.0,
-        targetFill: 0.0,
-        branchLevel: 2
-      });
-    }
-
-    // Rama derecha inferior horizontal
-    const rightBranch: CrackNode[] = [
-      { x: W * 0.58, y: H * 0.42 },
-      { x: W * 0.70, y: H * 0.58 },
-      { x: W * 0.85, y: H * 0.62 },
-      { x: W * 0.98, y: H * 0.66 }
-    ];
-    for (let i = 0; i < rightBranch.length - 1; i++) {
-      this.segments.push({
-        p0: rightBranch[i],
-        p1: rightBranch[i + 1],
-        width: 2.8 - i * 0.6,
-        filled: 0.0,
-        targetFill: 0.0,
-        branchLevel: 1
-      });
-    }
-
-    // Ramas capilares finas cruzadas (Imagen 1)
-    const hairLines = [
-      [ { x: W * 0.72, y: H * 0.28 }, { x: W * 0.88, y: H * 0.32 }, { x: W * 0.98, y: H * 0.35 } ],
-      [ { x: W * 0.70, y: H * 0.58 }, { x: W * 0.74, y: H * 0.78 }, { x: W * 0.78, y: H * 0.95 } ],
-      [ { x: W * 0.22, y: H * 0.58 }, { x: W * 0.16, y: H * 0.70 }, { x: W * 0.08, y: H * 0.74 } ],
-      [ { x: W * 0.84, y: H * 0.16 }, { x: W * 0.92, y: H * 0.22 } ]
-    ];
-
-    for (const hPts of hairLines) {
-      for (let i = 0; i < hPts.length - 1; i++) {
-        this.segments.push({
-          p0: hPts[i],
-          p1: hPts[i + 1],
-          width: 1.3,
-          filled: 0.0,
-          targetFill: 0.0,
-          branchLevel: 2
-        });
-      }
-    }
-
-    this.totalSegments = this.segments.length;
+    this.branches.push({ points: cap1, width: 1.8, filledRatio: 0.0, targetFilledRatio: 0.0, isMainTrunk: false, glowPulse: 0 });
+    this.branches.push({ points: cap2, width: 1.5, filledRatio: 0.0, targetFilledRatio: 0.0, isMainTrunk: false, glowPulse: 0 });
+    this.branches.push({ points: cap3, width: 1.6, filledRatio: 0.0, targetFilledRatio: 0.0, isMainTrunk: false, glowPulse: 0 });
   }
 
   /**
-   * Renderiza el estado base de las grietas.
+   * Deposita curación de oro líquido directamente en la herida al presionar teclas Q-P o clic.
+   * La respuesta es inmediata y visible.
    */
-  public renderInitialCracks() {
-    this.ctx.fillStyle = '#000000';
-    this.ctx.fillRect(0, 0, this.width, this.height);
-  }
+  public addHealingEnergy(cursorX: number, cursorY: number, amount: number = 0.12) {
+    // Generar un destello dorado expansivo en el punto de contacto
+    this.goldFlashes.push({
+      x: cursorX,
+      y: cursorY,
+      radius: 8,
+      maxRadius: 120,
+      alpha: 1.0
+    });
 
-  /**
-   * Deposita curación dorada directamente a lo largo de las grietas (sin pelotas flotantes).
-   * Cuando el usuario toca teclas Q a P o hace clic, el oro líquido fluye por las fracturas.
-   */
-  public addHealingEnergy(cursorX: number, cursorY: number, amount: number = 0.08) {
-    // Buscar los segmentos de grieta más cercanos al cursor o expandir progresivamente
-    let closestIdx = 0;
+    // Buscar la rama más cercana al cursor y llenarla con oro
+    let closestBranchIdx = 0;
     let minDistSq = 1e9;
 
-    for (let i = 0; i < this.segments.length; i++) {
-      const seg = this.segments[i];
-      const midX = (seg.p0.x + seg.p1.x) * 0.5;
-      const midY = (seg.p0.y + seg.p1.y) * 0.5;
-      const dx = cursorX - midX;
-      const dy = cursorY - midY;
-      const dSq = dx * dx + dy * dy;
-
-      if (dSq < minDistSq) {
-        minDistSq = dSq;
-        closestIdx = i;
+    for (let b = 0; b < this.branches.length; b++) {
+      const branch = this.branches[b];
+      for (const pt of branch.points) {
+        const dx = cursorX - pt.x;
+        const dy = cursorY - pt.y;
+        const dSq = dx * dx + dy * dy;
+        if (dSq < minDistSq) {
+          minDistSq = dSq;
+          closestBranchIdx = b;
+        }
       }
     }
 
-    // Aumentar el objetivo de oro en el segmento más cercano y sus adyacentes
-    const radius = 3;
-    for (let k = Math.max(0, closestIdx - radius); k <= Math.min(this.segments.length - 1, closestIdx + radius); k++) {
-      const weight = 1.0 - Math.abs(k - closestIdx) / (radius + 1);
-      this.segments[k].targetFill = Math.min(1.0, this.segments[k].targetFill + amount * weight);
+    // Inyectar oro líquido en la rama más cercana
+    const target = this.branches[closestBranchIdx];
+    target.targetFilledRatio = Math.min(1.0, target.targetFilledRatio + amount * 1.5);
+    target.glowPulse = 1.0;
+
+    // También propagar oro hacia el tronco principal si no estaba seleccionado
+    if (closestBranchIdx !== 0) {
+      this.branches[0].targetFilledRatio = Math.min(1.0, this.branches[0].targetFilledRatio + amount * 0.5);
+      this.branches[0].glowPulse = 0.8;
     }
 
-    // Si todo está lleno cerca, avanzar hacia adelante a lo largo de la grieta
-    for (let i = 0; i < this.segments.length; i++) {
-      if (this.segments[i].targetFill < 0.99) {
-        this.segments[i].targetFill = Math.min(1.0, this.segments[i].targetFill + amount * 0.25);
+    // Si la rama seleccionada ya está casi llena, llenar la siguiente rama abierta
+    for (const b of this.branches) {
+      if (b.targetFilledRatio < 0.95) {
+        b.targetFilledRatio = Math.min(1.0, b.targetFilledRatio + amount * 0.4);
+        b.glowPulse = 0.7;
         break;
       }
     }
   }
 
   /**
-   * Actualiza y dibuja las venas doradas de oro Kintsugi idénticas a la Imagen 1.
+   * Actualiza y renderiza tanto la herida visible como la curación de oro Kintsugi.
    */
-  public updateAndRender(dt: number) {
+  public updateAndRender(dt: number, time: number) {
     const ctx = this.ctx;
 
     // Fondo negro puro permanente (#000000)
@@ -297,108 +229,132 @@ export class KintsugiLayer {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    for (let i = 0; i < this.segments.length; i++) {
-      const seg = this.segments[i];
+    // Pulsación sutil de respiración en la herida abierta
+    const woundPulse = Math.sin(time * 3.0) * 0.15 + 0.85;
 
-      // El oro líquido avanza suavemente hacia el targetFill
-      if (seg.filled < seg.targetFill) {
-        seg.filled = Math.min(seg.targetFill, seg.filled + dt * 0.85);
+    // ==============================================================
+    // PASO 1: RENDERIZAR LA HERIDA ABIERTA (Resplandor Carmesí y Abismo)
+    // ==============================================================
+    for (const branch of this.branches) {
+      const pts = branch.points;
+      if (pts.length < 2) continue;
+
+      // Actualizar llenado suave de oro
+      if (branch.filledRatio < branch.targetFilledRatio) {
+        branch.filledRatio = Math.min(branch.targetFilledRatio, branch.filledRatio + dt * 0.9);
+      }
+      if (branch.glowPulse > 0) {
+        branch.glowPulse = Math.max(0, branch.glowPulse - dt * 2.0);
       }
 
-      if (seg.filled <= 0.001) continue;
+      // Si la rama aún no está 100% sellada de oro, mostrar la herida viva abierta
+      if (branch.filledRatio < 0.99) {
+        const openPortionStart = Math.floor(pts.length * branch.filledRatio);
 
-      const fill = seg.filled;
-      const w = seg.width;
+        if (openPortionStart < pts.length - 1) {
+          ctx.beginPath();
+          ctx.moveTo(pts[openPortionStart].x, pts[openPortionStart].y);
+          for (let i = openPortionStart + 1; i < pts.length; i++) {
+            ctx.lineTo(pts[i].x, pts[i].y);
+          }
 
-      // Calcular punto final interpolado según fill
-      let targetX = seg.p1.x;
-      let targetY = seg.p1.y;
+          // 1. Resplandor carmesí/rubí profundo de la carne herida
+          const glowAlpha = (0.35 * woundPulse).toFixed(2);
+          ctx.strokeStyle = `rgba(255, 23, 68, ${glowAlpha})`;
+          ctx.lineWidth = branch.width * 2.8;
+          ctx.stroke();
 
-      if (fill < 0.999) {
-        if (seg.p2) {
-          // Curva cuadrática parcial
-          const t = fill;
-          const u = 1 - t;
-          targetX = u * u * seg.p0.x + 2 * u * t * seg.p2.x + t * t * seg.p1.x;
-          targetY = u * u * seg.p0.y + 2 * u * t * seg.p2.y + t * t * seg.p1.y;
-        } else {
-          targetX = seg.p0.x + (seg.p1.x - seg.p0.x) * fill;
-          targetY = seg.p0.y + (seg.p1.y - seg.p0.y) * fill;
+          // 2. Borde de corte vivo (rojo fuego intenso)
+          const coreAlpha = (0.75 * woundPulse).toFixed(2);
+          ctx.strokeStyle = `rgba(213, 0, 50, ${coreAlpha})`;
+          ctx.lineWidth = branch.width * 1.4;
+          ctx.stroke();
+
+          // 3. Fisura interna oscura del desgarro
+          ctx.strokeStyle = '#050203';
+          ctx.lineWidth = Math.max(1.0, branch.width * 0.5);
+          ctx.stroke();
         }
       }
+    }
 
-      // ==============================================================
-      // RENDERIZADO METÁLICO MULTICAPA DE ORO KINTSUGI (Imagen 1)
-      // ==============================================================
+    // ==============================================================
+    // PASO 2: RENDERIZAR LA CURACIÓN DE ORO KINTSUGI (Imagen 1)
+    // ==============================================================
+    for (const branch of this.branches) {
+      if (branch.filledRatio <= 0.005) continue;
 
-      // 1. CAPA BASE: Ocre/Ámbar de anclaje (#8c6517)
+      const pts = branch.points;
+      const fillCount = Math.max(2, Math.floor(pts.length * branch.filledRatio));
+      const w = branch.width;
+      const pulseExtra = branch.glowPulse * 1.5;
+
       ctx.beginPath();
-      ctx.moveTo(seg.p0.x, seg.p0.y);
-      if (seg.p2 && fill > 0.5) {
-        ctx.quadraticCurveTo(seg.p2.x, seg.p2.y, targetX, targetY);
-      } else {
-        ctx.lineTo(targetX, targetY);
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < fillCount; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
       }
-      ctx.strokeStyle = 'rgba(140, 101, 23, 0.45)';
-      ctx.lineWidth = w * 1.5;
+
+      // 1. Halo áureo cálido de anclaje (#b8860b)
+      ctx.strokeStyle = `rgba(184, 134, 11, ${(0.45 + pulseExtra * 0.3).toFixed(2)})`;
+      ctx.lineWidth = w * 1.6 + pulseExtra * 2.0;
       ctx.stroke();
 
-      // 2. CAPA PRINCIPAL: Oro 24K brillante metálico (#d4af37 / #ffd700)
-      ctx.beginPath();
-      ctx.moveTo(seg.p0.x, seg.p0.y);
-      if (seg.p2 && fill > 0.5) {
-        ctx.quadraticCurveTo(seg.p2.x, seg.p2.y, targetX, targetY);
-      } else {
-        ctx.lineTo(targetX, targetY);
-      }
-      ctx.strokeStyle = 'rgba(229, 190, 87, 0.92)';
-      ctx.lineWidth = w;
+      // 2. Vena de oro 24K puro metálico (#ffd700 / #e5be57)
+      ctx.strokeStyle = 'rgba(235, 195, 80, 0.95)';
+      ctx.lineWidth = w + pulseExtra * 1.0;
       ctx.stroke();
 
-      // 3. CAPA BRILLANTE: Oro claro reflectante (#f7dda4 / #fff0c2)
-      ctx.beginPath();
-      ctx.moveTo(seg.p0.x, seg.p0.y);
-      if (seg.p2 && fill > 0.5) {
-        ctx.quadraticCurveTo(seg.p2.x, seg.p2.y, targetX, targetY);
-      } else {
-        ctx.lineTo(targetX, targetY);
+      // 3. Reflejo especular blanco-dorado reflectante (#ffffff / #fff9e6)
+      ctx.strokeStyle = 'rgba(255, 252, 240, 1.0)';
+      ctx.lineWidth = Math.max(0.9, w * 0.4);
+      ctx.stroke();
+    }
+
+    // ==============================================================
+    // PASO 3: DESTELLOS DE CURACIÓN DORADA AL TOCAR TECLAS
+    // ==============================================================
+    for (let i = this.goldFlashes.length - 1; i >= 0; i--) {
+      const f = this.goldFlashes[i];
+      f.radius += dt * 180.0;
+      f.alpha -= dt * 1.6;
+
+      if (f.alpha <= 0 || f.radius >= f.maxRadius) {
+        this.goldFlashes.splice(i, 1);
+        continue;
       }
-      ctx.strokeStyle = 'rgba(255, 240, 194, 0.85)';
-      ctx.lineWidth = Math.max(0.8, w * 0.45);
+
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 215, 0, ${f.alpha.toFixed(2)})`;
+      ctx.lineWidth = 2.0;
       ctx.stroke();
 
-      // 4. PICO ESPECULAR: Hilo central blanco-dorado puro (#ffffff)
-      if (w > 2.0) {
-        ctx.beginPath();
-        ctx.moveTo(seg.p0.x, seg.p0.y);
-        if (seg.p2 && fill > 0.5) {
-          ctx.quadraticCurveTo(seg.p2.x, seg.p2.y, targetX, targetY);
-        } else {
-          ctx.lineTo(targetX, targetY);
-        }
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-      }
+      // Destello central
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, Math.max(1, f.radius * 0.25), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 250, 220, ${(f.alpha * 0.8).toFixed(2)})`;
+      ctx.fill();
     }
   }
 
   /**
-   * Calcula el progreso de curación real (0.0 a 1.0) basado en las líneas selladas con oro.
+   * Progreso de curación real (0.0 a 1.0) medido por la cantidad de herida sellada con oro.
    */
   public getHealingProgress(): number {
     let sum = 0;
-    for (let i = 0; i < this.segments.length; i++) {
-      sum += this.segments[i].filled;
+    for (const b of this.branches) {
+      sum += b.filledRatio;
     }
-    return sum / this.segments.length;
+    return sum / this.branches.length;
   }
 
   public clear() {
-    for (let i = 0; i < this.segments.length; i++) {
-      this.segments[i].filled = 0.0;
-      this.segments[i].targetFill = 0.0;
+    for (const b of this.branches) {
+      b.filledRatio = 0.0;
+      b.targetFilledRatio = 0.0;
+      b.glowPulse = 0;
     }
-    this.renderInitialCracks();
+    this.goldFlashes = [];
   }
 }

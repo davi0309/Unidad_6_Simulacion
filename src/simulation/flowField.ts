@@ -1,9 +1,11 @@
 /**
  * flowField.ts
- * Motor de Campo de Flujo (Flow Field) con centros orbitales y Curl Noise:
- * - Genera las trayectorias concéntricas, arcos y curvas sinuosas características de la Imagen 2.
- * - Perturbaciones musicales en las figuras blancas y azules (teclas Q a P).
- * - Fondo negro absoluto.
+ * Motor de Campo de Flujo (Flow Field) 100% divergencia-cero (Divergence-Free):
+ * - Movimiento ultra-fluido que conserva el área: las partículas NUNCA se amontonan
+ *   ni dejan vacíos en el centro.
+ * - Vortices orbitales y arcos concéntricos suaves (Imagen 2).
+ * - Espina dorsal orgánica de la herida para guiar el desgarro carmesí y la curación de oro.
+ * - Ondas armónicas reactivas y visibles al presionar las teclas Q a P.
  */
 
 export interface Point2D {
@@ -11,38 +13,41 @@ export interface Point2D {
   y: number;
 }
 
-export interface KeyPerturbation {
+export interface KeyPulse {
   x: number;
   y: number;
   radius: number;
   maxRadius: number;
-  frequency: number;
+  speed: number;
   strength: number;
   life: number;
   maxLife: number;
-  swirlDir: number;
+  freq: number;
+  swirl: number;
 }
 
-export interface OrbitalCenter {
-  x: number;
-  y: number;
-  radius: number;
-  speed: number;
-  dir: number; // 1 = horario, -1 = antihorario
+export interface WoundSegment {
+  p0: Point2D;
+  p1: Point2D;
+  width: number;
+  branchLevel: number;
+  healed: number; // 0.0 (abierta) a 1.0 (sellada con oro)
 }
 
 export class FlowFieldEngine {
   public width: number;
   public height: number;
 
-  // Ruido pseudo-aleatorio para Curl Noise
   private permTable: Uint8Array;
 
-  // Centros orbitales que crean los círculos y arcos concéntricos de la Imagen 2
-  public orbitalCenters: OrbitalCenter[] = [];
+  // Centros de vórtice suaves (función de corriente)
+  public vortexCenters: { x: number; y: number; radius: number; strength: number }[] = [];
 
-  // Perturbaciones activas generadas por las teclas Q a P
-  public activePerturbations: KeyPerturbation[] = [];
+  // Pulsos y ondas de teclado activas
+  public activePulses: KeyPulse[] = [];
+
+  // Red de la herida (geometría de la fractura)
+  public woundSegments: WoundSegment[] = [];
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -50,33 +55,126 @@ export class FlowFieldEngine {
 
     this.permTable = new Uint8Array(512);
     for (let i = 0; i < 256; i++) {
-      this.permTable[i] = Math.floor(Math.sin(i * 91.3 + 17.5) * 43758.5453) & 255;
+      this.permTable[i] = Math.floor(Math.sin(i * 127.1 + 311.7) * 43758.5453) & 255;
       this.permTable[i + 256] = this.permTable[i];
     }
 
-    this.initOrbitalCenters();
+    this.initVortices();
+    this.buildWoundSegments();
   }
 
   public resize(w: number, h: number) {
     this.width = w;
     this.height = h;
-    this.initOrbitalCenters();
+    this.initVortices();
+    this.buildWoundSegments();
   }
 
   /**
-   * Distribuye 6 centros orbitales que hacen girar las líneas en arcos concéntricos (Imagen 2).
+   * Inicializa centros de vórtice suaves distribuidos para que las líneas formen
+   * arcos fluidos y curvas concéntricas (Imagen 2) sin acumular partículas en ningún punto.
    */
-  public initOrbitalCenters() {
-    this.orbitalCenters = [
-      { x: this.width * 0.28, y: this.height * 0.36, radius: this.height * 0.28, speed: 1.4, dir: 1 },
-      { x: this.width * 0.74, y: this.height * 0.22, radius: this.height * 0.22, speed: 1.2, dir: -1 },
-      { x: this.width * 0.48, y: this.height * 0.18, radius: this.height * 0.18, speed: 1.1, dir: 1 },
-      { x: this.width * 0.18, y: this.height * 0.78, radius: this.height * 0.24, speed: 1.3, dir: -1 },
-      { x: this.width * 0.42, y: this.height * 0.72, radius: this.height * 0.26, speed: 1.2, dir: 1 },
-      { x: this.width * 0.80, y: this.height * 0.68, radius: this.height * 0.25, speed: 1.3, dir: -1 }
+  public initVortices() {
+    this.vortexCenters = [
+      { x: this.width * 0.25, y: this.height * 0.35, radius: this.height * 0.35, strength: 1.8 },
+      { x: this.width * 0.72, y: this.height * 0.28, radius: this.height * 0.32, strength: -1.6 },
+      { x: this.width * 0.50, y: this.height * 0.52, radius: this.height * 0.38, strength: 1.5 },
+      { x: this.width * 0.22, y: this.height * 0.75, radius: this.height * 0.34, strength: -1.7 },
+      { x: this.width * 0.78, y: this.height * 0.70, radius: this.height * 0.36, strength: 1.6 }
     ];
   }
 
+  /**
+   * Construye la red de la herida orgánica visible con fractalidad suave.
+   */
+  public buildWoundSegments() {
+    this.woundSegments = [];
+    const W = this.width;
+    const H = this.height;
+
+    // Tronco principal diagonal (de izquierda-abajo a derecha-arriba)
+    const pts: Point2D[] = [
+      { x: W * 0.08, y: H * 0.85 },
+      { x: W * 0.22, y: H * 0.76 },
+      { x: W * 0.36, y: H * 0.62 },
+      { x: W * 0.48, y: H * 0.50 },
+      { x: W * 0.62, y: H * 0.40 },
+      { x: W * 0.76, y: H * 0.25 },
+      { x: W * 0.92, y: H * 0.12 }
+    ];
+
+    // Subdividir con perturbación suave
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const midX = (p0.x + p1.x) * 0.5 + (Math.sin(i * 3.7) * (W * 0.02));
+      const midY = (p0.y + p1.y) * 0.5 + (Math.cos(i * 2.9) * (H * 0.025));
+
+      this.woundSegments.push({
+        p0,
+        p1: { x: midX, y: midY },
+        width: 6.0,
+        branchLevel: 0,
+        healed: 0.0
+      });
+      this.woundSegments.push({
+        p0: { x: midX, y: midY },
+        p1,
+        width: 5.5,
+        branchLevel: 0,
+        healed: 0.0
+      });
+    }
+
+    // Ramas secundarias
+    const branch1: Point2D[] = [
+      { x: W * 0.36, y: H * 0.62 },
+      { x: W * 0.26, y: H * 0.54 },
+      { x: W * 0.16, y: H * 0.50 }
+    ];
+    for (let i = 0; i < branch1.length - 1; i++) {
+      this.woundSegments.push({
+        p0: branch1[i],
+        p1: branch1[i + 1],
+        width: 3.8 - i * 0.8,
+        branchLevel: 1,
+        healed: 0.0
+      });
+    }
+
+    const branch2: Point2D[] = [
+      { x: W * 0.62, y: H * 0.40 },
+      { x: W * 0.58, y: H * 0.22 },
+      { x: W * 0.52, y: H * 0.10 }
+    ];
+    for (let i = 0; i < branch2.length - 1; i++) {
+      this.woundSegments.push({
+        p0: branch2[i],
+        p1: branch2[i + 1],
+        width: 3.5 - i * 0.8,
+        branchLevel: 1,
+        healed: 0.0
+      });
+    }
+
+    const branch3: Point2D[] = [
+      { x: W * 0.48, y: H * 0.50 },
+      { x: W * 0.60, y: H * 0.64 },
+      { x: W * 0.74, y: H * 0.68 },
+      { x: W * 0.88, y: H * 0.65 }
+    ];
+    for (let i = 0; i < branch3.length - 1; i++) {
+      this.woundSegments.push({
+        p0: branch3[i],
+        p1: branch3[i + 1],
+        width: 3.2 - i * 0.6,
+        branchLevel: 1,
+        healed: 0.0
+      });
+    }
+  }
+
+  // Ruido pseudo-perlin suave
   private rawNoise(x: number, y: number): number {
     const X = Math.floor(x) & 255;
     const Y = Math.floor(y) & 255;
@@ -99,122 +197,142 @@ export class FlowFieldEngine {
     return x1 * (1.0 - v) + x2 * v;
   }
 
-  public curlNoise(x: number, y: number, time: number): { vx: number; vy: number } {
-    const eps = 2.0;
-    const scale = 0.0022;
-    const nx = x * scale;
-    const ny = y * scale;
-    const nt = time * 0.06;
+  /**
+   * Función de Corriente Escalar Ψ(x, y, t):
+   * Derivando este potencial escalar mediante (dΨ/dy, -dΨ/dx) se obtiene un campo
+   * de velocidad MATEMÁTICAMENTE DIVERGENCIA-CERO (∇·v = 0).
+   * Conserva el área en cada punto: NUNCA amontona agentes ni deja el centro vacío.
+   */
+  public streamFunction(x: number, y: number, t: number): number {
+    const scale = 0.0016;
+    let psi = this.rawNoise(x * scale, y * scale + t * 0.05) * 120.0;
 
-    const nUp = this.rawNoise(nx, ny + eps * scale + nt);
-    const nDown = this.rawNoise(nx, ny - eps * scale + nt);
-    const nRight = this.rawNoise(nx + eps * scale, ny + nt);
-    const nLeft = this.rawNoise(nx - eps * scale, ny + nt);
+    // Aporte suave de los vórtices
+    for (const v of this.vortexCenters) {
+      const dx = x - v.x;
+      const dy = y - v.y;
+      const rSq = dx * dx + dy * dy;
+      const rMaxSq = v.radius * v.radius;
+      if (rSq < rMaxSq) {
+        const factor = 1.0 - rSq / rMaxSq;
+        psi += v.strength * factor * factor * 90.0;
+      }
+    }
 
-    const dFdy = (nUp - nDown) / (2.0 * eps);
-    const dFdx = (nRight - nLeft) / (2.0 * eps);
+    // Aporte de las ondas de teclas activas
+    for (const p of this.activePulses) {
+      const dx = x - p.x;
+      const dy = y - p.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < p.radius && dist > 1.0) {
+        const wave = Math.sin((dist - p.radius * 0.5) * 0.06 * p.freq);
+        const falloff = (1.0 - dist / p.radius) * (p.life / p.maxLife);
+        psi += wave * p.strength * falloff * p.swirl * 70.0;
+      }
+    }
 
-    return {
-      vx: dFdy * 380.0 + 0.6,
-      vy: -dFdx * 380.0
-    };
+    return psi;
   }
 
   /**
-   * Dispara perturbación armónica con las teclas Q a P.
+   * Muestreo del vector de velocidad mediante derivadas centrales de la función de corriente.
    */
-  public triggerKeyPerturbation(x: number, y: number, keyCode: string) {
-    const keyMap: Record<string, { radius: number; freq: number; str: number; life: number }> = {
-      KeyQ: { radius: 260, freq: 1.5, str: 3.5, life: 2.4 },
-      KeyW: { radius: 240, freq: 1.8, str: 3.2, life: 2.2 },
-      KeyE: { radius: 220, freq: 2.2, str: 3.0, life: 2.0 },
-      KeyR: { radius: 200, freq: 2.5, str: 2.8, life: 1.9 },
-      KeyT: { radius: 180, freq: 2.8, str: 2.6, life: 1.8 },
-      KeyY: { radius: 160, freq: 3.2, str: 2.4, life: 1.7 },
-      KeyU: { radius: 150, freq: 3.6, str: 2.2, life: 1.6 },
-      KeyI: { radius: 140, freq: 4.0, str: 2.0, life: 1.5 },
-      KeyO: { radius: 130, freq: 4.4, str: 1.8, life: 1.4 },
-      KeyP: { radius: 120, freq: 4.8, str: 1.6, life: 1.3 }
+  public sampleVelocity(x: number, y: number, time: number): { vx: number; vy: number } {
+    const eps = 3.0;
+
+    const psiUp = this.streamFunction(x, y + eps, time);
+    const psiDown = this.streamFunction(x, y - eps, time);
+    const psiRight = this.streamFunction(x + eps, y, time);
+    const psiLeft = this.streamFunction(x - eps, y, time);
+
+    // v = (dΨ/dy, -dΨ/dx)
+    const vx = (psiUp - psiDown) / (2.0 * eps);
+    const vy = -(psiRight - psiLeft) / (2.0 * eps);
+
+    return { vx, vy };
+  }
+
+  /**
+   * Dispara una onda armónica reactiva claramente visible al presionar teclas Q a P.
+   */
+  public triggerKeyPulse(x: number, y: number, keyCode: string) {
+    const keyMap: Record<string, { maxR: number; speed: number; str: number; freq: number; life: number }> = {
+      KeyQ: { maxR: 380, speed: 280, str: 4.8, freq: 1.5, life: 2.2 },
+      KeyW: { maxR: 350, speed: 300, str: 4.5, freq: 1.8, life: 2.0 },
+      KeyE: { maxR: 320, speed: 320, str: 4.2, freq: 2.2, life: 1.9 },
+      KeyR: { maxR: 300, speed: 340, str: 4.0, freq: 2.5, life: 1.8 },
+      KeyT: { maxR: 280, speed: 360, str: 3.8, freq: 2.8, life: 1.7 },
+      KeyY: { maxR: 260, speed: 380, str: 3.6, freq: 3.2, life: 1.6 },
+      KeyU: { maxR: 240, speed: 400, str: 3.4, freq: 3.6, life: 1.5 },
+      KeyI: { maxR: 220, speed: 420, str: 3.2, freq: 4.0, life: 1.4 },
+      KeyO: { maxR: 200, speed: 440, str: 3.0, freq: 4.4, life: 1.3 },
+      KeyP: { maxR: 190, speed: 460, str: 2.8, freq: 4.8, life: 1.2 }
     };
 
-    const cfg = keyMap[keyCode] || { radius: 180, freq: 2.5, str: 2.5, life: 1.8 };
+    const cfg = keyMap[keyCode] || { maxR: 300, speed: 350, str: 4.0, freq: 2.5, life: 1.8 };
 
-    this.activePerturbations.push({
+    this.activePulses.push({
       x,
       y,
-      radius: 15,
-      maxRadius: cfg.radius,
-      frequency: cfg.freq,
+      radius: 10,
+      maxRadius: cfg.maxR,
+      speed: cfg.speed,
       strength: cfg.str,
       life: cfg.life,
       maxLife: cfg.life,
-      swirlDir: Math.random() > 0.5 ? 1 : -1
+      freq: cfg.freq,
+      swirl: Math.random() > 0.5 ? 1 : -1
     });
 
-    if (this.activePerturbations.length > 25) {
-      this.activePerturbations.shift();
+    if (this.activePulses.length > 15) {
+      this.activePulses.shift();
     }
   }
 
   public update(dt: number) {
-    for (let i = this.activePerturbations.length - 1; i >= 0; i--) {
-      const p = this.activePerturbations[i];
+    for (let i = this.activePulses.length - 1; i >= 0; i--) {
+      const p = this.activePulses[i];
       p.life -= dt;
-      p.radius += (p.maxRadius - p.radius) * (dt * 3.5);
+      p.radius += p.speed * dt;
 
-      if (p.life <= 0) {
-        this.activePerturbations.splice(i, 1);
+      if (p.life <= 0 || p.radius >= p.maxRadius) {
+        this.activePulses.splice(i, 1);
       }
     }
   }
 
   /**
-   * Muestrea el vector de velocidad combinando centros orbitales (arcos concéntricos de Imagen 2),
-   * curl noise de fondo y perturbaciones de teclas.
+   * Busca la distancia a la herida y si está sanada en ese punto.
    */
-  public sampleVelocity(x: number, y: number, time: number): { vx: number; vy: number } {
-    let vx = 0;
-    let vy = 0;
+  public getWoundDistance(x: number, y: number): { dist: number; isHealed: boolean } {
+    let minDistSq = 1e9;
+    let healedRatio = 0.0;
 
-    // 1. Campo Curl Noise base
-    const curl = this.curlNoise(x, y, time);
-    vx += curl.vx * 0.45;
-    vy += curl.vy * 0.45;
+    for (let i = 0; i < this.woundSegments.length; i++) {
+      const seg = this.woundSegments[i];
+      const dx = seg.p1.x - seg.p0.x;
+      const dy = seg.p1.y - seg.p0.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq < 1e-5) continue;
 
-    // 2. Influencia de los centros orbitales (Imagen 2: arcos concéntricos y pistas circulares)
-    for (const c of this.orbitalCenters) {
-      const dx = x - c.x;
-      const dy = y - c.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      let u = ((x - seg.p0.x) * dx + (y - seg.p0.y) * dy) / lenSq;
+      u = Math.max(0, Math.min(1, u));
 
-      if (dist < c.radius && dist > 1.0) {
-        const factor = (1.0 - dist / c.radius);
-        const tanX = -dy / dist;
-        const tanY = dx / dist;
+      const px = seg.p0.x + u * dx;
+      const py = seg.p0.y + u * dy;
+      const rx = x - px;
+      const ry = y - py;
+      const dSq = rx * rx + ry * ry;
 
-        vx += tanX * c.speed * c.dir * factor * 2.8;
-        vy += tanY * c.speed * c.dir * factor * 2.8;
+      if (dSq < minDistSq) {
+        minDistSq = dSq;
+        healedRatio = seg.healed;
       }
     }
 
-    // 3. Perturbaciones de teclas Q a P
-    for (const p of this.activePerturbations) {
-      const dx = x - p.x;
-      const dy = y - p.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist < p.radius && dist > 1.0) {
-        const falloff = (1.0 - dist / p.radius) * (p.life / p.maxLife);
-        const wave = Math.sin(dist * 0.08 * p.frequency) * p.strength * falloff;
-
-        const perpX = -dy / dist;
-        const perpY = dx / dist;
-
-        vx += perpX * wave * p.swirlDir * 2.4;
-        vy += perpY * wave * p.swirlDir * 2.4;
-      }
-    }
-
-    return { vx, vy };
+    return {
+      dist: Math.sqrt(minDistSq),
+      isHealed: healedRatio > 0.35
+    };
   }
 }
