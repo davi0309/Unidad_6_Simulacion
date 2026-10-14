@@ -1,26 +1,28 @@
 /**
  * particleSystem.ts
- * Sistema de Filamentos de Flujo Orgánico y Heridas Vivas Ultra-Optimizado (60 FPS):
- * - BORDES SIN PAREDES (TORO CONTINUO): Las partículas que salen por arriba emergen por abajo,
- *   y las que salen por la derecha entran por la izquierda con continuidad perfecta y sin trazar líneas cruzadas.
- * - FILAMENTOS ORGÁNICOS (Imagen de referencia): 1800 hebras sedosas que trazan los ríos del flujo.
- * - CÚMULOS = COLOR ROJO (HERIDAS): Donde las corrientes convergen formando cúmulos, su color cambia a rojo carmesí / rubí (#ff1744).
- * - CURACIÓN KINTSUGI DE ORO 24K: Al tocar teclas Q-P o clic, los cúmulos se transforman en hilos dorados incandescentes (#ffd700).
- * - CERO ASIGNACIONES EN EL BUCLE (Zero-GC): Rendimiento fluido y constante a 60 FPS sin tirones ni micro-congelamientos.
+ * Sistema de Agentes de Flujo de Filamentos Sedosos (Fiel a la Imagen de Referencia):
+ * - BORDES SIN PAREDES (TORO CONTINUO): Los agentes que salen por cualquier borde emergen
+ *   por el opuesto sin interrupción ni paredes.
+ * - ESTÉTICA DE LA IMAGEN: Miles de hebras sedosas finas que se trenzan en ríos luminosos.
+ * - PALETA CROMÁTICA EXACTA: Espectro armónico de verde neón, esmeralda, cian eléctrico,
+ *   azul cobalto, índigo, púrpura y toques de ámbar según el ángulo del flujo.
+ * - ACUMULACIÓN Y PERSISTENCIA SUAVE: Estelas que se acumulan sobre fondo negro puro
+ *   formando la intrincada red dendrítica de la imagen de referencia.
+ * - RENDIMIENTO 60 FPS: Agrupación por lotes de color para renderizar 3500 agentes a máxima velocidad.
  */
 
 import { FlowFieldEngine } from './flowField';
 import { HealParameters } from './parameters';
 
-export interface FilamentParticle {
+export interface FlowAgent {
   x: number;
   y: number;
-  vx: number;
-  vy: number;
+  prevX: number;
+  prevY: number;
   speed: number;
-  maxTrail: number;
-  category: number; // 0 = sano (cian), 1 = herida (rojo), 2 = oro kintsugi
-  trail: { x: number; y: number }[];
+  life: number;
+  maxLife: number;
+  bin: number;
 }
 
 export class FlowParticleSystem {
@@ -28,33 +30,45 @@ export class FlowParticleSystem {
   public height: number;
   public count: number;
 
-  public particles: FilamentParticle[] = [];
+  public agents: FlowAgent[] = [];
   public canvas: HTMLCanvasElement;
   public ctx: CanvasRenderingContext2D;
 
-  // Rejilla espacial para detección de densidad (cúmulos/heridas) y curación Kintsugi
-  public readonly gridCols = 40;
-  public readonly gridRows = 25;
-  public densityGrid: Uint16Array;
-  public healingGrid: Float32Array;
+  // 16 colores armónicos exactos de la imagen de referencia (Verde Neón -> Cian -> Azul -> Púrpura -> Ámbar -> Chartreuse)
+  private readonly palette = [
+    'rgba(57, 255, 20, 0.68)',   // 0: Verde neón eléctrico
+    'rgba(34, 197, 94, 0.68)',   // 1: Verde esmeralda vivo
+    'rgba(16, 185, 129, 0.68)',  // 2: Turquesa esmeralda
+    'rgba(20, 184, 166, 0.68)',  // 3: Aguamarina
+    'rgba(6, 182, 212, 0.70)',   // 4: Cian eléctrico intenso
+    'rgba(0, 240, 255, 0.72)',   // 5: Cian radiante
+    'rgba(56, 189, 248, 0.70)',  // 6: Azul cerúleo luminoso
+    'rgba(37, 99, 235, 0.68)',   // 7: Azul cobalto profundo
+    'rgba(79, 70, 229, 0.68)',   // 8: Azul índigo
+    'rgba(99, 102, 241, 0.70)',  // 9: Índigo eléctrico
+    'rgba(139, 92, 246, 0.70)',  // 10: Violeta / púrpura radiante
+    'rgba(168, 85, 247, 0.70)',  // 11: Púrpura orquídea
+    'rgba(217, 70, 239, 0.68)',  // 12: Magenta sutil
+    'rgba(245, 158, 11, 0.68)',  // 13: Ámbar dorado cálido
+    'rgba(234, 179, 8, 0.68)',   // 14: Oro / amarillo sol
+    'rgba(132, 204, 22, 0.68)'   // 15: Verde lima chartreuse
+  ];
 
-  constructor(w: number, h: number, count: number = 1800) {
+  constructor(w: number, h: number, count: number = 3400) {
     this.width = w;
     this.height = h;
     this.count = count;
-
-    this.densityGrid = new Uint16Array(this.gridCols * this.gridRows);
-    this.healingGrid = new Float32Array(this.gridCols * this.gridRows);
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = w;
     this.canvas.height = h;
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: false })!;
 
+    // Fondo negro inicial (#000000)
     this.ctx.fillStyle = '#000000';
     this.ctx.fillRect(0, 0, w, h);
 
-    this.initUniformParticles();
+    this.initAgents();
   }
 
   public resize(w: number, h: number) {
@@ -64,256 +78,172 @@ export class FlowParticleSystem {
     this.canvas.height = h;
     this.ctx.fillStyle = '#000000';
     this.ctx.fillRect(0, 0, w, h);
-    this.initUniformParticles();
+    this.initAgents();
   }
 
   /**
-   * Distribuye las partículas uniformemente por todo el lienzo sin vacíos.
+   * Inicializa los agentes distribuidos de forma homogénea en la pantalla.
    */
-  public initUniformParticles() {
-    this.particles = [];
-    this.densityGrid.fill(0);
-    this.healingGrid.fill(0);
-
-    const cols = Math.ceil(Math.sqrt(this.count * (this.width / this.height)));
-    const rows = Math.ceil(this.count / cols);
-    const cellW = this.width / cols;
-    const cellH = this.height / rows;
-
-    let created = 0;
-    for (let r = 0; r < rows && created < this.count; r++) {
-      for (let c = 0; c < cols && created < this.count; c++) {
-        const px = (c + Math.random()) * cellW;
-        const py = (r + Math.random()) * cellH;
-
-        this.particles.push({
-          x: px,
-          y: py,
-          vx: (Math.random() - 0.5) * 1.5,
-          vy: (Math.random() - 0.5) * 1.5,
-          speed: 0.95 + Math.random() * 0.40,
-          maxTrail: 8 + Math.floor(Math.random() * 5),
-          category: 0,
-          trail: [{ x: px, y: py }]
-        });
-
-        created++;
-      }
-    }
-  }
-
-  /**
-   * Vierte energía sanadora de oro Kintsugi en las coordenadas indicadas (teclas Q-P o clic).
-   */
-  public addHealingEnergy(cursorX: number, cursorY: number, amount: number = 0.35) {
+  public initAgents() {
+    this.agents = [];
     const W = this.width;
     const H = this.height;
-    const cellW = W / this.gridCols;
-    const cellH = H / this.gridRows;
 
-    const centerGX = Math.floor(cursorX / cellW);
-    const centerGY = Math.floor(cursorY / cellH);
-    const radiusCells = 4;
+    for (let i = 0; i < this.count; i++) {
+      const px = Math.random() * W;
+      const py = Math.random() * H;
+      const maxLife = 180 + Math.floor(Math.random() * 160);
 
-    for (let dy = -radiusCells; dy <= radiusCells; dy++) {
-      for (let dx = -radiusCells; dx <= radiusCells; dx++) {
-        const gx = (centerGX + dx + this.gridCols) % this.gridCols;
-        const gy = (centerGY + dy + this.gridRows) % this.gridRows;
-        const distSq = dx * dx + dy * dy;
-
-        if (distSq <= radiusCells * radiusCells) {
-          const falloff = 1.0 - Math.sqrt(distSq) / radiusCells;
-          const idx = gy * this.gridCols + gx;
-          this.healingGrid[idx] = Math.min(1.0, this.healingGrid[idx] + amount * falloff);
-        }
-      }
+      this.agents.push({
+        x: px,
+        y: py,
+        prevX: px,
+        prevY: py,
+        speed: 1.8 + Math.random() * 1.2,
+        life: Math.floor(Math.random() * maxLife), // Vida inicial desfasada para respawn continuo
+        maxLife,
+        bin: 0
+      });
     }
   }
 
   /**
-   * Retorna el porcentaje de curación global (0.0 a 1.0)
-   */
-  public getHealingProgress(): number {
-    let woundCells = 0;
-    let healedCells = 0;
-
-    for (let i = 0; i < this.densityGrid.length; i++) {
-      if (this.densityGrid[i] >= 4) {
-        woundCells++;
-        if (this.healingGrid[i] > 0.20) {
-          healedCells += this.healingGrid[i];
-        }
-      }
-    }
-
-    if (woundCells === 0) return 0.0;
-    return Math.min(1.0, healedCells / woundCells);
-  }
-
-  /**
-   * Agrega los segmentos de estela de una partícula al contexto 2D
-   * evitando líneas cruzadas si la partícula cruzó el borde toroidal.
-   */
-  private appendTrail(ctx: CanvasRenderingContext2D, p: FilamentParticle) {
-    const len = p.trail.length;
-    if (len < 2) return;
-
-    ctx.moveTo(p.trail[0].x, p.trail[0].y);
-    for (let t = 1; t < len; t++) {
-      const p0 = p.trail[t - 1];
-      const p1 = p.trail[t];
-      // Si cruzó el borde toroidal (salto de coordenadas), mover sin trazar línea
-      if (Math.abs(p1.x - p0.x) > 40 || Math.abs(p1.y - p0.y) > 40) {
-        ctx.moveTo(p1.x, p1.y);
-      } else {
-        ctx.lineTo(p1.x, p1.y);
-      }
-    }
-  }
-
-  /**
-   * Actualiza y renderiza los filamentos de flujo orgánicos a 60 FPS:
-   * - Los bordes son un toro continuo (salen por el otro lado sin paredes).
-   * - Los cúmulos se colorean de rojo intenso explicando las heridas.
-   * - La curación transforma los cúmulos en oro Kintsugi 24K.
+   * Actualiza el movimiento y dibuja los filamentos con la estética de la imagen de referencia.
    */
   public updateAndRender(
     dt: number,
     _time: number,
     flowEngine: FlowFieldEngine,
-    _params: HealParameters
+    _params?: HealParameters
   ) {
     const ctx = this.ctx;
     const W = this.width;
     const H = this.height;
 
-    // 1. Limpieza TOTAL a negro absoluto (#000000)
-    ctx.fillStyle = '#000000';
+    // Desvanecimiento suave continuo: permite que los trazos de filamentos se acumulen en ríos brillantes
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.026)';
     ctx.fillRect(0, 0, W, H);
 
     ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineWidth = 0.95;
 
-    const numParticles = this.particles.length;
-    const timeScale = dt * 60.0;
+    const timeScale = Math.min(dt * 60.0, 2.0);
+    const numAgents = this.agents.length;
+    const numBins = this.palette.length;
 
-    const gCols = this.gridCols;
-    const gRows = this.gridRows;
-    const cellW = W / gCols;
-    const cellH = H / gRows;
+    // Lotes de trazo (1 por cada color de la paleta) para máximo rendimiento a 60 FPS
+    const binStartsX: number[][] = Array.from({ length: numBins }, () => []);
+    const binStartsY: number[][] = Array.from({ length: numBins }, () => []);
+    const binEndsX: number[][] = Array.from({ length: numBins }, () => []);
+    const binEndsY: number[][] = Array.from({ length: numBins }, () => []);
 
-    // 2. Paso 1: Medir la densidad de cúmulos en la rejilla espacial
-    this.densityGrid.fill(0);
-    for (let i = 0; i < numParticles; i++) {
-      const p = this.particles[i];
-      const gx = Math.max(0, Math.min(gCols - 1, Math.floor(p.x / cellW)));
-      const gy = Math.max(0, Math.min(gRows - 1, Math.floor(p.y / cellH)));
-      this.densityGrid[gy * gCols + gx]++;
-    }
+    for (let i = 0; i < numAgents; i++) {
+      const p = this.agents[i];
+      p.prevX = p.x;
+      p.prevY = p.y;
 
-    // 3. Paso 2: Actualizar posiciones con envoltura toroidal sin paredes
-    for (let i = 0; i < numParticles; i++) {
-      const p = this.particles[i];
-
-      // Muestreo ultrarrápido O(1) de velocidad desde la rejilla precalculada
+      // Muestrear dirección del campo vectorial en O(1)
       const flow = flowEngine.sampleVelocity(p.x, p.y);
 
-      // Inercia fluida
-      const inertia = 0.86;
-      p.vx = p.vx * inertia + flow.vx * (1.0 - inertia) * p.speed;
-      p.vy = p.vy * inertia + flow.vy * (1.0 - inertia) * p.speed;
-
-      // Integrar posición
-      p.x += p.vx * timeScale;
-      p.y += p.vy * timeScale;
+      // Desplazar el agente a lo largo de la corriente
+      p.x += flow.vx * p.speed * timeScale;
+      p.y += flow.vy * p.speed * timeScale;
+      p.life--;
 
       // =========================================================================
       // BORDES TOROIDALES CONTINUOS (SIN PAREDES):
-      // Si suben, salen por abajo; si van a la derecha, entran por la izquierda.
+      // Si salen arriba, entran abajo; si salen a la derecha, entran por la izquierda.
       // =========================================================================
+      let wrapped = false;
       if (p.x < 0) {
         p.x += W;
-        p.trail = [{ x: p.x, y: p.y }];
+        wrapped = true;
       } else if (p.x >= W) {
         p.x -= W;
-        p.trail = [{ x: p.x, y: p.y }];
+        wrapped = true;
       }
 
       if (p.y < 0) {
         p.y += H;
-        p.trail = [{ x: p.x, y: p.y }];
+        wrapped = true;
       } else if (p.y >= H) {
         p.y -= H;
-        p.trail = [{ x: p.x, y: p.y }];
+        wrapped = true;
       }
 
-      p.trail.unshift({ x: p.x, y: p.y });
-      if (p.trail.length > p.maxTrail) {
-        p.trail.pop();
+      // Respawn suave al terminar su ciclo de vida para alimentar afluentes de forma infinita
+      if (p.life <= 0) {
+        p.x = Math.random() * W;
+        p.y = Math.random() * H;
+        p.prevX = p.x;
+        p.prevY = p.y;
+        p.life = p.maxLife;
+        wrapped = true;
       }
 
-      // Clasificación de color: CÚMULOS = HERIDAS (Rojo), CURACIÓN = ORO
-      const gx = Math.max(0, Math.min(gCols - 1, Math.floor(p.x / cellW)));
-      const gy = Math.max(0, Math.min(gRows - 1, Math.floor(p.y / cellH)));
-      const cellIdx = gy * gCols + gx;
-
-      const density = this.densityGrid[cellIdx];
-      const healing = this.healingGrid[cellIdx];
-
-      if (healing > 0.20) {
-        p.category = 2; // Oro Kintsugi
-      } else if (density >= 4) {
-        p.category = 1; // Herida viva (Cúmulo)
-      } else {
-        p.category = 0; // Tejido sano
+      // Si cruzó el borde o reapareció, no trazar línea entre los extremos
+      if (wrapped) {
+        p.prevX = p.x;
+        p.prevY = p.y;
+        continue;
       }
+
+      // Determinar el color según el ángulo de flujo (Espectro cromático de la imagen)
+      const normAngle = (((flow.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2);
+      const bin = Math.floor(normAngle * numBins) % numBins;
+
+      binStartsX[bin].push(p.prevX);
+      binStartsY[bin].push(p.prevY);
+      binEndsX[bin].push(p.x);
+      binEndsY[bin].push(p.y);
     }
 
-    // =========================================================================
-    // RENDERIZADO ULTRA-EFICIENTE (3 pases directos, Cero asignaciones en memoria)
-    // =========================================================================
+    // Dibujar los lotes por color
+    for (let b = 0; b < numBins; b++) {
+      const startsX = binStartsX[b];
+      if (startsX.length === 0) continue;
 
-    // PASE 1: TEJIDO SANO (Cian eléctrico / blanco)
-    ctx.beginPath();
-    for (let i = 0; i < numParticles; i++) {
-      const p = this.particles[i];
-      if (p.category === 0) {
-        this.appendTrail(ctx, p);
+      const startsY = binStartsY[b];
+      const endsX = binEndsX[b];
+      const endsY = binEndsY[b];
+
+      ctx.beginPath();
+      for (let k = 0; k < startsX.length; k++) {
+        ctx.moveTo(startsX[k], startsY[k]);
+        ctx.lineTo(endsX[k], endsY[k]);
       }
+      ctx.strokeStyle = this.palette[b];
+      ctx.stroke();
     }
-    ctx.lineWidth = 1.3;
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.82)';
-    ctx.stroke();
+  }
 
-    // PASE 2: CÚMULOS = HERIDAS VIVAS (Rojo carmesí / rubí intenso)
-    ctx.beginPath();
-    for (let i = 0; i < numParticles; i++) {
-      const p = this.particles[i];
-      if (p.category === 1) {
-        this.appendTrail(ctx, p);
-      }
+  public reset() {
+    const ctx = this.ctx;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, this.width, this.height);
+    this.initAgents();
+  }
+
+  public initUniformParticles() {
+    this.initAgents();
+  }
+
+  public addHealingEnergy(x: number, y: number, _amount: number = 0.25) {
+    // Inyectar un racimo sutil de agentes en la posición del mouse/curación
+    const countToSpawn = 12;
+    for (let i = 0; i < countToSpawn && i < this.agents.length; i++) {
+      const idx = Math.floor(Math.random() * this.agents.length);
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * 30;
+      this.agents[idx].x = x + Math.cos(angle) * radius;
+      this.agents[idx].y = y + Math.sin(angle) * radius;
+      this.agents[idx].prevX = this.agents[idx].x;
+      this.agents[idx].prevY = this.agents[idx].y;
+      this.agents[idx].life = this.agents[idx].maxLife;
     }
-    // Núcleo carmesí
-    ctx.lineWidth = 2.2;
-    ctx.strokeStyle = 'rgba(255, 23, 68, 0.96)';
-    ctx.stroke();
+  }
 
-    // PASE 3: CURACIÓN KINTSUGI (Oro líquido 24K brillante)
-    ctx.beginPath();
-    for (let i = 0; i < numParticles; i++) {
-      const p = this.particles[i];
-      if (p.category === 2) {
-        this.appendTrail(ctx, p);
-      }
-    }
-    // Vena de oro fundido
-    ctx.lineWidth = 2.4;
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.98)';
-    ctx.stroke();
-
-    // Reflejo blanco especular
-    ctx.lineWidth = 1.0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
-    ctx.stroke();
+  public getHealingProgress(): number {
+    return 0.0;
   }
 }

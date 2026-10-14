@@ -1,12 +1,11 @@
 /**
  * flowField.ts
- * Motor de Campo de Flujo (Flow Field) Ultra-Optimizado (60 FPS continuos):
- * - REJILLA DE VECTORES EN GPU/CPU: Precalcula el campo vectorial toroidal una vez por fotograma (48x32).
- *   Las partículas muestrean el campo en O(1) mediante interpolación bilineal instantánea.
- * - BORDES SIN PAREDES (TORO CONTINUO): No existen paredes. Las partículas salen por un borde y entran
- *   por el opuesto con continuidad matemática perfecta.
- * - CURL NOISE DIVERGENCIA-CERO: Ríos sedosos orgánicos inspirados en la imagen de referencia.
- * - 10 COMPORTAMIENTOS DINÁMICOS ÚNICOS para las teclas Q a P.
+ * Motor de Campo de Flujo (Flow Field) con Domain-Warping Toroidal:
+ * - Diseñado para reproducir fielmente la imagen de referencia (ríos y filamentos sedosos).
+ * - BORDES SIN PAREDES (TORO CONTINUO 4D): Las coordenadas están proyectadas en un toro periódico.
+ *   El campo en la parte superior e inferior, izquierda y derecha es matemáticamente idéntico y continuo.
+ * - DOMAIN WARPING FRACTAL: Produce las sinuosas ramificaciones y afluentes que convergen en ríos principales.
+ * - Rejilla vectorial de 64x40 precalculada para un rendimiento ultra-fluido (60 FPS estables).
  */
 
 export interface Point2D {
@@ -31,13 +30,14 @@ export class FlowFieldEngine {
 
   private permTable: Uint8Array;
 
-  // Rejilla de campo de vectores precalculada (Elimina 20,000 llamadas a ruido por frame)
-  public readonly gridCols = 48;
-  public readonly gridRows = 32;
+  // Rejilla de vectores para rendimiento de 60 FPS
+  public readonly gridCols = 64;
+  public readonly gridRows = 40;
   private gridVx: Float32Array;
   private gridVy: Float32Array;
+  private gridAngle: Float32Array;
 
-  // Impulsos activos de las 10 teclas distintas
+  // Impulsos dinámicos (interacciones de teclado/ratón)
   public activeImpulses: DynamicImpulse[] = [];
   public get activePulses(): DynamicImpulse[] {
     return this.activeImpulses;
@@ -53,8 +53,10 @@ export class FlowFieldEngine {
       this.permTable[i + 256] = this.permTable[i];
     }
 
-    this.gridVx = new Float32Array(this.gridCols * this.gridRows);
-    this.gridVy = new Float32Array(this.gridCols * this.gridRows);
+    const totalCells = this.gridCols * this.gridRows;
+    this.gridVx = new Float32Array(totalCells);
+    this.gridVy = new Float32Array(totalCells);
+    this.gridAngle = new Float32Array(totalCells);
 
     this.rebuildVectorGrid(0);
   }
@@ -87,9 +89,10 @@ export class FlowFieldEngine {
   }
 
   /**
-   * Potencial escalar toroidal periódico (4D mapping).
+   * Genera el ángulo del flujo mediante Domain-Warping toroidal periódico 4D.
+   * Esto crea las ramificaciones arteriales y ríos sinuosos de la imagen de referencia.
    */
-  private toroidalPotential(u: number, v: number, time: number): number {
+  private getDomainWarpedAngle(u: number, v: number, time: number): number {
     const th = u * Math.PI * 2;
     const ph = v * Math.PI * 2;
 
@@ -98,18 +101,27 @@ export class FlowFieldEngine {
     const cosPh = Math.cos(ph);
     const sinPh = Math.sin(ph);
 
-    const n1 = this.noise2D((cosTh + 1.2) * 1.5 + time * 0.03, (sinTh + 1.2) * 1.5 + (cosPh + 1.2) * 1.5);
-    const n2 = this.noise2D((cosPh + 1.5) * 2.2 - time * 0.025, (sinPh + 1.5) * 2.2 + (sinTh + 1.5) * 2.0);
+    // Muestreo toroidal periódico 4D
+    const t = time * 0.015;
 
-    const w1 = Math.sin(th * 2.0 + ph * 1.0 + time * 0.15) * 1.2;
-    const w2 = Math.cos(th * 1.0 - ph * 2.0 - time * 0.12) * 1.0;
-    const w3 = Math.sin(th * 3.0 + ph * 2.0 + time * 0.08) * 0.6;
+    // Primer nivel de distorsión (Domain Warp 1)
+    const qx = this.noise2D((cosTh + 1.2) * 1.5 + t, (sinTh + 1.2) * 1.5);
+    const qy = this.noise2D((cosPh + 1.2) * 1.5, (sinPh + 1.2) * 1.5 - t);
 
-    return n1 * 2.2 + n2 * 1.3 + w1 + w2 + w3;
+    // Segundo nivel de distorsión (Domain Warp 2: produce pliegues sedosos)
+    const rx = this.noise2D((cosTh + 2.4 * qx + 1.5) * 1.4, (cosPh + 2.4 * qy + 2.2) * 1.4);
+    const ry = this.noise2D((sinTh + 2.4 * qx + 3.1) * 1.4, (sinPh + 2.4 * qy + 4.5) * 1.4);
+
+    // Ondulación armónica para dar fluidez continua
+    const harmonic = Math.sin(th * 2.0 + ph * 1.0 + t * 4.0) * 0.5;
+
+    // Ángulo final con multiplicador fractal
+    const angleNoise = this.noise2D((cosTh + 2.0 * rx) * 1.6, (sinPh + 2.0 * ry) * 1.6 + t * 0.5);
+    return (angleNoise + harmonic) * Math.PI * 3.5;
   }
 
   /**
-   * Reconstruye la rejilla de vectores toroidal (se ejecuta 1 sola vez por frame, ~0.3ms).
+   * Reconstruye la rejilla de vectores para que las partículas puedan muestrearla en O(1).
    */
   public rebuildVectorGrid(time: number) {
     const cols = this.gridCols;
@@ -119,9 +131,6 @@ export class FlowFieldEngine {
     const cellW = W / cols;
     const cellH = H / rows;
 
-    const epsU = 0.015;
-    const epsV = 0.015;
-
     for (let j = 0; j < rows; j++) {
       const v = j / rows;
       const cellY = (j + 0.5) * cellH;
@@ -130,16 +139,12 @@ export class FlowFieldEngine {
         const u = i / cols;
         const cellX = (i + 0.5) * cellW;
 
-        // Derivadas numéricas del potencial toroidal
-        const pY1 = this.toroidalPotential(u, v + epsV, time);
-        const pY0 = this.toroidalPotential(u, v - epsV, time);
-        const pX1 = this.toroidalPotential(u + epsU, v, time);
-        const pX0 = this.toroidalPotential(u - epsU, v, time);
+        let angle = this.getDomainWarpedAngle(u, v, time);
 
-        let vx = ((pY1 - pY0) / (2.0 * epsV)) * 1.4;
-        let vy = -((pX1 - pX0) / (2.0 * epsU)) * 1.4;
+        let vx = Math.cos(angle) * 2.2;
+        let vy = Math.sin(angle) * 2.2;
 
-        // Modificaciones dinámicas de los 10 tipos de impulsos de teclas Q-P
+        // Impulsos dinámicos interactivos (teclas / clics)
         for (const imp of this.activeImpulses) {
           const dx = cellX - imp.x;
           const dy = cellY - imp.y;
@@ -148,85 +153,74 @@ export class FlowFieldEngine {
 
           if (dist < imp.radius && dist > 1.0) {
             const factor = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
-
             switch (imp.type) {
+              case 'cyclone_cw':
+                vx += (-dy / dist) * factor * 5.5;
+                vy += (dx / dist) * factor * 5.5;
+                break;
+              case 'cyclone_ccw':
+                vx += (dy / dist) * factor * 5.5;
+                vy += (-dx / dist) * factor * 5.5;
+                break;
               case 'shockwave':
-                vx += (dx / dist) * factor * 4.5;
-                vy += (dy / dist) * factor * 4.5;
+                vx += (dx / dist) * factor * 5.0;
+                vy += (dy / dist) * factor * 5.0;
                 break;
-              case 'cyclone':
-                vx += (-dy / dist) * factor * 5.0;
-                vy += (dx / dist) * factor * 5.0;
+              case 'attractor':
+                vx -= (dx / dist) * factor * 4.5;
+                vy -= (dy / dist) * factor * 4.5;
                 break;
-              case 'jet':
-                vx += factor * 6.5;
-                vy += Math.sin(cellX * 0.03) * factor * 1.2;
-                break;
-              case 'sine':
-                vy += Math.sin(cellX * 0.04 + imp.radius * 0.05) * factor * 6.0;
-                vx += Math.cos(cellY * 0.04) * factor * 2.0;
-                break;
-              case 'counter_cyclone':
-                vx += (dy / dist) * factor * 5.0;
-                vy += (-dx / dist) * factor * 5.0;
-                break;
-              case 'chaos':
-                vx += Math.cos(dist * 0.1) * factor * 5.5;
-                vy += Math.sin(dist * 0.1) * factor * 5.5;
-                break;
-              case 'magnet':
-                if (dist > 25.0) {
-                  vx -= (dx / dist) * factor * 4.2;
-                  vy -= (dy / dist) * factor * 4.2;
-                }
-                break;
-              case 'lift':
+              case 'jet_up':
                 vy -= factor * 6.0;
+                vx += Math.sin(cellY * 0.05) * factor * 2.0;
                 break;
-              case 'twin': {
-                const d1 = Math.hypot(cellX - (imp.x - 50), cellY - imp.y);
-                if (d1 < imp.radius && d1 > 2) {
-                  const p1 = (1.0 - d1 / imp.radius) * factor * 3.5;
-                  vx += (-(cellY - imp.y) / d1) * p1;
-                  vy += ((cellX - (imp.x - 50)) / d1) * p1;
-                }
+              case 'jet_down':
+                vy += factor * 6.0;
+                vx += Math.cos(cellY * 0.05) * factor * 2.0;
                 break;
-              }
-              case 'shimmer':
-                vx += Math.sin(time * 40.0 + cellX * 0.1) * factor * 4.5;
-                vy += Math.cos(time * 40.0 + cellY * 0.1) * factor * 4.5;
+              case 'transverse_wave':
+                vx += Math.sin((cellX - imp.x) * 0.04) * factor * 5.0;
+                break;
+              case 'divergence':
+                vx += (dx / dist) * factor * 6.0;
+                vy += (dy / dist) * factor * 6.0;
+                break;
+              case 'shear':
+                vx += (dy > 0 ? 1 : -1) * factor * 5.0;
+                break;
+              case 'harmonic_ripple':
+                vx += Math.cos(dist * 0.08) * factor * 4.2;
+                vy += Math.sin(dist * 0.08) * factor * 4.2;
+                break;
+              default:
+                vx += (-dy / dist) * factor * 4.5;
+                vy += (dx / dist) * factor * 4.5;
                 break;
             }
           }
         }
 
-        // Velocidad mínima garantizada
+        // Velocidad normalizada asegurada
         const spd = Math.hypot(vx, vy);
-        if (spd < 1.4) {
-          const h = spd > 0.01 ? Math.atan2(vy, vx) : (u + v) * Math.PI * 2;
-          vx = Math.cos(h) * 1.8;
-          vy = Math.sin(h) * 1.8;
-        } else if (spd > 7.0) {
-          vx = (vx / spd) * 7.0;
-          vy = (vy / spd) * 7.0;
+        if (spd > 0.01) {
+          angle = Math.atan2(vy, vx);
         }
 
         const idx = j * cols + i;
         this.gridVx[idx] = vx;
         this.gridVy[idx] = vy;
+        this.gridAngle[idx] = angle;
       }
     }
   }
 
   /**
-   * Muestreo ultrarrápido O(1) de velocidad mediante interpolación bilineal en la rejilla.
-   * ¡Cero llamadas a ruido por partícula! Toma menos de 0.0001 ms.
+   * Muestreo ultra-rápido O(1) de velocidad y ángulo en cualquier punto (x, y).
    */
-  public sampleVelocity(x: number, y: number, _time?: number): { vx: number; vy: number } {
+  public sampleVelocity(x: number, y: number): { vx: number; vy: number; angle: number } {
     const W = this.width;
     const H = this.height;
 
-    // Coordenadas normalizadas toroidales [0, 1)
     const u = (((x % W) + W) % W) / W;
     const v = (((y % H) + H) % H) / H;
 
@@ -257,85 +251,70 @@ export class FlowFieldEngine {
     const vy1 = this.gridVy[idx01] * (1.0 - tx) + this.gridVy[idx11] * tx;
     const vy = vy0 * (1.0 - ty) + vy1 * ty;
 
-    return { vx, vy };
+    const angle = this.gridAngle[idx00];
+
+    return { vx, vy, angle };
   }
 
-  /**
-   * Dispara el comportamiento específico único para cada tecla de Q a P.
-   */
   public triggerKeyPulse(x: number, y: number, keyCode: string) {
-    this.triggerKeyAction(x, y, keyCode);
-  }
-
-  public triggerKeyAction(x: number, y: number, keyCode: string) {
-    let type = 'shockwave';
-    let maxR = 340;
-    let str = 4.5;
+    let type = 'cyclone_cw';
+    let maxR = 380;
+    let str = 5.0;
     let life = 2.0;
 
     switch (keyCode) {
       case 'KeyQ':
-        type = 'shockwave';
-        maxR = 440;
+        type = 'shockwave';         // Onda expansiva radial
+        maxR = 460;
         str = 6.0;
-        life = 2.2;
         break;
       case 'KeyW':
-        type = 'cyclone';
-        maxR = 320;
+        type = 'cyclone_cw';        // Vórtice horario
+        maxR = 360;
         str = 5.5;
-        life = 2.2;
         break;
       case 'KeyE':
-        type = 'jet';
-        maxR = 400;
-        str = 6.5;
-        life = 2.0;
+        type = 'jet_up';            // Chorro ascendente
+        maxR = 420;
+        str = 6.2;
         break;
       case 'KeyR':
-        type = 'sine';
+        type = 'cyclone_ccw';       // Vórtice antihorario
         maxR = 360;
-        str = 5.0;
-        life = 2.2;
+        str = 5.5;
         break;
       case 'KeyT':
-        type = 'counter_cyclone';
-        maxR = 320;
-        str = 5.5;
-        life = 2.2;
+        type = 'attractor';         // Succión gravitacional
+        maxR = 400;
+        str = 4.8;
         break;
       case 'KeyY':
-        type = 'chaos';
-        maxR = 350;
-        str = 5.5;
-        life = 1.9;
+        type = 'transverse_wave';    // Onda sinusoidal transversal
+        maxR = 440;
+        str = 5.2;
         break;
       case 'KeyU':
-        type = 'magnet';
-        maxR = 380;
-        str = 6.0;
-        life = 2.4;
+        type = 'divergence';        // Apertura divergente
+        maxR = 420;
+        str = 5.8;
         break;
       case 'KeyI':
-        type = 'lift';
-        maxR = 380;
+        type = 'jet_down';          // Cascada descendente
+        maxR = 420;
         str = 6.2;
-        life = 2.0;
         break;
       case 'KeyO':
-        type = 'twin';
-        maxR = 340;
-        str = 5.5;
-        life = 2.4;
+        type = 'shear';             // Cizalla tangencial
+        maxR = 390;
+        str = 5.0;
         break;
       case 'KeyP':
-        type = 'shimmer';
-        maxR = 300;
-        str = 5.0;
-        life = 1.6;
+        type = 'harmonic_ripple';   // Vibración armónica rápida
+        maxR = 450;
+        str = 4.5;
         break;
       default:
-        type = 'shockwave';
+        type = 'cyclone_cw';
         break;
     }
 
@@ -366,7 +345,6 @@ export class FlowFieldEngine {
       }
     }
 
-    // Actualiza la rejilla de vectores 1 vez por fotograma
     this.rebuildVectorGrid(timeSec);
   }
 }

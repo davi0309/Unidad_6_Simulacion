@@ -53,7 +53,7 @@ async function main() {
 
   const flowEngine = new FlowFieldEngine(screenW, screenH);
   const kintsugiLayer = new KintsugiLayer(screenW, screenH);
-  const particleSystem = new FlowParticleSystem(screenW, screenH, 1600);
+  const particleSystem = new FlowParticleSystem(screenW, screenH, 3800);
   const stressSystem = new StressSystem();
   const heartbeatSystem = new HeartbeatSystem();
 
