@@ -10,12 +10,13 @@
  * - Oro (goldTrail + permanentScar) encima del tejido: base #c8902e, medio #ffd27a, picos #fff3d1
  * - Destello de latidos: +6% a +12% global
  * - Grano de película 0.04, viñeta 0.35 y bloom
+ * - QuadMesh para garantizar renderizado a pantalla completa sin clipping.
  */
 
 import * as THREE from 'three/webgpu';
 import {
   Fn,
-  vec2,
+  If,
   vec3,
   vec4,
   float,
@@ -30,8 +31,7 @@ import {
 import { HealParameters } from '../simulation/parameters';
 
 export class CompositePass {
-  public scene: THREE.Scene;
-  public camera: THREE.OrthographicCamera;
+  public compositeQuad: any;
   public material: any;
 
   // Uniforms de estado
@@ -41,43 +41,41 @@ export class CompositePass {
   public uTime = uniform(0.0);
   public uFilmGrain = uniform(0.04);
   public uVignette = uniform(0.35);
-  public uDomainRatio = uniform(1.6); // Relación entre dominio de simulación y viewport
   public uSwarmAlpha = uniform(0.0);
 
-  // Texturas de entrada
-  private tissueTexture: any;
-  private goldTexture: any;
-  private scarTexture: any;
-  private sdfTexture: any;
-  private swarmTexture: any;
+  // Nodos de textura dinámicos
+  public tissueTextureNode: any;
+  public goldTextureNode: any;
+  public scarTextureNode: any;
+  public sdfTextureNode: any;
+  public swarmTextureNode: any;
+  public overlayTextureNode: any;
   public overlayTexture: THREE.CanvasTexture;
 
   constructor(
-    tissueRT: THREE.RenderTarget,
-    goldRT: THREE.RenderTarget,
-    scarRT: THREE.RenderTarget,
-    sdfTex: THREE.DataTexture,
+    initialTissueTex: THREE.Texture,
+    initialGoldTex: THREE.Texture,
+    initialScarTex: THREE.Texture,
+    sdfTex: THREE.Texture,
     overlayCanvas: HTMLCanvasElement,
     swarmRT: THREE.RenderTarget
   ) {
-    this.scene = new THREE.Scene();
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
-    this.tissueTexture = tissueRT.texture;
-    this.goldTexture = goldRT.texture;
-    this.scarTexture = scarRT.texture;
-    this.sdfTexture = sdfTex;
-    this.swarmTexture = swarmRT.texture;
-
     this.overlayTexture = new THREE.CanvasTexture(overlayCanvas);
     this.overlayTexture.minFilter = THREE.LinearFilter;
     this.overlayTexture.magFilter = THREE.LinearFilter;
 
+    this.tissueTextureNode = texture(initialTissueTex);
+    this.goldTextureNode = texture(initialGoldTex);
+    this.scarTextureNode = texture(initialScarTex);
+    this.sdfTextureNode = texture(sdfTex);
+    this.swarmTextureNode = texture(swarmRT.texture);
+    this.overlayTextureNode = texture(this.overlayTexture);
+
     this.setupMaterial();
+    this.compositeQuad = new THREE.QuadMesh(this.material);
   }
 
   private setupMaterial() {
-    const quadGeom = new THREE.PlaneGeometry(2, 2);
     this.material = new THREE.MeshBasicNodeMaterial({
       depthWrite: false,
       depthTest: false
@@ -117,11 +115,11 @@ export class CompositePass {
       const inBounds = domainUV.x.greaterThanEqual(0.0).and(domainUV.x.lessThanEqual(1.0))
         .and(domainUV.y.greaterThanEqual(0.0)).and(domainUV.y.lessThanEqual(1.0));
 
-      const tissueTrail = texture(this.tissueTexture, domainUV).r;
-      const goldTrail = texture(this.goldTexture, domainUV).r;
-      const permanentScar = texture(this.scarTexture, domainUV).r;
-      const sdf = texture(this.sdfTexture, domainUV).r;
-      const overlay = texture(this.overlayTexture, screenUV);
+      const tissueTrail = this.tissueTextureNode.sample(domainUV).r;
+      const goldTrail = this.goldTextureNode.sample(domainUV).r;
+      const permanentScar = this.scarTextureNode.sample(domainUV).r;
+      const sdf = this.sdfTextureNode.sample(domainUV).r;
+      const overlay = this.overlayTextureNode.sample(screenUV);
 
       // Color base del fondo
       let col = colBackground.toVar();
@@ -134,13 +132,13 @@ export class CompositePass {
 
       // Borde de la herida (SDF de 0 a 6 px): resplandor #5a0f17 con intensidad (1 - healingProgress)
       const borderGlowFactor = smoothstep(float(6.0), float(0.0), sdf).mul(float(1.0).sub(uHP));
-      col.addAssign(colWoundGlow.mul(borderGlowFactor.mul(1.2)));
+      col.addAssign(colWoundGlow.mul(borderGlowFactor.mul(1.5)));
 
       // Tejido: interpolar entre frío y cálido según healingProgress
       const tissueMid = mix(colColdMid, colWarmMid, uHP);
       const tissueLight = mix(colColdLight, colWarmLight, uHP);
       const tissueShade = mix(tissueMid, tissueLight, tissueTrail.mul(0.6).clamp(0.0, 1.0));
-      const tissueFinal = tissueShade.mul(tissueTrail.mul(1.8));
+      const tissueFinal = tissueShade.mul(tissueTrail.mul(2.2));
 
       // Mezclar tejido sobre el fondo (sólo fuera de la herida o en cicatrices sanadas)
       const scarTotal = goldTrail.add(permanentScar);
@@ -153,11 +151,11 @@ export class CompositePass {
       const totalGold = goldTrail.add(permanentScar);
       const gold1 = mix(colGoldBase, colGoldMid, smoothstep(float(0.05), float(0.55), totalGold));
       const gold2 = mix(gold1, colGoldPeak, smoothstep(float(0.55), float(1.0), totalGold));
-      const goldFinal = gold2.mul(totalGold.mul(1.6).clamp(0.0, 2.0));
+      const goldFinal = gold2.mul(totalGold.mul(2.0).clamp(0.0, 2.5));
       col.addAssign(goldFinal);
 
       // Superponer enjambre de partículas visibles si está activo (tecla V)
-      const swarmCol = texture(this.swarmTexture, domainUV).rgb;
+      const swarmCol = this.swarmTextureNode.sample(domainUV).rgb;
       col.addAssign(swarmCol.mul(this.uSwarmAlpha));
 
       // Superponer células sanadoras y fragmentos de fractura (overlay canvas)
@@ -184,12 +182,15 @@ export class CompositePass {
 
       return vec4(finalColor, 1.0);
     })();
-
-    const quadMesh = new THREE.Mesh(quadGeom, this.material);
-    this.scene.add(quadMesh);
   }
 
-  public update(params: HealParameters, timeSeconds: number) {
+  public update(
+    params: HealParameters,
+    timeSeconds: number,
+    latestTissueTex: THREE.Texture,
+    latestGoldTex: THREE.Texture,
+    latestScarTex: THREE.Texture
+  ) {
     this.uHealingProgress.value = params.healingProgress;
     this.uHeartbeatFlash.value = params.heartbeatFlash;
     this.uZoom.value = params.zoom;
@@ -197,11 +198,17 @@ export class CompositePass {
     this.uFilmGrain.value = params.filmGrain;
     this.uVignette.value = params.vignette;
     this.uSwarmAlpha.value = params.showParticles ? params.particleBrightness : 0.0;
+
+    // Actualizar referencias a las texturas ping-pong más recientes
+    if (latestTissueTex) this.tissueTextureNode.value = latestTissueTex;
+    if (latestGoldTex) this.goldTextureNode.value = latestGoldTex;
+    if (latestScarTex) this.scarTextureNode.value = latestScarTex;
+
     this.overlayTexture.needsUpdate = true;
   }
 
   public render(renderer: any) {
     renderer.setRenderTarget(null);
-    renderer.render(this.scene, this.camera);
+    this.compositeQuad.render(renderer);
   }
 }

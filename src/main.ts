@@ -60,8 +60,8 @@ async function main() {
   // 4. SISTEMAS DE FÍSICA Y DINÁMICA
   const fractureSystem = new FractureSystem();
   const stressSystem = new StressSystem((origin, _end) => {
-    // Callback al dispararse una microfractura por estrés > 1
-    tissuePhysarum.updateSDFTexture(woundSystem);
+    // Al dispararse una microfractura por estrés > 1, la herida se reabre
+    params.healingProgress = Math.max(0.0, params.healingProgress - 0.08);
   });
   const heartbeatSystem = new HeartbeatSystem();
 
@@ -107,10 +107,10 @@ async function main() {
 
   // 9. PASO DE COMPOSICIÓN FINAL
   const compositePass = new CompositePass(
-    tissuePhysarum.trailRT_A,
-    goldPhysarum.goldTrailRT_A,
-    goldPhysarum.scarRT,
-    (tissuePhysarum as any).woundSDFTexture,
+    tissuePhysarum.latestTrail.texture,
+    goldPhysarum.latestGold.texture,
+    goldPhysarum.latestScar.texture,
+    woundSystem.woundSDFTexture,
     overlayCanvas,
     swarmRT
   );
@@ -120,7 +120,6 @@ async function main() {
     woundSystem.generateProceduralWound();
     woundSystem.generateAncientScars();
     woundSystem.recomputeSDF();
-    tissuePhysarum.updateSDFTexture(woundSystem);
     tissuePhysarum.reset(woundSystem);
     goldPhysarum.reset(woundSystem);
     healingCellSystem.clear();
@@ -148,7 +147,6 @@ async function main() {
     () => {
       const { origin } = woundSystem.addMicrofracture();
       fractureSystem.spawnFragments(origin.x, origin.y, 30);
-      tissuePhysarum.updateSDFTexture(woundSystem);
     }
   );
 
@@ -295,9 +293,12 @@ async function main() {
 
     // E. Estimación periódica de healingProgress cada 10 frames
     if (frameCounter % 10 === 0) {
-      // El progreso de curación aumenta a medida que los agentes dorados consolidan la herida
-      const targetHealedRatio = Math.min(1.0, goldPhysarum.activeCount / 120.0);
-      params.healingProgress = Math.max(params.healingProgress, targetHealedRatio);
+      if (goldPhysarum.activeCount > 0) {
+        // Cada célula sanadora y agente dorado contribuye a sellar la herida con kintsugi
+        // Tocando con calma durante unos 2 a 3 minutos (~150 s) se completa la cicatrización
+        const progressIncrement = (goldPhysarum.activeCount * dt) / 14000.0;
+        params.healingProgress = Math.min(1.0, params.healingProgress + progressIncrement);
+      }
     }
 
     // F. Renderizar células sanadoras y fragmentos de fractura en el overlay canvas
@@ -390,7 +391,13 @@ async function main() {
     startScreen.updateHud(params.healingProgress, params.stress, params.showParticles);
 
     // H. Renderizado de la composición final
-    compositePass.update(params, now * 0.001);
+    compositePass.update(
+      params,
+      now * 0.001,
+      tissuePhysarum.latestTrail.texture,
+      goldPhysarum.latestGold.texture,
+      goldPhysarum.latestScar.texture
+    );
     compositePass.render(renderer);
   });
 }

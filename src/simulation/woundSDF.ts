@@ -12,6 +12,8 @@
  * - 6 a 10 cicatrices antiguas en la región exterior (1.6x) al 25% de brillo.
  */
 
+import * as THREE from 'three/webgpu';
+
 export interface Point2D {
   x: number;
   y: number;
@@ -101,6 +103,10 @@ export class WoundSystem {
 
   // Buffer de datos Float32 para el SDF: negativo dentro, positivo fuera
   public sdfData: Float32Array;
+  // Buffer HalfFloat (Uint16Array) para textura WebGPU compatible r16float
+  public sdfHalfData: Uint16Array;
+  // Textura DataTexture WebGPU r16float
+  public woundSDFTexture: any;
   // Gradiente precalculado para el campo de dolor (gradX, gradY)
   public gradData: Float32Array;
 
@@ -115,6 +121,7 @@ export class WoundSystem {
     this.simHeight = simH;
 
     this.sdfData = new Float32Array(simW * simH);
+    this.sdfHalfData = new Uint16Array(simW * simH);
     this.gradData = new Float32Array(simW * simH * 2);
     this.woundMask = new Uint8Array(simW * simH);
 
@@ -130,6 +137,7 @@ export class WoundSystem {
     this.simHeight = simH;
 
     this.sdfData = new Float32Array(simW * simH);
+    this.sdfHalfData = new Uint16Array(simW * simH);
     this.gradData = new Float32Array(simW * simH * 2);
     this.woundMask = new Uint8Array(simW * simH);
 
@@ -373,6 +381,31 @@ export class WoundSystem {
     }
 
     this.totalWoundPixels = woundCount;
+
+    // Convertir sdfData (Float32) a sdfHalfData (Uint16 HalfFloat) para compatibilidad WebGPU r16float
+    const totalPixels = sw * sh;
+    if (!this.sdfHalfData || this.sdfHalfData.length !== totalPixels) {
+      this.sdfHalfData = new Uint16Array(totalPixels);
+    }
+    for (let k = 0; k < totalPixels; k++) {
+      this.sdfHalfData[k] = THREE.DataUtils.toHalfFloat(this.sdfData[k]);
+    }
+
+    if (this.woundSDFTexture) {
+      this.woundSDFTexture.image.data = this.sdfHalfData;
+      this.woundSDFTexture.needsUpdate = true;
+    } else {
+      this.woundSDFTexture = new THREE.DataTexture(
+        this.sdfHalfData,
+        sw,
+        sh,
+        THREE.RedFormat,
+        THREE.HalfFloatType
+      );
+      this.woundSDFTexture.minFilter = THREE.LinearFilter;
+      this.woundSDFTexture.magFilter = THREE.LinearFilter;
+      this.woundSDFTexture.needsUpdate = true;
+    }
 
     // Calcular gradiente ∇SDF: apunta hacia afuera de la herida (campo de dolor)
     for (let j = 0; j < sh; j++) {

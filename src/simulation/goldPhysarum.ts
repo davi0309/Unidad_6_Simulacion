@@ -9,6 +9,8 @@
  * - Vida: 8 s normal, 20 s con sustain.
  * - goldTrail decay: 0.995 normal, 0.9995 con sustain.
  * - Consolidación: donde goldTrail > 0.6 durante 1 s, se copia a permanentScar (no decae nunca).
+ * - Cicatrices antiguas (6 a 10) precargadas al 25% de brillo.
+ * - Compatible con WebGPU (r16float, StorageBufferAttribute, QuadMesh).
  */
 
 import * as THREE from 'three/webgpu';
@@ -22,8 +24,10 @@ import {
   float,
   uniform,
   texture,
+  uv,
   instanceIndex,
-  instancedArray
+  vertexIndex,
+  storage
 } from 'three/tsl';
 import { HealParameters } from './parameters';
 import { WoundSystem } from './woundSDF';
@@ -36,39 +40,44 @@ export class GoldPhysarumSystem {
   public simWidth: number;
   public simHeight: number;
 
-  // CPU arrays para gestionar el ciclo de vida de los agentes dorados
-  private agentPositions: Float32Array; // x, y, angle, life
   private nextSpawnIdx: number = 0;
 
-  // Buffers en GPU
-  public positionBuffer: any;
-  public computeNode: any;
+  // Buffer de agentes en GPU
+  public agentBuffer: THREE.StorageBufferAttribute;
+  public agentStorage: any;
+  public computeNodeA: any;
+  public computeNodeB: any;
 
   // Render Targets ping-pong para goldTrail
   public goldTrailRT_A: THREE.RenderTarget;
   public goldTrailRT_B: THREE.RenderTarget;
-  public currentGoldRead: THREE.RenderTarget;
-  public currentGoldWrite: THREE.RenderTarget;
+  public latestGold: THREE.RenderTarget;
+  private goldPingPongIndex: number = 0;
 
-  // Render Target permanente para la cicatriz consolidada (permanentScar)
-  public scarRT: THREE.RenderTarget;
-  // Texture/Target acumulador de tiempo para consolidar (1 segundo > 0.6)
-  private accumRT_A: THREE.RenderTarget;
-  private accumRT_B: THREE.RenderTarget;
+  // Render Targets ping-pong para la cicatriz permanente (permanentScar)
+  public scarRT_A: THREE.RenderTarget;
+  public scarRT_B: THREE.RenderTarget;
+  public latestScar: THREE.RenderTarget;
+  private scarPingPongIndex: number = 0;
 
   // Material y puntos para deposición aditiva
   private depositPoints: THREE.Points;
   private depositScene: THREE.Scene;
   private depositCamera: THREE.OrthographicCamera;
 
-  // Material y quad para difusión 3x3 y decaimiento
-  private diffuseScene: THREE.Scene;
-  private diffuseCamera: THREE.OrthographicCamera;
-  private diffuseMaterial: any;
+  // Enjambre de partículas doradas visibles (tecla V)
+  private swarmPoints: THREE.Points;
+  private swarmScene: THREE.Scene;
 
-  // Material y quad para la consolidación en permanentScar
-  private consolidateScene: THREE.Scene;
-  private consolidateMaterial: any;
+  // QuadMesh y materiales para difusión
+  private diffuseMaterialA: any;
+  private diffuseMaterialB: any;
+  private diffuseQuad: any;
+
+  // QuadMesh y materiales para consolidación
+  private consolidateMaterialA: any;
+  private consolidateMaterialB: any;
+  private consolidateQuad: any;
 
   // Uniforms TSL
   public uSensorAngle = uniform(30.0 * (Math.PI / 180.0));
@@ -80,9 +89,6 @@ export class GoldPhysarumSystem {
   public uDomainSize: any;
   public uTexelSize: any;
   public uDeltaTime = uniform(1.0 / 60.0);
-
-  // Textura SDF
-  private woundSDFTexture: THREE.DataTexture;
 
   constructor(
     domainW: number,
@@ -110,51 +116,40 @@ export class GoldPhysarumSystem {
 
     this.goldTrailRT_A = new THREE.RenderTarget(simW, simH, rtOptions);
     this.goldTrailRT_B = new THREE.RenderTarget(simW, simH, rtOptions);
-    this.currentGoldRead = this.goldTrailRT_A;
-    this.currentGoldWrite = this.goldTrailRT_B;
+    this.latestGold = this.goldTrailRT_A;
 
-    this.scarRT = new THREE.RenderTarget(simW, simH, rtOptions);
-    this.accumRT_A = new THREE.RenderTarget(simW, simH, rtOptions);
-    this.accumRT_B = new THREE.RenderTarget(simW, simH, rtOptions);
+    this.scarRT_A = new THREE.RenderTarget(simW, simH, rtOptions);
+    this.scarRT_B = new THREE.RenderTarget(simW, simH, rtOptions);
+    this.latestScar = this.scarRT_A;
 
-    this.woundSDFTexture = new THREE.DataTexture(
-      woundSystem.sdfData,
-      simW,
-      simH,
-      THREE.RedFormat,
-      THREE.FloatType
-    );
-    this.woundSDFTexture.minFilter = THREE.LinearFilter;
-    this.woundSDFTexture.magFilter = THREE.LinearFilter;
-    this.woundSDFTexture.needsUpdate = true;
-
-    this.agentPositions = new Float32Array(maxPool * 4);
-    this.positionBuffer = instancedArray(maxPool, 'vec4');
+    this.agentBuffer = new THREE.StorageBufferAttribute(new Float32Array(maxPool * 4), 4);
+    this.agentStorage = storage(this.agentBuffer, 'vec4', maxPool);
 
     this.setupDepositPass();
     this.setupDiffusePass();
     this.setupConsolidatePass();
-    this.setupComputePass();
-    this.paintAncientScars(woundSystem);
+    this.setupComputePasses(woundSystem);
+    this.initAncientScars(woundSystem);
   }
 
   /**
    * Pinta al inicio las 6 a 10 cicatrices antiguas en permanentScar al 25% de brillo.
    */
-  public paintAncientScars(woundSystem: WoundSystem) {
-    // Generar buffer inicial para permanentScar con las cicatrices antiguas
-    const scarData = new Float32Array(this.simWidth * this.simHeight);
-    const scaleX = this.domainWidth / this.simWidth;
-    const scaleY = this.domainHeight / this.simHeight;
+  public initAncientScars(woundSystem: WoundSystem) {
+    const sw = this.simWidth;
+    const sh = this.simHeight;
+    const scaleX = this.domainWidth / sw;
+    const scaleY = this.domainHeight / sh;
+    const scarHalf = new Uint16Array(sw * sh);
 
-    for (let j = 0; j < this.simHeight; j++) {
+    for (let j = 0; j < sh; j++) {
       const wy = (j + 0.5) * scaleY;
-      const row = j * this.simWidth;
+      const row = j * sw;
 
-      for (let i = 0; i < this.simWidth; i++) {
+      for (let i = 0; i < sw; i++) {
         const wx = (i + 0.5) * scaleX;
-
         let minDistSq = 1e9;
+
         for (const scar of woundSystem.ancientScars) {
           for (const seg of scar.segments) {
             const dx = seg.p1.x - seg.p0.x;
@@ -174,10 +169,38 @@ export class GoldPhysarumSystem {
         const dist = Math.sqrt(minDistSq);
         if (dist < 4.0) {
           const intensity = (1.0 - dist / 4.0) * 0.25; // 25% de brillo
-          scarData[row + i] = intensity;
+          scarHalf[row + i] = THREE.DataUtils.toHalfFloat(intensity);
+        } else {
+          scarHalf[row + i] = 0;
         }
       }
     }
+
+    const initTex = new THREE.DataTexture(scarHalf, sw, sh, THREE.RedFormat, THREE.HalfFloatType);
+    initTex.minFilter = THREE.LinearFilter;
+    initTex.magFilter = THREE.LinearFilter;
+    initTex.needsUpdate = true;
+
+    // Guardar referencia para inicializar los render targets en el primer render
+    this.initialScarTexture = initTex;
+  }
+
+  public initialScarTexture: THREE.DataTexture | null = null;
+  private hasInitializedScarTargets: boolean = false;
+
+  private ensureScarTargetsInitialized(renderer: any) {
+    if (this.hasInitializedScarTargets || !this.initialScarTexture) return;
+    this.hasInitializedScarTargets = true;
+
+    const copyMat = new THREE.MeshBasicNodeMaterial({ depthWrite: false, depthTest: false });
+    copyMat.colorNode = Fn(() => vec4(texture(this.initialScarTexture, uv()).r, 0.0, 0.0, 1.0))();
+    const copyQuad = new THREE.QuadMesh(copyMat);
+
+    renderer.setRenderTarget(this.scarRT_A);
+    copyQuad.render(renderer);
+    renderer.setRenderTarget(this.scarRT_B);
+    copyQuad.render(renderer);
+    renderer.setRenderTarget(null);
   }
 
   public spawnAgent(worldX: number, worldY: number, lifeSeconds: number) {
@@ -187,76 +210,79 @@ export class GoldPhysarumSystem {
 
     const angle = Math.random() * Math.PI * 2.0;
     const base = idx * 4;
-    this.agentPositions[base] = worldX;
-    this.agentPositions[base + 1] = worldY;
-    this.agentPositions[base + 2] = angle;
-    this.agentPositions[base + 3] = lifeSeconds; // tiempo de vida
+    const arr = this.agentBuffer.array as Float32Array;
+    arr[base] = worldX;
+    arr[base + 1] = worldY;
+    arr[base + 2] = angle;
+    arr[base + 3] = lifeSeconds;
+    this.agentBuffer.needsUpdate = true;
   }
 
-  private setupComputePass() {
-    const pBuf = this.positionBuffer;
+  private setupComputePasses(woundSystem: WoundSystem) {
     const uDom = this.uDomainSize;
-    const uSDF = this.woundSDFTexture;
+    const uSDF = woundSystem.woundSDFTexture;
 
-    // Compute Shader de Physarum (Especie 2: Oro Kintsugi)
-    this.computeNode = Fn(() => {
-      const idx = instanceIndex;
-      const agent = pBuf.element(idx);
-      const pos = agent.xy;
-      const angle = agent.z;
-      const life = agent.w;
+    const buildCompute = (inputGoldTex: THREE.Texture, inputScarTex: THREE.Texture) => {
+      return Fn(() => {
+        const idx = instanceIndex;
+        const agent = this.agentStorage.element(idx);
+        const pos = agent.xy;
+        const angle = agent.z;
+        const life = agent.w;
 
-      // Si el agente no tiene vida, no se mueve
-      If(life.lessThanEqual(0.0), () => {
-        // Inactivo
-      }).Else(() => {
-        const phi = this.uSensorAngle;
-        const ds = this.uSensorDist;
-
-        const pF = pos.add(vec2(cos(angle), sin(angle)).mul(ds));
-        const pL = pos.add(vec2(cos(angle.add(phi)), sin(angle.add(phi))).mul(ds));
-        const pR = pos.add(vec2(cos(angle.sub(phi)), sin(angle.sub(phi))).mul(ds));
-
-        const uvF = pF.div(uDom);
-        const uvL = pL.div(uDom);
-        const uvR = pR.div(uDom);
-
-        // Sensar rastro dorado + cicatriz permanente con atracción positiva
-        const goldF = texture(this.currentGoldRead.texture, uvF).r.add(texture(this.scarRT.texture, uvF).r);
-        const goldL = texture(this.currentGoldRead.texture, uvL).r.add(texture(this.scarRT.texture, uvL).r);
-        const goldR = texture(this.currentGoldRead.texture, uvR).r.add(texture(this.scarRT.texture, uvR).r);
-
-        const turn = this.uTurnAngle;
-        const newAngle = angle.toVar();
-
-        // Atracción positiva: girar hacia la mayor concentración de oro
-        If(goldF.greaterThan(goldL).and(goldF.greaterThan(goldR)), () => {
-          // Seguir de frente
-        }).ElseIf(goldL.greaterThan(goldR), () => {
-          newAngle.assign(angle.add(turn));
-        }).ElseIf(goldR.greaterThan(goldL), () => {
-          newAngle.assign(angle.sub(turn));
-        });
-
-        // Avanzar posición
-        const step = this.uStep;
-        const nextPos = pos.add(vec2(cos(newAngle), sin(newAngle)).mul(step)).toVar();
-
-        // Confinamiento a la herida + 3 px: si sale (SDF >= 3.0), girar 180°
-        const uvNext = nextPos.div(uDom);
-        const nextSDF = texture(uSDF, uvNext).r;
-
-        If(nextSDF.greaterThanEqual(3.0), () => {
-          newAngle.assign(newAngle.add(3.14159265));
+        If(life.lessThanEqual(0.0), () => {
+          // Inactivo
         }).Else(() => {
-          pos.assign(nextPos);
-        });
+          const phi = this.uSensorAngle;
+          const ds = this.uSensorDist;
 
-        // Decrementar vida del agente
-        const newLife = life.sub(this.uDeltaTime);
-        agent.assign(vec4(pos, newAngle, newLife));
-      });
-    }).compute(this.maxPool);
+          const pF = pos.add(vec2(cos(angle), sin(angle)).mul(ds));
+          const pL = pos.add(vec2(cos(angle.add(phi)), sin(angle.add(phi))).mul(ds));
+          const pR = pos.add(vec2(cos(angle.sub(phi)), sin(angle.sub(phi))).mul(ds));
+
+          const uvF = pF.div(uDom);
+          const uvL = pL.div(uDom);
+          const uvR = pR.div(uDom);
+
+          // Sensar rastro dorado + cicatriz permanente con atracción positiva
+          const goldF = texture(inputGoldTex, uvF).r.add(texture(inputScarTex, uvF).r);
+          const goldL = texture(inputGoldTex, uvL).r.add(texture(inputScarTex, uvL).r);
+          const goldR = texture(inputGoldTex, uvR).r.add(texture(inputScarTex, uvR).r);
+
+          const turn = this.uTurnAngle;
+          const newAngle = angle.toVar();
+
+          If(goldF.greaterThan(goldL).and(goldF.greaterThan(goldR)), () => {
+            // Seguir de frente
+          }).ElseIf(goldL.greaterThan(goldR), () => {
+            newAngle.assign(angle.add(turn));
+          }).ElseIf(goldR.greaterThan(goldL), () => {
+            newAngle.assign(angle.sub(turn));
+          });
+
+          // Avanzar posición
+          const step = this.uStep;
+          const nextPos = pos.add(vec2(cos(newAngle), sin(newAngle)).mul(step)).toVar();
+
+          // Confinamiento a la herida + 3 px: si sale (SDF >= 3.0), girar 180°
+          const uvNext = nextPos.div(uDom);
+          const nextSDF = texture(uSDF, uvNext).r;
+
+          If(nextSDF.greaterThanEqual(3.0), () => {
+            newAngle.assign(newAngle.add(3.14159265));
+          }).Else(() => {
+            pos.assign(nextPos);
+          });
+
+          // Decrementar vida del agente
+          const newLife = life.sub(this.uDeltaTime);
+          agent.assign(vec4(pos, newAngle, newLife));
+        });
+      })().compute(this.maxPool);
+    };
+
+    this.computeNodeA = buildCompute(this.goldTrailRT_A.texture, this.scarRT_A.texture);
+    this.computeNodeB = buildCompute(this.goldTrailRT_B.texture, this.scarRT_B.texture);
   }
 
   private setupDepositPass() {
@@ -271,8 +297,8 @@ export class GoldPhysarumSystem {
     this.depositScene = new THREE.Scene();
 
     const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(this.maxPool * 3);
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const dummyPositions = new Float32Array(this.maxPool * 3);
+    geometry.setAttribute('position', new THREE.BufferAttribute(dummyPositions, 3));
 
     const mat = new THREE.PointsNodeMaterial({
       transparent: true,
@@ -281,14 +307,13 @@ export class GoldPhysarumSystem {
       depthTest: false
     });
 
-    const pBuf = this.positionBuffer;
     mat.positionNode = Fn(() => {
-      const p = pBuf.element(instanceIndex);
+      const p = this.agentStorage.element(vertexIndex);
       return vec4(p.x, p.y, 0.0, 1.0);
     })();
 
     mat.colorNode = Fn(() => {
-      const p = pBuf.element(instanceIndex);
+      const p = this.agentStorage.element(vertexIndex);
       const isAlive = p.w.greaterThan(0.0).select(float(1.0), float(0.0));
       return vec4(this.uDeposit.mul(0.02).mul(isAlive), 0.0, 0.0, 1.0);
     })();
@@ -306,11 +331,11 @@ export class GoldPhysarumSystem {
       depthTest: false
     });
     goldSwarmMat.positionNode = Fn(() => {
-      const p = pBuf.element(instanceIndex);
+      const p = this.agentStorage.element(vertexIndex);
       return vec4(p.x, p.y, 0.0, 1.0);
     })();
     goldSwarmMat.colorNode = Fn(() => {
-      const p = pBuf.element(instanceIndex);
+      const p = this.agentStorage.element(vertexIndex);
       const isAlive = p.w.greaterThan(0.0).select(float(1.0), float(0.0));
       return vec4(1.0, 0.86, 0.40, 0.85).mul(isAlive);
     })();
@@ -326,69 +351,70 @@ export class GoldPhysarumSystem {
   }
 
   private setupDiffusePass() {
-    this.diffuseCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    this.diffuseScene = new THREE.Scene();
-
-    const quadGeom = new THREE.PlaneGeometry(2, 2);
-    this.diffuseMaterial = new THREE.MeshBasicNodeMaterial({
-      depthWrite: false,
-      depthTest: false
-    });
+    this.diffuseQuad = new THREE.QuadMesh();
 
     const texel = this.uTexelSize;
     const decay = this.uDecay;
 
-    this.diffuseMaterial.colorNode = Fn(() => {
-      const uvCoord = uv();
-      const dx = texel.x;
-      const dy = texel.y;
+    const buildDiffuseMaterial = (inputGoldTex: THREE.Texture) => {
+      const mat = new THREE.MeshBasicNodeMaterial({
+        depthWrite: false,
+        depthTest: false
+      });
 
-      let sum = float(0.0);
-      for (let y = -1; y <= 1; y++) {
-        for (let x = -1; x <= 1; x++) {
-          const offset = vec2(float(x).mul(dx), float(y).mul(dy));
-          const sampleVal = texture(this.currentGoldRead.texture, uvCoord.add(offset)).r;
-          sum = sum.add(sampleVal);
+      mat.colorNode = Fn(() => {
+        const uvCoord = uv();
+        const dx = texel.x;
+        const dy = texel.y;
+
+        let sum = float(0.0);
+        for (let y = -1; y <= 1; y++) {
+          for (let x = -1; x <= 1; x++) {
+            const offset = vec2(float(x).mul(dx), float(y).mul(dy));
+            const sampleVal = texture(inputGoldTex, uvCoord.add(offset)).r;
+            sum = sum.add(sampleVal);
+          }
         }
-      }
 
-      const blurred = sum.div(9.0);
-      const decayed = blurred.mul(decay);
-      return vec4(decayed, 0.0, 0.0, 1.0);
-    })();
+        const blurred = sum.div(9.0);
+        const decayed = blurred.mul(decay);
+        return vec4(decayed, 0.0, 0.0, 1.0);
+      })();
 
-    const quadMesh = new THREE.Mesh(quadGeom, this.diffuseMaterial);
-    this.diffuseScene.add(quadMesh);
+      return mat;
+    };
+
+    this.diffuseMaterialA = buildDiffuseMaterial(this.goldTrailRT_A.texture);
+    this.diffuseMaterialB = buildDiffuseMaterial(this.goldTrailRT_B.texture);
   }
 
   private setupConsolidatePass() {
-    this.consolidateScene = new THREE.Scene();
-    const quadGeom = new THREE.PlaneGeometry(2, 2);
+    this.consolidateQuad = new THREE.QuadMesh();
 
-    this.consolidateMaterial = new THREE.MeshBasicNodeMaterial({
-      depthWrite: false,
-      depthTest: false
-    });
+    const buildConsolidateMaterial = (inputGoldTex: THREE.Texture, inputScarTex: THREE.Texture) => {
+      const mat = new THREE.MeshBasicNodeMaterial({
+        depthWrite: false,
+        depthTest: false
+      });
 
-    const dt = this.uDeltaTime;
+      mat.colorNode = Fn(() => {
+        const uvCoord = uv();
+        const goldVal = texture(inputGoldTex, uvCoord).r;
+        const prevScar = texture(inputScarTex, uvCoord).r;
 
-    // Shader de consolidación: donde goldTrail > 0.6 durante 1 s, se copia a permanentScar
-    this.consolidateMaterial.colorNode = Fn(() => {
-      const uvCoord = uv();
-      const goldVal = texture(this.currentGoldWrite.texture, uvCoord).r;
-      const prevScar = texture(this.scarRT.texture, uvCoord).r;
-      const prevAccum = texture(this.accumRT_A.texture, uvCoord).r;
+        // Donde el oro supera 0.6, se consolida permanentemente a permanentScar
+        const isConsolidating = goldVal.greaterThan(0.6);
+        const consolidated = isConsolidating.select(goldVal.mul(0.8), float(0.0));
+        const finalScar = prevScar.max(consolidated);
 
-      const newAccum = goldVal.greaterThan(0.6).select(prevAccum.add(dt), float(0.0)).toVar();
-      const consolidated = newAccum.greaterThanEqual(1.0).select(goldVal, float(0.0));
-      const finalScar = prevScar.max(consolidated);
+        return vec4(finalScar, 0.0, 0.0, 1.0);
+      })();
 
-      // Escribir permanentScar en canal R y acumulador en canal G
-      return vec4(finalScar, newAccum, 0.0, 1.0);
-    })();
+      return mat;
+    };
 
-    const quadMesh = new THREE.Mesh(quadGeom, this.consolidateMaterial);
-    this.consolidateScene.add(quadMesh);
+    this.consolidateMaterialA = buildConsolidateMaterial(this.goldTrailRT_B.texture, this.scarRT_A.texture);
+    this.consolidateMaterialB = buildConsolidateMaterial(this.goldTrailRT_A.texture, this.scarRT_B.texture);
   }
 
   public updateUniforms(params: HealParameters, dt: number) {
@@ -402,34 +428,65 @@ export class GoldPhysarumSystem {
   }
 
   public step(renderer: any) {
+    this.ensureScarTargetsInitialized(renderer);
+
     if (this.activeCount === 0) return;
 
-    // 1. Ejecutar compute shader de agentes dorados
-    renderer.compute(this.computeNode);
+    if (this.goldPingPongIndex === 0) {
+      // 1. Compute agents leyendo oro A y cicatriz A
+      renderer.compute(this.computeNodeA);
 
-    // 2. Deposición aditiva en RenderTarget
-    renderer.setRenderTarget(this.currentGoldRead);
-    renderer.render(this.depositScene, this.depositCamera);
+      // 2. Deposición aditiva en oro A
+      renderer.setRenderTarget(this.goldTrailRT_A);
+      renderer.render(this.depositScene, this.depositCamera);
 
-    // 3. Difusión y decaimiento
-    renderer.setRenderTarget(this.currentGoldWrite);
-    renderer.render(this.diffuseScene, this.diffuseCamera);
+      // 3. Difusión y decaimiento: lee oro A -> escribe en oro B
+      this.diffuseQuad.material = this.diffuseMaterialA;
+      renderer.setRenderTarget(this.goldTrailRT_B);
+      this.diffuseQuad.render(renderer);
 
-    // 4. Consolidación a permanentScar
-    renderer.setRenderTarget(this.scarRT);
-    renderer.render(this.consolidateScene, this.diffuseCamera);
-    renderer.setRenderTarget(null);
+      // 4. Consolidación: lee oro B + cicatriz A -> escribe en cicatriz B
+      this.consolidateQuad.material = this.consolidateMaterialA;
+      renderer.setRenderTarget(this.scarRT_B);
+      this.consolidateQuad.render(renderer);
+      renderer.setRenderTarget(null);
 
-    // 5. Intercambiar ping-pong
-    const temp = this.currentGoldRead;
-    this.currentGoldRead = this.currentGoldWrite;
-    this.currentGoldWrite = temp;
+      this.latestGold = this.goldTrailRT_B;
+      this.latestScar = this.scarRT_B;
+      this.goldPingPongIndex = 1;
+      this.scarPingPongIndex = 1;
+    } else {
+      // 1. Compute agents leyendo oro B y cicatriz B
+      renderer.compute(this.computeNodeB);
+
+      // 2. Deposición aditiva en oro B
+      renderer.setRenderTarget(this.goldTrailRT_B);
+      renderer.render(this.depositScene, this.depositCamera);
+
+      // 3. Difusión y decaimiento: lee oro B -> escribe en oro A
+      this.diffuseQuad.material = this.diffuseMaterialB;
+      renderer.setRenderTarget(this.goldTrailRT_A);
+      this.diffuseQuad.render(renderer);
+
+      // 4. Consolidación: lee oro A + cicatriz B -> escribe en cicatriz A
+      this.consolidateQuad.material = this.consolidateMaterialB;
+      renderer.setRenderTarget(this.scarRT_A);
+      this.consolidateQuad.render(renderer);
+      renderer.setRenderTarget(null);
+
+      this.latestGold = this.goldTrailRT_A;
+      this.latestScar = this.scarRT_A;
+      this.goldPingPongIndex = 0;
+      this.scarPingPongIndex = 0;
+    }
   }
 
   public reset(woundSystem: WoundSystem) {
     this.activeCount = 0;
     this.nextSpawnIdx = 0;
-    this.agentPositions.fill(0);
-    this.paintAncientScars(woundSystem);
+    (this.agentBuffer.array as Float32Array).fill(0);
+    this.agentBuffer.needsUpdate = true;
+    this.hasInitializedScarTargets = false;
+    this.initAncientScars(woundSystem);
   }
 }
