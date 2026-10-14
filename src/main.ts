@@ -106,6 +106,7 @@ async function main() {
     mouse.x = e.clientX;
     mouse.y = e.clientY;
     flowEngine.triggerKeyPulse(mouse.x, mouse.y, 'KeyG');
+    particleSystem.addHealingEnergy(mouse.x, mouse.y, params.isClimax ? 0.40 : 0.25);
     kintsugiLayer.addHealingEnergy(mouse.x, mouse.y, params.isClimax ? 0.20 : 0.12);
     params.heartbeatFlash = Math.max(params.heartbeatFlash, 0.04);
   });
@@ -153,8 +154,9 @@ async function main() {
       // 1. Modifica visiblemente el movimiento de las figuras blancas y azules
       flowEngine.triggerKeyPulse(mouse.x, mouse.y, e.code);
 
-      // 2. Vierte oro líquido directamente en las grietas visibles
-      const healAmount = params.isClimax ? 0.18 : 0.10;
+      // 2. Vierte oro líquido directamente en las grietas visibles y cúmulos de herida
+      const healAmount = params.isClimax ? 0.25 : 0.14;
+      particleSystem.addHealingEnergy(mouse.x, mouse.y, params.isClimax ? 0.38 : 0.22);
       kintsugiLayer.addHealingEnergy(mouse.x, mouse.y, healAmount);
 
       // 3. Resplandor reactivo musical
@@ -231,8 +233,8 @@ async function main() {
     // D. Actualizar y renderizar la herida visible y las grietas de oro puro Kintsugi (Imagen 1)
     kintsugiLayer.updateAndRender(dt, timeSec);
 
-    // E. Progreso de curación real (0.0 a 1.0) medido por las líneas de oro selladas
-    params.healingProgress = kintsugiLayer.getHealingProgress();
+    // E. Progreso de curación real (0.0 a 1.0) medido por las líneas de oro selladas y cúmulos curados
+    params.healingProgress = Math.max(kintsugiLayer.getHealingProgress(), particleSystem.getHealingProgress());
 
     // F. Actualizar HUD dinámico
     startScreen.updateHud(params.healingProgress, params.stress, params.showParticles);

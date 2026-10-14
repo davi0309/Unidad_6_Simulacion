@@ -1,19 +1,11 @@
 /**
  * flowField.ts
- * Motor de Campo de Flujo (Flow Field) 100% activo en toda la pantalla:
- * - Campo continuo sin zonas muertas: velocidad garantizada en el 100% del lienzo.
- * - Sin atascos en bordes ni congelamiento de partículas.
- * - 10 comportamientos completamente distintos para cada tecla de Q a P:
- *   Q: Onda expansiva de bajo profundo (Radial Shockwave)
- *   W: Vórtice ciclónico horario (Cyclone Spiral)
- *   E: Torrente horizontal cometa (Jet Stream)
- *   R: Onda serpentina transversal (Snake Undulation)
- *   T: Vórtice antihorario invertido (Counter-Cyclone)
- *   Y: Dispersión y turbulencia de chispas (Chaos Jitter)
- *   U: Atracción gravitacional magnética (Magnetic Attractor)
- *   I: Ascenso vertical géiser (Upward Lift)
- *   O: Doble hélice / Vórtices binarios (Twin Orbit)
- *   P: Vibración cristalina de alta frecuencia (Crystal Shimmer)
+ * Motor de Campo de Flujo (Flow Field) 100% Toroidal y Continuo (Estilo Imagen de Referencia):
+ * - BORDES SIN PAREDES (TORO CONTINUO): No existen paredes ni rebotes. Las partículas que cruzan
+ *   arriba salen abajo, las de la derecha salen por la izquierda con continuidad matemática perfecta.
+ * - CURL NOISE DIVERGENCIA-CERO: Las líneas de corriente forman ríos y filamentos orgánicos
+ *   sedosos que se trenzan por toda la pantalla.
+ * - 10 comportamientos dinámicos únicos para las teclas Q a P.
  */
 
 export interface Point2D {
@@ -83,74 +75,57 @@ export class FlowFieldEngine {
   }
 
   /**
-   * Muestreo del campo de velocidad base:
-   * Garantiza que CADA punto del lienzo (centro, bordes, esquinas) tenga un flujo activo
-   * de 1.8 a 3.0 px/frame. ¡Las partículas NUNCA se detienen!
+   * Potencial escalar toroidal perfectamente periódico en X (periodo W) y en Y (periodo H).
+   * Al cruzar x=0 <-> x=W o y=0 <-> y=H, el campo es matemáticamente idéntico y continuo.
+   * Los bordes NO actúan como paredes: son un toro continuo.
    */
-  public sampleVelocity(x: number, y: number, time: number): { vx: number; vy: number } {
+  public toroidalPotential(x: number, y: number, time: number): number {
     const W = this.width;
     const H = this.height;
 
-    // 1. Campo de ángulo continuo multiescala que abarca todo el lienzo
-    const scale1 = 0.0016;
-    const scale2 = 0.0036;
-    const scale3 = 0.0009;
-    const angle1 = this.noise2D(x * scale1 + time * 0.03, y * scale1 + time * 0.02) * Math.PI * 3.0;
-    const angle2 = this.noise2D(x * scale2 - time * 0.02, y * scale2 + 35.0) * Math.PI * 2.0;
-    const angle3 = Math.sin(x * scale3 + time * 0.05) * Math.cos(y * scale3) * Math.PI;
-    const finalAngle = angle1 + angle2 * 0.35 + angle3 * 0.25;
+    const u = (((x % W) + W) % W) / W;
+    const v = (((y % H) + H) % H) / H;
 
-    let vx = Math.cos(finalAngle) * 2.2;
-    let vy = Math.sin(finalAngle) * 2.2;
+    const th = u * Math.PI * 2;
+    const ph = v * Math.PI * 2;
 
-    // 2. Centros orbitales armónicos DINÁMICOS que se desplazan suavemente en el tiempo (Imagen 2)
-    // Se mueven sinusoidalmente evitando cualquier atractor fijo o zona de acumulación estática
-    const centers = [
-      {
-        cx: W * 0.28 + Math.sin(time * 0.18) * (W * 0.09),
-        cy: H * 0.32 + Math.cos(time * 0.16) * (H * 0.09),
-        R: H * 0.32,
-        dir: 1
-      },
-      {
-        cx: W * 0.72 + Math.cos(time * 0.20) * (W * 0.09),
-        cy: H * 0.28 + Math.sin(time * 0.18) * (H * 0.09),
-        R: H * 0.30,
-        dir: -1
-      },
-      {
-        cx: W * 0.50 + Math.sin(time * 0.14 + 1.2) * (W * 0.08),
-        cy: H * 0.55 + Math.cos(time * 0.14 + 1.2) * (H * 0.08),
-        R: H * 0.35,
-        dir: 1
-      },
-      {
-        cx: W * 0.24 + Math.cos(time * 0.17 + 2.3) * (W * 0.08),
-        cy: H * 0.76 + Math.sin(time * 0.17 + 2.3) * (H * 0.08),
-        R: H * 0.28,
-        dir: -1
-      },
-      {
-        cx: W * 0.76 + Math.sin(time * 0.22 + 3.1) * (W * 0.08),
-        cy: H * 0.72 + Math.cos(time * 0.22 + 3.1) * (H * 0.08),
-        R: H * 0.30,
-        dir: 1
-      }
-    ];
+    const cosTh = Math.cos(th);
+    const sinTh = Math.sin(th);
+    const cosPh = Math.cos(ph);
+    const sinPh = Math.sin(ph);
 
-    for (const c of centers) {
-      const dx = x - c.cx;
-      const dy = y - c.cy;
-      const dist = Math.hypot(dx, dy);
-      if (dist > 1.0) {
-        const factor = 1.0 / (1.0 + (dist / c.R) * (dist / c.R));
-        // VELOCIDAD ORBITAL PURA TANGENCIAL (CERO SUCCIÓN HACIA EL CENTRO)
-        vx += (-dy / dist) * factor * c.dir * 2.2;
-        vy += (dx / dist) * factor * c.dir * 2.2;
-      }
-    }
+    // Muestreo toroidal 4D con 2 octavas de ruido Perlin
+    const n1 = this.noise2D((cosTh + 1.2) * 1.6 + time * 0.03, (sinTh + 1.2) * 1.6 + (cosPh + 1.2) * 1.6);
+    const n2 = this.noise2D((cosPh + 1.5) * 2.4 - time * 0.025, (sinPh + 1.5) * 2.4 + (sinTh + 1.5) * 2.0);
 
-    // 3. Modificaciones dinámicas según los 10 tipos de impulsos de teclado
+    // Ondas sinusoidales periódicas que generan los ríos trenzados y filamentos de la imagen
+    const w1 = Math.sin(th * 2.0 + ph * 1.0 + time * 0.15) * 1.3;
+    const w2 = Math.cos(th * 1.0 - ph * 2.0 - time * 0.12) * 1.1;
+    const w3 = Math.sin(th * 3.0 + ph * 2.0 + time * 0.08) * 0.7;
+
+    return n1 * 2.4 + n2 * 1.4 + w1 + w2 + w3;
+  }
+
+  /**
+   * Muestreo del campo de velocidad base mediante CURL NOISE TOROIDAL:
+   * vx =  dPotential/dy
+   * vy = -dPotential/dx
+   * Garantiza divergencia cero y continuidad infinita por los bordes (¡sin paredes!).
+   */
+  public sampleVelocity(x: number, y: number, time: number): { vx: number; vy: number } {
+    const eps = 4.0;
+    const pY1 = this.toroidalPotential(x, y + eps, time);
+    const pY0 = this.toroidalPotential(x, y - eps, time);
+    const pX1 = this.toroidalPotential(x + eps, y, time);
+    const pX0 = this.toroidalPotential(x - eps, y, time);
+
+    const dP_dy = (pY1 - pY0) / (2.0 * eps);
+    const dP_dx = (pX1 - pX0) / (2.0 * eps);
+
+    let vx = dP_dy * 320.0;
+    let vy = -dP_dx * 320.0;
+
+    // 2. Modificaciones dinámicas según los 10 tipos de impulsos de teclado
     for (const imp of this.activeImpulses) {
       const dx = x - imp.x;
       const dy = y - imp.y;
@@ -168,7 +143,7 @@ export class FlowFieldEngine {
           break;
         }
 
-        // W: Vórtice ciclónico horario (Cyclone Spiral - Rotación pura sin colapso interno)
+        // W: Vórtice ciclónico horario (Cyclone Spiral)
         case 'cyclone': {
           if (dist < imp.radius && dist > 1.0) {
             const spin = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
@@ -219,7 +194,7 @@ export class FlowFieldEngine {
           break;
         }
 
-        // U: Atracción gravitacional magnética (Deflexión suave al aproximarse)
+        // U: Atracción gravitacional magnética
         case 'magnet': {
           if (dist < imp.radius && dist > 25.0) {
             const pull = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
@@ -268,15 +243,15 @@ export class FlowFieldEngine {
       }
     }
 
-    // 4. Garantizar velocidad mínima permanente: ¡NINGUNA PARTÍCULA SE DETIENE JAMÁS!
+    // 3. Garantizar velocidad mínima permanente
     const curSpeed = Math.sqrt(vx * vx + vy * vy);
-    if (curSpeed < 1.6) {
-      const heading = curSpeed > 0.01 ? Math.atan2(vy, vx) : finalAngle;
+    if (curSpeed < 1.4) {
+      const heading = curSpeed > 0.01 ? Math.atan2(vy, vx) : Math.random() * Math.PI * 2;
       vx = Math.cos(heading) * 1.8;
       vy = Math.sin(heading) * 1.8;
-    } else if (curSpeed > 8.0) {
-      vx = (vx / curSpeed) * 8.0;
-      vy = (vy / curSpeed) * 8.0;
+    } else if (curSpeed > 7.5) {
+      vx = (vx / curSpeed) * 7.5;
+      vy = (vy / curSpeed) * 7.5;
     }
 
     return { vx, vy };
