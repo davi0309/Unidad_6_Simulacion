@@ -2,12 +2,13 @@
  * particleSystem.ts
  * Sistema de partículas gráficas estilizadas (Imagen 2):
  * - Tonos BLANCOS Y AZULES CLAROS LUMINOSOS (Cian neón #00f0ff, azul cielo #38bdf8, agua #67e8f9, blanco #ffffff).
- * - Fondo 100% LIMPIO NEGRO PURO (#000000): Cada frame se limpia sin dejar manchas, estelas sucias ni residuos.
- * - Sombra / halo sutil directo detrás de cada partícula sin ensuciar el lienzo.
- * - ¡LAS PARTÍCULAS NUNCA SE DETIENEN!: Velocidad mínima garantizada en todo momento.
- * - Cobertura uniforme en toda la pantalla sin vacíos ni atascos en bordes.
- * - Figuras geométricas estilizadas:
- *   1. Píldoras / líneas con doble borde (borde cian luminoso + núcleo blanco puro).
+ * - CERO AGLOMERACIÓN (Anti-Clustering System): Rejilla de densidad espacial que dispersa
+ *   automáticamente cualquier concentración, evitando que las partículas se apelotonen en un solo punto.
+ * - Cobertura uniforme y total en el 100% de la pantalla (centro, esquinas y cuadrantes siempre poblados).
+ * - Fondo 100% LIMPIO NEGRO PURO (#000000): Limpieza total en cada fotograma.
+ * - Sombra suave individual detrás de cada partícula sin ensuciar el lienzo.
+ * - Figuras geométricas estilizadas según la Imagen 2:
+ *   1. Píldoras / cápsulas con doble borde (borde cian luminoso + núcleo blanco puro).
  *   2. Anillos concéntricos (anillo exterior cian + punto central blanco).
  *   3. Cadenas de cuentas punteadas en cian y blanco.
  *   4. Arcos circulares suaves.
@@ -44,6 +45,11 @@ export class FlowParticleSystem {
   public canvas: HTMLCanvasElement;
   public ctx: CanvasRenderingContext2D;
 
+  // Rejilla de dispersión espacial para evitar aglomeraciones (Anti-Clustering)
+  private readonly gridCols = 36;
+  private readonly gridRows = 22;
+  private cellCounts: Uint16Array;
+
   // Paleta de azules claros luminosos y cianes neón (Imagen 2)
   private readonly brightCyanBlues = [
     '#00f0ff', // Cian neón eléctrico
@@ -54,10 +60,12 @@ export class FlowParticleSystem {
     '#22d3ee'  // Turquesa cian radiante
   ];
 
-  constructor(w: number, h: number, count: number = 1300) {
+  constructor(w: number, h: number, count: number = 1600) {
     this.width = w;
     this.height = h;
     this.count = count;
+
+    this.cellCounts = new Uint16Array(this.gridCols * this.gridRows);
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = w;
@@ -126,14 +134,14 @@ export class FlowParticleSystem {
   /**
    * Actualiza y renderiza los agentes:
    * - Fondo 100% limpio (#000000) en cada fotograma.
-   * - Sombra suave detrás de cada partícula sin manchar el fondo.
-   * - NUNCA se detienen ni se congelan tras ser empujadas.
+   * - Anti-clustering para evitar bolas o acumulaciones en un solo punto.
+   * - NUNCA se detienen ni se congelan.
    */
   public updateAndRender(
     dt: number,
     time: number,
     flowEngine: FlowFieldEngine,
-    params: HealParameters
+    _params: HealParameters
   ) {
     const ctx = this.ctx;
     const W = this.width;
@@ -149,6 +157,21 @@ export class FlowParticleSystem {
     const numParticles = this.particles.length;
     const timeScale = dt * 60.0;
 
+    // 2. Paso 1 del Anti-Clustering: Calcular densidad en la rejilla espacial
+    const gCols = this.gridCols;
+    const gRows = this.gridRows;
+    const cellW = W / gCols;
+    const cellH = H / gRows;
+    this.cellCounts.fill(0);
+
+    for (let i = 0; i < numParticles; i++) {
+      const p = this.particles[i];
+      const gx = Math.max(0, Math.min(gCols - 1, Math.floor(p.x / cellW)));
+      const gy = Math.max(0, Math.min(gRows - 1, Math.floor(p.y / cellH)));
+      this.cellCounts[gy * gCols + gx]++;
+    }
+
+    // 3. Paso 2: Actualización de física y renderizado
     for (let i = 0; i < numParticles; i++) {
       const p = this.particles[i];
       p.prevX = p.x;
@@ -160,16 +183,28 @@ export class FlowParticleSystem {
         p.trail.pop();
       }
 
-      // Muestrear velocidad del campo de flujo (que ya incluye las 10 teclas Q-P)
+      // Muestrear velocidad del campo de flujo multiescala
       const flow = flowEngine.sampleVelocity(p.x, p.y, time);
 
       // Inercia fluida
-      const inertia = 0.86;
+      const inertia = 0.85;
       p.vx = p.vx * inertia + flow.vx * (1.0 - inertia) * p.speed;
       p.vy = p.vy * inertia + flow.vy * (1.0 - inertia) * p.speed;
 
+      // ANTI-CLUSTERING: Si la celda está sobrecargada (> 3 partículas), dispersar hacia afuera
+      const gx = Math.max(0, Math.min(gCols - 1, Math.floor(p.x / cellW)));
+      const gy = Math.max(0, Math.min(gRows - 1, Math.floor(p.y / cellH)));
+      const countInCell = this.cellCounts[gy * gCols + gx];
+
+      if (countInCell > 3) {
+        // Empuje de dispersión orgánico para que se expandan por toda la pantalla
+        const disperseStrength = Math.min(3.2, (countInCell - 3) * 0.45);
+        const randAng = Math.random() * Math.PI * 2;
+        p.vx += Math.cos(randAng) * disperseStrength;
+        p.vy += Math.sin(randAng) * disperseStrength;
+      }
+
       // ¡GARANTIZAR QUE NUNCA SE QUEDEN QUIETAS!:
-      // Si la velocidad cae por debajo del umbral mínimo, relanzarla suavemente
       const curSpd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
       if (curSpd < 1.4) {
         const h = curSpd > 0.05 ? Math.atan2(p.vy, p.vx) : p.heading;
@@ -181,21 +216,20 @@ export class FlowParticleSystem {
       p.x += p.vx * timeScale;
       p.y += p.vy * timeScale;
 
-      // Recirculación suave en los bordes con margen para evitar atascos y vacíos
-      const pad = 25;
-      if (p.x < -pad) {
-        p.x = W + pad * 0.4;
+      // Envoltura toroidal suave: Mantiene densidad homogénea continua
+      if (p.x < 0) {
+        p.x += W;
         p.trail = [];
-      } else if (p.x > W + pad) {
-        p.x = -pad * 0.4;
+      } else if (p.x >= W) {
+        p.x -= W;
         p.trail = [];
       }
 
-      if (p.y < -pad) {
-        p.y = H + pad * 0.4;
+      if (p.y < 0) {
+        p.y += H;
         p.trail = [];
-      } else if (p.y > H + pad) {
-        p.y = -pad * 0.4;
+      } else if (p.y >= H) {
+        p.y -= H;
         p.trail = [];
       }
 

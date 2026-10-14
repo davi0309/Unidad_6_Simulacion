@@ -53,7 +53,7 @@ async function main() {
 
   const flowEngine = new FlowFieldEngine(screenW, screenH);
   const kintsugiLayer = new KintsugiLayer(screenW, screenH);
-  const particleSystem = new FlowParticleSystem(screenW, screenH, 1300);
+  const particleSystem = new FlowParticleSystem(screenW, screenH, 1600);
   const stressSystem = new StressSystem();
   const heartbeatSystem = new HeartbeatSystem();
 
@@ -66,6 +66,7 @@ async function main() {
   // 4. FUNCIÓN DE REINICIO
   const resetExperience = () => {
     kintsugiLayer.clear();
+    particleSystem.initUniformParticles();
     heartbeatSystem.clear();
     params.healingProgress = 0.0;
     params.stress = 0.0;

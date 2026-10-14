@@ -91,43 +91,64 @@ export class FlowFieldEngine {
     const W = this.width;
     const H = this.height;
 
-    // 1. Campo de ángulo continuo que abarca todo el lienzo
-    const scale1 = 0.0022;
-    const scale2 = 0.0055;
-    const angle1 = this.noise2D(x * scale1, y * scale1 + time * 0.04) * Math.PI * 3.5;
-    const angle2 = this.noise2D(x * scale2 + 50.0, y * scale2 + time * 0.08) * Math.PI * 1.5;
-    const finalAngle = angle1 + angle2 * 0.4;
+    // 1. Campo de ángulo continuo multiescala que abarca todo el lienzo
+    const scale1 = 0.0016;
+    const scale2 = 0.0036;
+    const scale3 = 0.0009;
+    const angle1 = this.noise2D(x * scale1 + time * 0.03, y * scale1 + time * 0.02) * Math.PI * 3.0;
+    const angle2 = this.noise2D(x * scale2 - time * 0.02, y * scale2 + 35.0) * Math.PI * 2.0;
+    const angle3 = Math.sin(x * scale3 + time * 0.05) * Math.cos(y * scale3) * Math.PI;
+    const finalAngle = angle1 + angle2 * 0.35 + angle3 * 0.25;
 
     let vx = Math.cos(finalAngle) * 2.2;
     let vy = Math.sin(finalAngle) * 2.2;
 
-    // 2. Corrientes orbitales suaves distribuidas por todo el espacio (Imagen 2)
+    // 2. Centros orbitales armónicos DINÁMICOS que se desplazan suavemente en el tiempo (Imagen 2)
+    // Se mueven sinusoidalmente evitando cualquier atractor fijo o zona de acumulación estática
     const centers = [
-      { cx: W * 0.28, cy: H * 0.35, R: H * 0.32, dir: 1 },
-      { cx: W * 0.72, cy: H * 0.28, R: H * 0.30, dir: -1 },
-      { cx: W * 0.50, cy: H * 0.55, R: H * 0.36, dir: 1 },
-      { cx: W * 0.22, cy: H * 0.75, R: H * 0.30, dir: -1 },
-      { cx: W * 0.78, cy: H * 0.72, R: H * 0.32, dir: 1 }
+      {
+        cx: W * 0.28 + Math.sin(time * 0.18) * (W * 0.09),
+        cy: H * 0.32 + Math.cos(time * 0.16) * (H * 0.09),
+        R: H * 0.32,
+        dir: 1
+      },
+      {
+        cx: W * 0.72 + Math.cos(time * 0.20) * (W * 0.09),
+        cy: H * 0.28 + Math.sin(time * 0.18) * (H * 0.09),
+        R: H * 0.30,
+        dir: -1
+      },
+      {
+        cx: W * 0.50 + Math.sin(time * 0.14 + 1.2) * (W * 0.08),
+        cy: H * 0.55 + Math.cos(time * 0.14 + 1.2) * (H * 0.08),
+        R: H * 0.35,
+        dir: 1
+      },
+      {
+        cx: W * 0.24 + Math.cos(time * 0.17 + 2.3) * (W * 0.08),
+        cy: H * 0.76 + Math.sin(time * 0.17 + 2.3) * (H * 0.08),
+        R: H * 0.28,
+        dir: -1
+      },
+      {
+        cx: W * 0.76 + Math.sin(time * 0.22 + 3.1) * (W * 0.08),
+        cy: H * 0.72 + Math.cos(time * 0.22 + 3.1) * (H * 0.08),
+        R: H * 0.30,
+        dir: 1
+      }
     ];
 
     for (const c of centers) {
       const dx = x - c.cx;
       const dy = y - c.cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.hypot(dx, dy);
       if (dist > 1.0) {
-        // Falloff suave continuo sin corte abrupto
         const factor = 1.0 / (1.0 + (dist / c.R) * (dist / c.R));
-        vx += (-dy / dist) * factor * c.dir * 2.4;
-        vy += (dx / dist) * factor * c.dir * 2.4;
+        // VELOCIDAD ORBITAL PURA TANGENCIAL (CERO SUCCIÓN HACIA EL CENTRO)
+        vx += (-dy / dist) * factor * c.dir * 2.2;
+        vy += (dx / dist) * factor * c.dir * 2.2;
       }
     }
- 
-    // 2.5 Nudge suave continuo para alejar partículas de los bordes y mantener el centro vivo
-    const margin = 80;
-    if (x < margin) vx += (1.0 - Math.max(0, x) / margin) * 2.8;
-    if (x > W - margin) vx -= (1.0 - Math.max(0, W - x) / margin) * 2.8;
-    if (y < margin) vy += (1.0 - Math.max(0, y) / margin) * 2.8;
-    if (y > H - margin) vy -= (1.0 - Math.max(0, H - y) / margin) * 2.8;
 
     // 3. Modificaciones dinámicas según los 10 tipos de impulsos de teclado
     for (const imp of this.activeImpulses) {
@@ -147,12 +168,12 @@ export class FlowFieldEngine {
           break;
         }
 
-        // W: Vórtice ciclónico horario (Cyclone Spiral)
+        // W: Vórtice ciclónico horario (Cyclone Spiral - Rotación pura sin colapso interno)
         case 'cyclone': {
           if (dist < imp.radius && dist > 1.0) {
             const spin = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
-            vx += (-dy / dist) * spin * 5.0 - (dx / dist) * spin * 1.5;
-            vy += (dx / dist) * spin * 5.0 - (dy / dist) * spin * 1.5;
+            vx += (-dy / dist) * spin * 5.0;
+            vy += (dx / dist) * spin * 5.0;
           }
           break;
         }
@@ -198,12 +219,12 @@ export class FlowFieldEngine {
           break;
         }
 
-        // U: Atracción gravitacional magnética (Magnetic Attractor)
+        // U: Atracción gravitacional magnética (Deflexión suave al aproximarse)
         case 'magnet': {
-          if (dist < imp.radius && dist > 10.0) {
+          if (dist < imp.radius && dist > 25.0) {
             const pull = (1.0 - dist / imp.radius) * imp.strength * lifeRatio;
-            vx -= (dx / dist) * pull * 4.8;
-            vy -= (dy / dist) * pull * 4.8;
+            vx -= (dx / dist) * pull * 4.2;
+            vy -= (dy / dist) * pull * 4.2;
           }
           break;
         }
