@@ -225,7 +225,7 @@ async function main() {
     // B. Dinámicas
     stressSystem.update(dt, params);
     heartbeatSystem.update(dt, params);
-    flowEngine.update(dt);
+    flowEngine.update(dt, timeSec);
 
     // C. Actualizar y renderizar las figuras geométricas blancas y azules (Imagen 2)
     particleSystem.updateAndRender(dt, timeSec, flowEngine, params);

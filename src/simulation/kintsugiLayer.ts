@@ -280,91 +280,7 @@ export class KintsugiLayer {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Pulsación orgánica sutil de respiración en la herida abierta
-    const woundPulse = Math.sin(time * 2.8) * 0.16 + 0.84;
-
-    // ==============================================================
-    // PASO 1: RENDERIZAR LA HERIDA ABIERTA (Imagen 1: Tejido vivo carmesí/rosáceo)
-    // ==============================================================
-    for (const branch of this.branches) {
-      const pts = branch.points;
-      if (pts.length < 2) continue;
-
-      // Actualizar llenado suave de oro
-      if (branch.filledRatio < branch.targetFilledRatio) {
-        branch.filledRatio = Math.min(branch.targetFilledRatio, branch.filledRatio + dt * 0.95);
-      }
-      if (branch.glowPulse > 0) {
-        branch.glowPulse = Math.max(0, branch.glowPulse - dt * 2.2);
-      }
-
-      // Si la rama aún no está 100% sellada de oro, mostrar la herida viva abierta
-      if (branch.filledRatio < 0.99) {
-        const openPortionStart = Math.floor(pts.length * branch.filledRatio);
-
-        if (openPortionStart < pts.length - 1) {
-          ctx.beginPath();
-          ctx.moveTo(pts[openPortionStart].x, pts[openPortionStart].y);
-          for (let i = openPortionStart + 1; i < pts.length; i++) {
-            ctx.lineTo(pts[i].x, pts[i].y);
-          }
-
-          // 1. Resplandor exterior de tejido vivo herido (Rosa carne / carmesí profundo)
-          const glowAlpha = (0.38 * woundPulse).toFixed(2);
-          ctx.strokeStyle = `rgba(230, 40, 80, ${glowAlpha})`;
-          ctx.lineWidth = branch.width * 2.8;
-          ctx.stroke();
-
-          // 2. Borde carnoso intenso (rojo rubí vivo de corte fresco)
-          const coreAlpha = (0.78 * woundPulse).toFixed(2);
-          ctx.strokeStyle = `rgba(195, 20, 55, ${coreAlpha})`;
-          ctx.lineWidth = branch.width * 1.4;
-          ctx.stroke();
-
-          // 3. Fisura interior profunda del desgarro
-          ctx.strokeStyle = '#050203';
-          ctx.lineWidth = Math.max(1.2, branch.width * 0.5);
-          ctx.stroke();
-        }
-      }
-    }
-
-    // ==============================================================
-    // PASO 2: RENDERIZAR LA CURACIÓN DE ORO KINTSUGI (Imagen 1 y Referencias)
-    // ==============================================================
-    for (const branch of this.branches) {
-      if (branch.filledRatio <= 0.005) continue;
-
-      const pts = branch.points;
-      const fillCount = Math.max(2, Math.floor(pts.length * branch.filledRatio));
-      const w = branch.width;
-      const pulseExtra = branch.glowPulse * 1.5;
-
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < fillCount; i++) {
-        ctx.lineTo(pts[i].x, pts[i].y);
-      }
-
-      // 1. Halo áureo cálido de incrustación (#d4af37 / #b8860b)
-      ctx.strokeStyle = `rgba(212, 160, 30, ${(0.42 + pulseExtra * 0.3).toFixed(2)})`;
-      ctx.lineWidth = w * 1.7 + pulseExtra * 2.0;
-      ctx.stroke();
-
-      // 2. Vena de oro fundido 24K brillante (#ffd700)
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.98)';
-      ctx.lineWidth = w * 1.05 + pulseExtra * 1.0;
-      ctx.stroke();
-
-      // 3. Reflejo especular blanco puro metálico reflectante (#ffffff)
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.lineWidth = Math.max(1.0, w * 0.38);
-      ctx.stroke();
-    }
-
-    // ==============================================================
-    // PASO 3: DESTELLOS DE CURACIÓN DORADA AL TOCAR TECLAS
-    // ==============================================================
+    // DESTELLOS DE CURACIÓN DORADA AL TOCAR TECLAS O CLIC
     for (let i = this.goldFlashes.length - 1; i >= 0; i--) {
       const f = this.goldFlashes[i];
       f.radius += dt * 190.0;
@@ -388,6 +304,7 @@ export class KintsugiLayer {
       ctx.fill();
     }
   }
+
 
   /**
    * Progreso de curación real (0.0 a 1.0) medido por la cantidad de herida sellada con oro.
