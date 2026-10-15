@@ -62,8 +62,7 @@ export class TrailSystem {
     ctx.fillStyle = `rgba(2, 4, 10, ${this.decayRate.toFixed(4)})`;
     ctx.fillRect(0, 0, W, H);
 
-    // 2. Dibujar auras ambientales etéreas de los espacios trigger activos
-    woundManager.renderAmbientSpaces(ctx);
+    // Los espacios trigger son 100% transparentes: solo los filamentos del flow field cambian de color
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';

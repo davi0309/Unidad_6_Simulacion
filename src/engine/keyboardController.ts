@@ -108,11 +108,11 @@ export class KeyboardController {
           type: 'turbulence',
           x,
           y,
-          radius: 170.0,
-          maxRadius: 290.0,
-          strength: 4.5,
-          life: 3.5,
-          maxLife: 3.5
+          radius: 90.0,
+          maxRadius: 160.0,
+          strength: 3.6,
+          life: 2.2,
+          maxLife: 2.2
         });
         this.lastFeedback = { key: 'Q', label: 'Herida', action: 'Espacio de fractura roja en el flujo', time: now };
         break;

@@ -78,11 +78,11 @@ export class WoundManager {
     let minY = startY;
     let maxY = startY;
 
-    // 1. Trazado coherente siguiendo la corriente del río hacia adelante (28 pasos)
+    // 1. Trazado coherente y compacto siguiendo la corriente del río hacia adelante (12 pasos)
     let cx = startX;
     let cy = startY;
-    const forwardSteps = 28;
-    const stepLen = 10.0;
+    const forwardSteps = 12;
+    const stepLen = 7.5;
 
     for (let s = 0; s < forwardSteps; s++) {
       let vx = 0;
@@ -93,8 +93,8 @@ export class WoundManager {
         vx = f.vx / len;
         vy = f.vy / len;
       }
-      // Ondulación armónica continua propia de un flujo orgánico
-      const harmonic = Math.sin(s * 0.35) * 0.20;
+      // Ondulación armónica sutil
+      const harmonic = Math.sin(s * 0.45) * 0.18;
       const nx = cx + (vx - vy * harmonic) * stepLen;
       const ny = cy + (vy + vx * harmonic) * stepLen;
 
@@ -108,10 +108,10 @@ export class WoundManager {
       cy = ny;
     }
 
-    // 2. Trazado continuo corriente arriba para otorgar entrada natural al corredor (20 pasos)
+    // 2. Trazado continuo corriente arriba (8 pasos)
     cx = startX;
     cy = startY;
-    const backwardSteps = 20;
+    const backwardSteps = 8;
     for (let s = 0; s < backwardSteps; s++) {
       let vx = 0;
       let vy = 1;
@@ -121,7 +121,7 @@ export class WoundManager {
         vx = f.vx / len;
         vy = f.vy / len;
       }
-      const harmonic = Math.cos(s * 0.35) * 0.20;
+      const harmonic = Math.cos(s * 0.45) * 0.18;
       const nx = cx - (vx - vy * harmonic) * stepLen;
       const ny = cy - (vy + vx * harmonic) * stepLen;
 
@@ -135,7 +135,7 @@ export class WoundManager {
       cy = ny;
     }
 
-    // 3. Ramificación afluente capilar conectada en la sección media
+    // 3. Ramificación afluente compacta
     const branches: WoundBranch[] = [{ points: mainBranch }];
     const branchPointIdx = Math.floor(mainBranch.length * 0.50);
     const branchRoot = mainBranch[branchPointIdx];
@@ -144,7 +144,7 @@ export class WoundManager {
       const subBranch: WoundPoint[] = [{ x: branchRoot.x, y: branchRoot.y }];
       let bx = branchRoot.x;
       let by = branchRoot.y;
-      for (let s = 0; s < 14; s++) {
+      for (let s = 0; s < 6; s++) {
         let vx = 1;
         let vy = 1;
         if (sampleFlow) {
@@ -153,8 +153,8 @@ export class WoundManager {
           vx = (-f.vy * 0.55 + f.vx * 0.85) / len;
           vy = (f.vx * 0.55 + f.vy * 0.85) / len;
         }
-        bx += vx * 9.0;
-        by += vy * 9.0;
+        bx += vx * 6.5;
+        by += vy * 6.5;
         subBranch.push({ x: bx, y: by });
         minX = Math.min(minX, bx);
         maxX = Math.max(maxX, bx);
@@ -164,7 +164,7 @@ export class WoundManager {
       branches.push({ points: subBranch });
     }
 
-    const corridorWidth = 28.0;
+    const corridorWidth = 13.0; // Corredor más pequeño y ajustado
     const zone: TriggerZone = {
       id,
       type,
@@ -315,39 +315,11 @@ export class WoundManager {
   }
 
   /**
-   * Dibuja un aura ambiental sutil y etérea que demarca visualmente los espacios en el lienzo
+   * Los espacios trigger son 100% transparentes e invisibles en el fondo.
+   * Lo único que cambia de color son los filamentos del flow field al cruzar por ellos.
    */
-  public renderAmbientSpaces(ctx: CanvasRenderingContext2D) {
-    if (this.zones.length === 0) return;
-
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    for (let i = 0; i < this.zones.length; i++) {
-      const z = this.zones[i];
-      const pulse = Math.sin(z.pulseTime * 2.0) * 0.15 + 0.85;
-
-      ctx.lineWidth = z.corridorWidth * 1.5;
-      if (z.type === ZoneType.GOLD) {
-        ctx.strokeStyle = `rgba(245, 158, 11, ${0.04 * pulse})`;
-      } else {
-        ctx.strokeStyle = `rgba(225, 29, 72, ${0.035 * pulse})`;
-      }
-
-      for (let b = 0; b < z.branches.length; b++) {
-        const pts = z.branches[b].points;
-        if (pts.length < 2) continue;
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let p = 1; p < pts.length; p++) {
-          ctx.lineTo(pts[p].x, pts[p].y);
-        }
-        ctx.stroke();
-      }
-    }
-
-    ctx.restore();
+  public renderAmbientSpaces(_ctx: CanvasRenderingContext2D) {
+    // Totalmente transparente: no dibuja ninguna silueta ni aura en el fondo
   }
 
   public clear() {
