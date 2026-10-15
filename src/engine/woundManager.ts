@@ -1,11 +1,17 @@
 /**
  * woundManager.ts
- * Gestor de Heridas y Fracturas Kintsugi para HEAL:
- * - Creación y manipulación de múltiples heridas coexistentes.
- * - Deformación orgánica del flujo en torno a la fractura.
- * - Progreso gradual de reparación Kintsugi (0.0 a 1.0).
- * - Campo de influencia espacial para percepción de agentes rojos y dorados.
+ * Gestor de Espacios Tipo Trigger (Fracturas Rojas y Costuras Doradas Kintsugi):
+ * - Los espacios se construyen a lo largo de las líneas de flujo (no aleatorios).
+ * - Cuando los filamentos pasan por la posición de un espacio rojo, se colorean de ROJO mientras estén dentro.
+ * - Cuando los filamentos pasan por la posición de un espacio dorado, se colorean de ORO mientras estén dentro.
+ * - Al salir del espacio, retornan inmediatamente a su color natural (AZUL).
+ * - Cero agentes inmóviles: el flujo es continuo, cinéticamente libre y a 60 FPS.
  */
+
+export enum ZoneType {
+  WOUND = 'WOUND',   // Espacio de fractura roja
+  GOLD = 'GOLD'      // Espacio áureo Kintsugi
+}
 
 export interface WoundPoint {
   x: number;
@@ -16,27 +22,33 @@ export interface WoundBranch {
   points: WoundPoint[];
 }
 
-export interface Wound {
+export interface TriggerZone {
   id: string;
+  type: ZoneType;
   x: number;
   y: number;
   branches: WoundBranch[];
-  corridorWidth: number;   // Ancho del corredor de la grieta
+  corridorWidth: number; // Radio del corredor (ancho de influencia)
   intensity: number;
-  repairProgress: number;  // 0.0 (abierta/roja) a 1.0 (sellada de oro)
-  isRepaired: boolean;
-  pulseTime: number;
-  // Caja delimitadora para descarte rápido
   minX: number;
   maxX: number;
   minY: number;
   maxY: number;
+  pulseTime: number;
 }
+
+// Alias de conveniencia para compatibilidad
+export type Wound = TriggerZone;
 
 export class WoundManager {
   public width: number;
   public height: number;
-  public wounds: Wound[] = [];
+  public zones: TriggerZone[] = [];
+
+  // Acceso para compatibilidad
+  public get wounds(): TriggerZone[] {
+    return this.zones;
+  }
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -49,14 +61,15 @@ export class WoundManager {
   }
 
   /**
-   * Crea una nueva herida a lo largo de los caminos del Flow Field (Tecla Q o clic)
+   * Crea un espacio tipo trigger a lo largo de las líneas de corriente del Flow Field (no aleatorio)
    */
-  public createWound(
+  public createZone(
     startX: number,
     startY: number,
+    type: ZoneType = ZoneType.WOUND,
     sampleFlow?: (x: number, y: number) => { vx: number; vy: number },
     intensity: number = 1.0
-  ): Wound {
+  ): TriggerZone {
     const id = Math.random().toString(36).substring(2, 9);
     const mainBranch: WoundPoint[] = [{ x: startX, y: startY }];
 
@@ -65,11 +78,11 @@ export class WoundManager {
     let minY = startY;
     let maxY = startY;
 
-    // 1. Trazar hacia adelante siguiendo el camino del flow field (corriente abajo)
+    // 1. Trazado coherente siguiendo la corriente del río hacia adelante (28 pasos)
     let cx = startX;
     let cy = startY;
-    const forwardSteps = 26;
-    const stepLen = 9.0;
+    const forwardSteps = 28;
+    const stepLen = 10.0;
 
     for (let s = 0; s < forwardSteps; s++) {
       let vx = 0;
@@ -80,10 +93,10 @@ export class WoundManager {
         vx = f.vx / len;
         vy = f.vy / len;
       }
-      // Pequeña oscilación fractal orgánica propia de una fractura
-      const jitter = (Math.sin(s * 1.3) * 0.4 + (Math.random() - 0.5) * 0.5);
-      const nx = cx + (vx - vy * jitter) * stepLen;
-      const ny = cy + (vy + vx * jitter) * stepLen;
+      // Ondulación armónica continua propia de un flujo orgánico
+      const harmonic = Math.sin(s * 0.35) * 0.20;
+      const nx = cx + (vx - vy * harmonic) * stepLen;
+      const ny = cy + (vy + vx * harmonic) * stepLen;
 
       mainBranch.push({ x: nx, y: ny });
       minX = Math.min(minX, nx);
@@ -95,10 +108,10 @@ export class WoundManager {
       cy = ny;
     }
 
-    // 2. Trazar hacia atrás (corriente arriba) para que la herida tenga continuidad a ambos lados
+    // 2. Trazado continuo corriente arriba para otorgar entrada natural al corredor (20 pasos)
     cx = startX;
     cy = startY;
-    const backwardSteps = 18;
+    const backwardSteps = 20;
     for (let s = 0; s < backwardSteps; s++) {
       let vx = 0;
       let vy = 1;
@@ -108,9 +121,9 @@ export class WoundManager {
         vx = f.vx / len;
         vy = f.vy / len;
       }
-      const jitter = (Math.cos(s * 1.5) * 0.4 + (Math.random() - 0.5) * 0.5);
-      const nx = cx - (vx - vy * jitter) * stepLen;
-      const ny = cy - (vy + vx * jitter) * stepLen;
+      const harmonic = Math.cos(s * 0.35) * 0.20;
+      const nx = cx - (vx - vy * harmonic) * stepLen;
+      const ny = cy - (vy + vx * harmonic) * stepLen;
 
       mainBranch.unshift({ x: nx, y: ny });
       minX = Math.min(minX, nx);
@@ -122,26 +135,26 @@ export class WoundManager {
       cy = ny;
     }
 
-    // 3. Ramificación capilar secundaria que se abre a lo largo de un afluente
+    // 3. Ramificación afluente capilar conectada en la sección media
     const branches: WoundBranch[] = [{ points: mainBranch }];
-    const branchPointIdx = Math.floor(mainBranch.length * 0.55);
+    const branchPointIdx = Math.floor(mainBranch.length * 0.50);
     const branchRoot = mainBranch[branchPointIdx];
 
     if (branchRoot) {
       const subBranch: WoundPoint[] = [{ x: branchRoot.x, y: branchRoot.y }];
       let bx = branchRoot.x;
       let by = branchRoot.y;
-      for (let s = 0; s < 12; s++) {
+      for (let s = 0; s < 14; s++) {
         let vx = 1;
         let vy = 1;
         if (sampleFlow) {
           const f = sampleFlow(bx, by);
           const len = Math.hypot(f.vx, f.vy) || 1.0;
-          vx = (-f.vy * 0.6 + f.vx * 0.8) / len;
-          vy = (f.vx * 0.6 + f.vy * 0.8) / len;
+          vx = (-f.vy * 0.55 + f.vx * 0.85) / len;
+          vy = (f.vx * 0.55 + f.vy * 0.85) / len;
         }
-        bx += vx * 8.0;
-        by += vy * 8.0;
+        bx += vx * 9.0;
+        by += vy * 9.0;
         subBranch.push({ x: bx, y: by });
         minX = Math.min(minX, bx);
         maxX = Math.max(maxX, bx);
@@ -151,29 +164,74 @@ export class WoundManager {
       branches.push({ points: subBranch });
     }
 
-    const corridorWidth = 24.0;
-    const wound: Wound = {
+    const corridorWidth = 28.0;
+    const zone: TriggerZone = {
       id,
+      type,
       x: startX,
       y: startY,
       branches,
       corridorWidth,
       intensity,
-      repairProgress: 0.0,
-      isRepaired: false,
-      pulseTime: 0.0,
       minX: minX - corridorWidth,
       maxX: maxX + corridorWidth,
       minY: minY - corridorWidth,
-      maxY: maxY + corridorWidth
+      maxY: maxY + corridorWidth,
+      pulseTime: 0.0
     };
 
-    this.wounds.push(wound);
-    return wound;
+    this.zones.push(zone);
+    return zone;
   }
 
   /**
-   * Distancia mínima cuadrada desde un punto a un segmento de línea (x1, y1) -> (x2, y2)
+   * Crea un espacio de fractura roja (Tecla Q)
+   */
+  public createWound(
+    startX: number,
+    startY: number,
+    sampleFlow?: (x: number, y: number) => { vx: number; vy: number },
+    intensity: number = 1.0
+  ): TriggerZone {
+    return this.createZone(startX, startY, ZoneType.WOUND, sampleFlow, intensity);
+  }
+
+  /**
+   * Transforma la herida roja más cercana en un espacio dorado Kintsugi (Tecla U),
+   * o crea un nuevo espacio dorado si no hay heridas existentes.
+   */
+  public transformOrCreateGoldZone(
+    x: number,
+    y: number,
+    sampleFlow?: (x: number, y: number) => { vx: number; vy: number }
+  ): { zone: TriggerZone; wasTransformed: boolean } {
+    let nearestWound: TriggerZone | null = null;
+    let minDist = 1e9;
+
+    for (let i = 0; i < this.zones.length; i++) {
+      const z = this.zones[i];
+      if (z.type === ZoneType.WOUND) {
+        const d = Math.hypot(z.x - x, z.y - y);
+        if (d < minDist) {
+          minDist = d;
+          nearestWound = z;
+        }
+      }
+    }
+
+    // Si hay una herida en pantalla, transmutar su espacio en oro
+    if (nearestWound) {
+      nearestWound.type = ZoneType.GOLD;
+      return { zone: nearestWound, wasTransformed: true };
+    }
+
+    // Si no había herida, crear un espacio dorado en la posición actual
+    const newGoldZone = this.createZone(x, y, ZoneType.GOLD, sampleFlow, 1.0);
+    return { zone: newGoldZone, wasTransformed: false };
+  }
+
+  /**
+   * Distancia mínima al cuadrado desde (px, py) al segmento (x1, y1) -> (x2, y2)
    */
   private distToSegmentSq(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
     const l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
@@ -186,17 +244,45 @@ export class WoundManager {
   }
 
   /**
-   * Mueve la herida más cercana a una nueva posición sin interrumpir la simulación
+   * Determina si el punto (x, y) de un agente está dentro del corredor de algún espacio trigger.
+   * Retorna la zona activa o null.
    */
-  public moveNearestWound(x: number, y: number, newX: number, newY: number) {
-    let nearest: Wound | null = null;
+  public getZoneAt(x: number, y: number): TriggerZone | null {
+    for (let i = 0; i < this.zones.length; i++) {
+      const z = this.zones[i];
+
+      // Descarte rápido mediante caja delimitadora
+      if (x < z.minX || x > z.maxX || y < z.minY || y > z.maxY) {
+        continue;
+      }
+
+      const corridorSq = z.corridorWidth * z.corridorWidth;
+
+      for (let b = 0; b < z.branches.length; b++) {
+        const pts = z.branches[b].points;
+        for (let p = 0; p < pts.length - 1; p++) {
+          const dSq = this.distToSegmentSq(x, y, pts[p].x, pts[p].y, pts[p + 1].x, pts[p + 1].y);
+          if (dSq < corridorSq) {
+            return z;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Mueve el espacio trigger más cercano
+   */
+  public moveNearestZone(x: number, y: number, newX: number, newY: number) {
+    let nearest: TriggerZone | null = null;
     let minDist = 1e9;
 
-    for (const w of this.wounds) {
-      const d = Math.hypot(w.x - x, w.y - y);
+    for (const z of this.zones) {
+      const d = Math.hypot(z.x - x, z.y - y);
       if (d < minDist && d < 180.0) {
         minDist = d;
-        nearest = w;
+        nearest = z;
       }
     }
 
@@ -220,111 +306,51 @@ export class WoundManager {
   }
 
   /**
-   * Devuelve información de herida si el punto (x, y) está dentro del corredor de una fractura
-   */
-  public getWoundAt(x: number, y: number): { dist: number; intensity: number; isRepaired: boolean; wound: Wound } | null {
-    for (let i = 0; i < this.wounds.length; i++) {
-      const w = this.wounds[i];
-
-      // Descarte rápido con bounding box
-      if (x < w.minX || x > w.maxX || y < w.minY || y > w.maxY) {
-        continue;
-      }
-
-      const corridorSq = w.corridorWidth * w.corridorWidth;
-      let minDistSq = 1e9;
-
-      for (let b = 0; b < w.branches.length; b++) {
-        const pts = w.branches[b].points;
-        for (let p = 0; p < pts.length - 1; p++) {
-          const dSq = this.distToSegmentSq(x, y, pts[p].x, pts[p].y, pts[p + 1].x, pts[p + 1].y);
-          if (dSq < minDistSq) {
-            minDistSq = dSq;
-          }
-        }
-      }
-
-      if (minDistSq < corridorSq) {
-        const d = Math.sqrt(minDistSq);
-        return {
-          dist: d,
-          intensity: w.intensity * (1.0 - w.repairProgress * 0.75),
-          isRepaired: w.isRepaired,
-          wound: w
-        };
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Encuentra la herida no reparada más cercana para la quimiotaxis de los agentes dorados
-   */
-  public getNearestWound(x: number, y: number): { x: number; y: number; intensity: number; isRepaired: boolean; wound: Wound } | null {
-    let nearest: Wound | null = null;
-    let minDist = 1e9;
-
-    for (let i = 0; i < this.wounds.length; i++) {
-      const w = this.wounds[i];
-      if (w.isRepaired) continue;
-
-      const dist = Math.hypot(w.x - x, w.y - y);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = w;
-      }
-    }
-
-    if (nearest) {
-      return {
-        x: nearest.x,
-        y: nearest.y,
-        intensity: nearest.intensity,
-        isRepaired: nearest.isRepaired,
-        wound: nearest
-      };
-    }
-    return null;
-  }
-
-  /**
-   * Obtiene la posición de entrada corriente arriba de una herida
-   */
-  public getUpstreamEntry(w: Wound): { x: number; y: number } {
-    if (w.branches.length > 0 && w.branches[0].points.length > 0) {
-      return w.branches[0].points[0];
-    }
-    return { x: w.x, y: w.y };
-  }
-
-  /**
-   * Deposita curación dorada directamente sobre la fractura de la herida
-   */
-  public addHealing(x: number, y: number, amount: number = 0.05) {
-    const woundInfo = this.getWoundAt(x, y);
-    if (woundInfo) {
-      const w = woundInfo.wound;
-      w.repairProgress = Math.min(1.0, w.repairProgress + amount);
-      if (w.repairProgress >= 0.95) {
-        w.isRepaired = true;
-      }
-    }
-  }
-
-  /**
-   * Actualiza el pulso sutil de las heridas
+   * Actualiza el pulso sutil de los espacios
    */
   public update(dt: number) {
-    for (let i = 0; i < this.wounds.length; i++) {
-      const w = this.wounds[i];
-      w.pulseTime += dt;
+    for (let i = 0; i < this.zones.length; i++) {
+      this.zones[i].pulseTime += dt;
     }
   }
 
   /**
-   * Reinicia todas las heridas
+   * Dibuja un aura ambiental sutil y etérea que demarca visualmente los espacios en el lienzo
    */
+  public renderAmbientSpaces(ctx: CanvasRenderingContext2D) {
+    if (this.zones.length === 0) return;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (let i = 0; i < this.zones.length; i++) {
+      const z = this.zones[i];
+      const pulse = Math.sin(z.pulseTime * 2.0) * 0.15 + 0.85;
+
+      ctx.lineWidth = z.corridorWidth * 1.5;
+      if (z.type === ZoneType.GOLD) {
+        ctx.strokeStyle = `rgba(245, 158, 11, ${0.04 * pulse})`;
+      } else {
+        ctx.strokeStyle = `rgba(225, 29, 72, ${0.035 * pulse})`;
+      }
+
+      for (let b = 0; b < z.branches.length; b++) {
+        const pts = z.branches[b].points;
+        if (pts.length < 2) continue;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let p = 1; p < pts.length; p++) {
+          ctx.lineTo(pts[p].x, pts[p].y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
   public clear() {
-    this.wounds = [];
+    this.zones = [];
   }
 }

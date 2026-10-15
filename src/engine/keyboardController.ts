@@ -3,9 +3,9 @@
  * Controlador de Interpretación Musical por Teclado para HEAL:
  * - 9 teclas expresivas: Q, W, E, R, T, Y, U, I, O.
  * - Prevención de repetición automática del sistema operativo (e.repeat).
- * - Superposición de efectos simultáneos.
+ * - Q crea un espacio de fractura roja en el flujo (trigger zone).
+ * - U transmuta la fractura en espacio dorado Kintsugi o crea un espacio áureo (trigger zone).
  * - Tecla F para pantalla completa y Escape para reinicio.
- * - Limpieza de estados en pérdida de foco (window.blur).
  */
 
 import { FlowField } from './flowField';
@@ -25,6 +25,7 @@ export class KeyboardController {
   private agentSystem: AgentSystem;
 
   public mousePos = { x: 0, y: 0 };
+  public isDragging: boolean = false;
   public lastFeedback: KeyFeedback | null = null;
   public onRestartCallback?: () => void;
 
@@ -46,14 +47,23 @@ export class KeyboardController {
 
   private setupListeners() {
     window.addEventListener('pointermove', (e: PointerEvent) => {
+      if (this.isDragging) {
+        this.woundManager.moveNearestZone(this.mousePos.x, this.mousePos.y, e.clientX, e.clientY);
+      }
       this.mousePos.x = e.clientX;
       this.mousePos.y = e.clientY;
     });
 
-    // Clic con el ratón como herramienta secundaria para crear/desplazar heridas
     window.addEventListener('pointerdown', (e: PointerEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
+      this.isDragging = true;
+      this.mousePos.x = e.clientX;
+      this.mousePos.y = e.clientY;
       this.triggerKey('KeyQ', e.clientX, e.clientY);
+    });
+
+    window.addEventListener('pointerup', () => {
+      this.isDragging = false;
     });
 
     window.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -77,11 +87,6 @@ export class KeyboardController {
 
       this.triggerKey(e.code, this.mousePos.x, this.mousePos.y);
     });
-
-    // Manejo de pérdida de foco para evitar estados residuales
-    window.addEventListener('blur', () => {
-      // Seguridad de foco
-    });
   }
 
   /**
@@ -92,8 +97,8 @@ export class KeyboardController {
 
     switch (code) {
       case 'KeyQ': {
-        // Q — Herida: crea una nueva fractura orgánica a lo largo de los caminos del Flow Field
-        const w = this.woundManager.createWound(
+        // Q — Herida: crea un espacio trigger de fractura roja a lo largo de las líneas de flujo
+        this.woundManager.createWound(
           x,
           y,
           (fx, fy) => this.flowField.sampleVelocity(fx, fy),
@@ -103,13 +108,13 @@ export class KeyboardController {
           type: 'turbulence',
           x,
           y,
-          radius: 160.0,
-          maxRadius: 280.0,
+          radius: 170.0,
+          maxRadius: 290.0,
           strength: 4.5,
           life: 3.5,
           maxLife: 3.5
         });
-        this.lastFeedback = { key: 'Q', label: 'Herida', action: 'Fractura a lo largo de la corriente', time: now };
+        this.lastFeedback = { key: 'Q', label: 'Herida', action: 'Espacio de fractura roja en el flujo', time: now };
         break;
       }
 
@@ -191,32 +196,25 @@ export class KeyboardController {
         break;
 
       case 'KeyU': {
-        // U — Reparación Kintsugi: busca la herida y transforma agentes existentes corriente arriba a oro
-        let targetWound = this.woundManager.getNearestWound(x, y);
-        if (!targetWound) {
-          // Si no hay cerca del cursor, buscar cualquier herida activa no reparada
-          for (const wd of this.woundManager.wounds) {
-            if (!wd.isRepaired) {
-              targetWound = { x: wd.x, y: wd.y, intensity: wd.intensity, isRepaired: false, wound: wd };
-              break;
-            }
-          }
-        }
+        // U — Reparación Kintsugi: transmuta la herida más cercana a espacio de oro o crea uno nuevo
+        const res = this.woundManager.transformOrCreateGoldZone(
+          x,
+          y,
+          (fx, fy) => this.flowField.sampleVelocity(fx, fy)
+        );
 
-        if (targetWound) {
-          const upstream = this.woundManager.getUpstreamEntry(targetWound.wound);
-          const count = this.agentSystem.convertUpstreamAgentsToGold(upstream, 45);
+        if (res.wasTransformed) {
           this.lastFeedback = {
             key: 'U',
-            label: 'Reparación',
-            action: `${count} agentes transformados a oro en la corriente`,
+            label: 'Kintsugi',
+            action: 'Herida transmutada en espacio áureo',
             time: now
           };
         } else {
           this.lastFeedback = {
             key: 'U',
-            label: 'Reparación',
-            action: 'No hay fracturas abiertas que sanar',
+            label: 'Kintsugi',
+            action: 'Espacio áureo creado en la corriente',
             time: now
           };
         }
@@ -240,11 +238,9 @@ export class KeyboardController {
 
       case 'KeyO':
         // O — Integración: estabilización y armonización de líneas
-        // Reduce perturbaciones y alinea agentes hacia una calma armónica
         for (const p of this.flowField.perturbations) {
           p.strength *= 0.5;
         }
-        this.woundManager.addHealing(x, y, 0.12);
         this.lastFeedback = { key: 'O', label: 'Integración', action: 'Armonización y unión de marcas', time: now };
         break;
     }

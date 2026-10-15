@@ -1,11 +1,11 @@
 /**
  * agentSystem.ts
- * Sistema de Agentes Autónomos con Percepción Local para HEAL:
+ * Sistema de Agentes Autónomos (Filamentos de Flujo) para HEAL:
  * - Cinemática de Reynolds (posición, velocidad, aceleración, fuerza máxima de giro).
- * - Percepción sensorial local con 3 sondas direccionales (Frontal, Izquierda, Derecha).
- * - 3 Estados de agente: AZUL (flujo base), ROJO (herida/inflamación), DORADO (reparador Kintsugi).
- * - Comportamiento emergente sin líder central.
+ * - Percepción sensorial local de 3 sondas (Physarum 3-probe).
+ * - Cero agentes inmóviles: velocidad continua y dinámica sin estancamiento.
  * - Bordes toroidales sin paredes.
+ * - Paletas de alta luminosidad (Azul natural, Rojo herida, Oro Kintsugi).
  */
 
 import { FlowField } from './flowField';
@@ -27,24 +27,19 @@ export class Agent {
   public ax: number;
   public ay: number;
 
-  public heading: number; // Ángulo actual de orientación
+  public heading: number;
   public maxSpeed: number;
   public maxForce: number;
 
-  public type: AgentType = AgentType.BLUE;
-  public colorIndex: number = 0; // Tono específico dentro de su paleta
+  public colorIndex: number = 0; // Tono específico dentro de la paleta activa
 
-  // Parámetros sensoriales individuales (variación biológica para evitar movimientos mecánicos)
+  // Parámetros sensoriales individuales
   public sensorDist: number;
   public sensorAngle: number;
   public turnSpeed: number;
 
   public life: number;
   public maxLife: number;
-
-  // Memoria de herida o atracción
-  public woundAffinity: number = 0.0;
-  public goldEnergy: number = 0.0;
 
   constructor(x: number, y: number) {
     this.x = x;
@@ -54,7 +49,7 @@ export class Agent {
 
     const angle = Math.random() * Math.PI * 2;
     this.heading = angle;
-    this.maxSpeed = 1.6 + Math.random() * 1.1; // Variación controlada de velocidad
+    this.maxSpeed = 1.6 + Math.random() * 1.1; // Variación orgánica de velocidad
     this.vx = Math.cos(angle) * this.maxSpeed;
     this.vy = Math.sin(angle) * this.maxSpeed;
     this.ax = 0;
@@ -65,20 +60,17 @@ export class Agent {
     this.sensorAngle = (22.0 + Math.random() * 18.0) * (Math.PI / 180.0);
     this.turnSpeed = 0.14 + Math.random() * 0.08;
 
-    this.maxLife = 200 + Math.floor(Math.random() * 180);
+    this.maxLife = 220 + Math.floor(Math.random() * 180);
     this.life = Math.floor(Math.random() * this.maxLife);
 
     this.colorIndex = Math.floor(Math.random() * 5);
   }
 
-  public reset(x: number, y: number, type: AgentType = AgentType.BLUE) {
+  public reset(x: number, y: number) {
     this.x = x;
     this.y = y;
     this.prevX = x;
     this.prevY = y;
-    this.type = type;
-    this.woundAffinity = 0.0;
-    this.goldEnergy = type === AgentType.GOLD ? 1.0 : 0.0;
     this.life = this.maxLife;
   }
 
@@ -106,20 +98,20 @@ export class AgentSystem {
 
   // Paleta roja de heridas (5 tonos carmesí y escarlata)
   public readonly redPalette = [
-    'rgba(255, 228, 230, 0.85)', // Resplandor especular claro
-    'rgba(251, 113, 133, 0.70)', // Rosa herida vivo
-    'rgba(244, 63, 94, 0.65)',   // Carmesí intenso
-    'rgba(225, 29, 72, 0.60)',   // Escarlata profundo
-    'rgba(159, 18, 57, 0.50)'    // Borgoña / sangre oscura
+    'rgba(255, 228, 230, 0.92)', // Resplandor especular claro
+    'rgba(251, 113, 133, 0.80)', // Rosa herida vivo
+    'rgba(244, 63, 94, 0.75)',   // Carmesí intenso
+    'rgba(225, 29, 72, 0.70)',   // Escarlata profundo
+    'rgba(159, 18, 57, 0.60)'    // Borgoña / sangre oscura
   ];
 
   // Paleta dorada Kintsugi (5 tonos de oro líquido resplandeciente)
   public readonly goldPalette = [
-    'rgba(255, 250, 220, 0.95)', // Brillo blanco-dorado especular
-    'rgba(254, 240, 138, 0.85)', // Oro claro brillante
-    'rgba(250, 204, 21, 0.80)',  // Oro 24K puro
-    'rgba(245, 158, 11, 0.75)',  // Ámbar cálido
-    'rgba(217, 119, 6, 0.65)'    // Bronce/oro antiguo
+    'rgba(255, 250, 220, 0.98)', // Brillo blanco-dorado especular
+    'rgba(254, 240, 138, 0.90)', // Oro claro brillante
+    'rgba(250, 204, 21, 0.85)',  // Oro 24K puro
+    'rgba(245, 158, 11, 0.80)',  // Ámbar cálido
+    'rgba(217, 119, 6, 0.70)'    // Bronce / oro antiguo
   ];
 
   constructor(w: number, h: number, count: number = 3800) {
@@ -148,64 +140,9 @@ export class AgentSystem {
   }
 
   /**
-   * Transforma agentes existentes situados en el camino / afluente hacia una herida en agentes dorados.
-   * Estos agentes recorren la corriente natural, depositan su oro sobre la herida y la sanan.
+   * Actualiza el movimiento dinámico y la cinemática fluida de los agentes a 60 FPS
    */
-  public convertUpstreamAgentsToGold(woundTarget: { x: number; y: number }, maxToConvert: number = 40): number {
-    let converted = 0;
-
-    // 1. Buscar agentes existentes en el corredor corriente arriba (radio 360px)
-    for (let i = 0; i < this.agents.length && converted < maxToConvert; i++) {
-      const a = this.agents[i];
-      if (a.type === AgentType.GOLD) continue;
-
-      const dx = a.x - woundTarget.x;
-      const dy = a.y - woundTarget.y;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist < 360.0) {
-        a.type = AgentType.GOLD;
-        a.goldEnergy = 1.0;
-        // Reorientar suavemente hacia la entrada de la herida
-        a.heading = Math.atan2(-dy, -dx);
-        a.vx = Math.cos(a.heading) * a.maxSpeed * 1.25;
-        a.vy = Math.sin(a.heading) * a.maxSpeed * 1.25;
-        converted++;
-      }
-    }
-
-    // 2. Si hay pocos agentes en ese radio, buscar en un radio más amplio
-    if (converted < 20) {
-      for (let i = 0; i < this.agents.length && converted < maxToConvert; i++) {
-        const a = this.agents[i];
-        if (a.type === AgentType.GOLD) continue;
-
-        const dx = a.x - woundTarget.x;
-        const dy = a.y - woundTarget.y;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist < 600.0) {
-          a.type = AgentType.GOLD;
-          a.goldEnergy = 1.0;
-          a.heading = Math.atan2(-dy, -dx);
-          a.vx = Math.cos(a.heading) * a.maxSpeed * 1.2;
-          a.vy = Math.sin(a.heading) * a.maxSpeed * 1.2;
-          converted++;
-        }
-      }
-    }
-
-    return converted;
-  }
-
-  /**
-   * Actualiza el estado, percepción sensorial local y cinemática de los agentes.
-   */
-  public update(
-    dt: number,
-    flowField: FlowField,
-    woundField?: { getWoundAt: (x: number, y: number) => { dist: number; intensity: number; isRepaired: boolean } | null; getNearestWound: (x: number, y: number) => { x: number; y: number; intensity: number; isRepaired: boolean } | null }
-  ) {
+  public update(dt: number, flowField: FlowField) {
     const W = this.width;
     const H = this.height;
     const timeScale = Math.min(dt * 60.0, 2.0);
@@ -216,37 +153,7 @@ export class AgentSystem {
       a.prevX = a.x;
       a.prevY = a.y;
 
-      // 1. Percepción Local de Heridas
-      const woundData = woundField ? woundField.getWoundAt(a.x, a.y) : null;
-
-      if (woundData && !woundData.isRepaired) {
-        if (a.type === AgentType.GOLD) {
-          // El agente dorado está dentro de la fractura depositando su oro
-          a.goldEnergy -= 0.012; // consume gradualmente su oro al transferirlo a la fractura
-          if (a.goldEnergy <= 0) {
-            // Transfirió su oro completamente: vuelve a ser un agente azul que sigue la corriente
-            a.type = AgentType.BLUE;
-            a.goldEnergy = 0;
-          }
-        } else {
-          // El agente azul entra en la fractura y se transforma temporalmente a ROJO
-          a.type = AgentType.RED;
-        }
-      } else {
-        // Fuera de la herida
-        if (a.type === AgentType.RED) {
-          // Al salir del corredor de la herida, el agente rojo vuelve a azul inmediatamente
-          a.type = AgentType.BLUE;
-        } else if (a.type === AgentType.GOLD) {
-          // Si el agente dorado ya entró y salió de una herida (su energía bajó), vuelve a azul
-          if (a.goldEnergy < 0.95) {
-            a.type = AgentType.BLUE;
-            a.goldEnergy = 0;
-          }
-        }
-      }
-
-      // 2. Muestreo de Sensores Locales (Physarum 3-probe perception)
+      // 1. Muestreo de Sensores Locales (Physarum 3-probe perception)
       const currentAngle = Math.atan2(a.vy, a.vx);
       a.heading = currentAngle;
 
@@ -265,62 +172,26 @@ export class AgentSystem {
       const sRightX = a.x + Math.cos(a.heading + sAngle) * fDist;
       const sRightY = a.y + Math.sin(a.heading + sAngle) * fDist;
 
-      // Evaluar dirección deseada según tipo de agente
-      let desiredAngle = a.heading;
+      // Muestreo del campo vectorial
+      const flowFront = flowField.sampleVelocity(sFrontX, sFrontY);
+      const flowLeft = flowField.sampleVelocity(sLeftX, sLeftY);
+      const flowRight = flowField.sampleVelocity(sRightX, sRightY);
 
-      if (a.type === AgentType.GOLD && woundField) {
-        // Los agentes dorados tienen quimiotaxis hacia las heridas no reparadas
-        const nearestWound = woundField.getNearestWound(a.x, a.y);
-        if (nearestWound && !nearestWound.isRepaired) {
-          const dx = nearestWound.x - a.x;
-          const dy = nearestWound.y - a.y;
-          const distToWound = Math.hypot(dx, dy);
+      // Dirección deseada determinada por el vector local
+      const desiredAngle = Math.atan2(flowFront.vy, flowFront.vx);
 
-          // Si perciben la herida dentro de su radio sensorial extendido
-          if (distToWound < 450.0) {
-            const woundAngle = Math.atan2(dy, dx);
-            // Mezclar suavemente la dirección del flujo con la atracción a la herida
-            const flow = flowField.sampleVelocity(a.x, a.y);
-            const flowAngle = Math.atan2(flow.vy, flow.vx);
-            desiredAngle = flowAngle * 0.35 + woundAngle * 0.65;
-          } else {
-            const flow = flowField.sampleVelocity(a.x, a.y);
-            desiredAngle = Math.atan2(flow.vy, flow.vx);
-          }
-        } else {
-          const flow = flowField.sampleVelocity(a.x, a.y);
-          desiredAngle = Math.atan2(flow.vy, flow.vx);
-        }
-      } else if (a.type === AgentType.RED) {
-        // Los agentes rojos sufren perturbación y desvío caótico en la herida
-        const flow = flowField.sampleVelocity(a.x, a.y);
-        const flowAngle = Math.atan2(flow.vy, flow.vx);
-        // Desvío angular y turbulencia local
-        const jitter = Math.sin(a.x * 0.05 + a.y * 0.05) * 1.2;
-        desiredAngle = flowAngle + jitter;
-      } else {
-        // Agentes azules estándar: combinan el sensor frontal con el campo
-        const flowFront = flowField.sampleVelocity(sFrontX, sFrontY);
-        const flowLeft = flowField.sampleVelocity(sLeftX, sLeftY);
-        const flowRight = flowField.sampleVelocity(sRightX, sRightY);
-
-        // Alineación suave con el vector local
-        desiredAngle = Math.atan2(flowFront.vy, flowFront.vx);
-      }
-
-      // 3. Regla de Steering (Reynolds): Fuerza proporcional a la diferencia angular
+      // 2. Regla de Steering (Reynolds): Fuerza proporcional a la diferencia angular
       let angleDiff = desiredAngle - a.heading;
-      // Normalizar entre -PI y +PI
       angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
 
       const turn = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), a.turnSpeed);
       a.heading += turn;
 
-      // Deseada velocidad
+      // Velocidad objetivo
       const targetVx = Math.cos(a.heading) * a.maxSpeed;
       const targetVy = Math.sin(a.heading) * a.maxSpeed;
 
-      // Fuerza de gobierno
+      // Fuerza de gobierno limitada
       const steerX = Math.min(Math.max(targetVx - a.vx, -a.maxForce), a.maxForce);
       const steerY = Math.min(Math.max(targetVy - a.vy, -a.maxForce), a.maxForce);
 
@@ -332,11 +203,14 @@ export class AgentSystem {
       a.ax = 0;
       a.ay = 0;
 
-      // Limitar a velocidad máxima
+      // Limitar a velocidad máxima y asegurar que nunca se detenga (sin agentes inmóviles)
       const curSpeed = Math.hypot(a.vx, a.vy);
       if (curSpeed > a.maxSpeed) {
         a.vx = (a.vx / curSpeed) * a.maxSpeed;
         a.vy = (a.vy / curSpeed) * a.maxSpeed;
+      } else if (curSpeed < 1.2) {
+        a.vx = Math.cos(a.heading) * 1.5;
+        a.vy = Math.sin(a.heading) * 1.5;
       }
 
       // Actualizar posición
@@ -344,7 +218,7 @@ export class AgentSystem {
       a.y += a.vy * timeScale;
       a.life--;
 
-      // 4. Bordes Toroidales Continuos (Sin paredes)
+      // 3. Bordes Toroidales Continuos (Sin paredes ni colisiones)
       let wrapped = false;
       if (a.x < 0) {
         a.x += W;
@@ -369,8 +243,6 @@ export class AgentSystem {
         a.prevX = a.x;
         a.prevY = a.y;
         a.life = a.maxLife;
-        a.type = AgentType.BLUE;
-        a.goldEnergy = 0;
         wrapped = true;
       }
 

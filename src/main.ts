@@ -81,7 +81,7 @@ function initApp() {
     // B. Dinámicas de simulación
     woundManager.update(dt);
     flowField.update(dt, timeSec);
-    agentSystem.update(dt, flowField, woundManager);
+    agentSystem.update(dt, flowField);
 
     // C. Renderizado y persistencia de estelas (Azul, Rojo herida, Oro Kintsugi)
     trailSystem.render(agentSystem, woundManager, ctx);
