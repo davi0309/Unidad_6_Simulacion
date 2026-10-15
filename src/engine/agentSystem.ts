@@ -1,4 +1,4 @@
-﻿/**
+/**
  * agentSystem.ts
  * Sistema de Agentes Autónomos con Percepción Local para HEAL:
  * - Cinemática de Reynolds (posición, velocidad, aceleración, fuerza máxima de giro).
@@ -44,6 +44,7 @@ export class Agent {
 
   // Memoria de herida o atracción
   public woundAffinity: number = 0.0;
+  public goldEnergy: number = 0.0;
 
   constructor(x: number, y: number) {
     this.x = x;
@@ -77,6 +78,7 @@ export class Agent {
     this.prevY = y;
     this.type = type;
     this.woundAffinity = 0.0;
+    this.goldEnergy = type === AgentType.GOLD ? 1.0 : 0.0;
     this.life = this.maxLife;
   }
 
@@ -93,35 +95,32 @@ export class AgentSystem {
 
   public agents: Agent[] = [];
 
-  // Paleta azul orgánica (5 tonos graduados de celeste a azul cobalto profundo)
+  // Paleta azul orgánica ultra-luminosa (5 tonos vibrantes y radiantes de celeste a cobalto brillante)
   public readonly bluePalette = [
-    'rgba(186, 230, 253, 0.40)', // Celeste suave muy luminoso
-    'rgba(56, 189, 248, 0.38)',  // Cian/azul cielo
-    'rgba(14, 165, 233, 0.35)',  // Azul cerúleo vibrante
-    'rgba(37, 99, 235, 0.32)',   // Azul cobalto medio
-    'rgba(29, 78, 216, 0.28)'    // Azul profundo medianoche
+    'rgba(240, 249, 255, 0.96)', // Destello blanco-celeste eléctrico de altísima luminosidad
+    'rgba(186, 230, 253, 0.90)', // Celeste cian muy brillante
+    'rgba(56, 189, 248, 0.84)',  // Cian eléctrico
+    'rgba(14, 165, 233, 0.78)',  // Azul cerúleo vivo
+    'rgba(37, 99, 235, 0.72)'    // Azul cobalto luminoso
   ];
 
   // Paleta roja de heridas (5 tonos carmesí y escarlata)
   public readonly redPalette = [
-    'rgba(255, 228, 230, 0.70)', // Resplandor especular claro
-    'rgba(251, 113, 133, 0.55)', // Rosa herida vivo
-    'rgba(244, 63, 94, 0.50)',   // Carmesí intenso
-    'rgba(225, 29, 72, 0.48)',   // Escarlata profundo
-    'rgba(159, 18, 57, 0.42)'    // Borgoña / sangre oscura
+    'rgba(255, 228, 230, 0.85)', // Resplandor especular claro
+    'rgba(251, 113, 133, 0.70)', // Rosa herida vivo
+    'rgba(244, 63, 94, 0.65)',   // Carmesí intenso
+    'rgba(225, 29, 72, 0.60)',   // Escarlata profundo
+    'rgba(159, 18, 57, 0.50)'    // Borgoña / sangre oscura
   ];
 
   // Paleta dorada Kintsugi (5 tonos de oro líquido resplandeciente)
   public readonly goldPalette = [
-    'rgba(255, 250, 220, 0.85)', // Brillo blanco-dorado especular
-    'rgba(254, 240, 138, 0.70)', // Oro claro brillante
-    'rgba(250, 204, 21, 0.65)',  // Oro 24K puro
-    'rgba(245, 158, 11, 0.60)',  // Ámbar cálido
-    'rgba(217, 119, 6, 0.55)'    // Bronce/oro antiguo
+    'rgba(255, 250, 220, 0.95)', // Brillo blanco-dorado especular
+    'rgba(254, 240, 138, 0.85)', // Oro claro brillante
+    'rgba(250, 204, 21, 0.80)',  // Oro 24K puro
+    'rgba(245, 158, 11, 0.75)',  // Ámbar cálido
+    'rgba(217, 119, 6, 0.65)'    // Bronce/oro antiguo
   ];
-
-  // Proporción temporal de agentes dorados (0.0 a 1.0)
-  public goldRatio: number = 0.0;
 
   constructor(w: number, h: number, count: number = 3800) {
     this.width = w;
@@ -149,6 +148,57 @@ export class AgentSystem {
   }
 
   /**
+   * Transforma agentes existentes situados en el camino / afluente hacia una herida en agentes dorados.
+   * Estos agentes recorren la corriente natural, depositan su oro sobre la herida y la sanan.
+   */
+  public convertUpstreamAgentsToGold(woundTarget: { x: number; y: number }, maxToConvert: number = 40): number {
+    let converted = 0;
+
+    // 1. Buscar agentes existentes en el corredor corriente arriba (radio 360px)
+    for (let i = 0; i < this.agents.length && converted < maxToConvert; i++) {
+      const a = this.agents[i];
+      if (a.type === AgentType.GOLD) continue;
+
+      const dx = a.x - woundTarget.x;
+      const dy = a.y - woundTarget.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < 360.0) {
+        a.type = AgentType.GOLD;
+        a.goldEnergy = 1.0;
+        // Reorientar suavemente hacia la entrada de la herida
+        a.heading = Math.atan2(-dy, -dx);
+        a.vx = Math.cos(a.heading) * a.maxSpeed * 1.25;
+        a.vy = Math.sin(a.heading) * a.maxSpeed * 1.25;
+        converted++;
+      }
+    }
+
+    // 2. Si hay pocos agentes en ese radio, buscar en un radio más amplio
+    if (converted < 20) {
+      for (let i = 0; i < this.agents.length && converted < maxToConvert; i++) {
+        const a = this.agents[i];
+        if (a.type === AgentType.GOLD) continue;
+
+        const dx = a.x - woundTarget.x;
+        const dy = a.y - woundTarget.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist < 600.0) {
+          a.type = AgentType.GOLD;
+          a.goldEnergy = 1.0;
+          a.heading = Math.atan2(-dy, -dx);
+          a.vx = Math.cos(a.heading) * a.maxSpeed * 1.2;
+          a.vy = Math.sin(a.heading) * a.maxSpeed * 1.2;
+          converted++;
+        }
+      }
+    }
+
+    return converted;
+  }
+
+  /**
    * Actualiza el estado, percepción sensorial local y cinemática de los agentes.
    */
   public update(
@@ -161,9 +211,6 @@ export class AgentSystem {
     const timeScale = Math.min(dt * 60.0, 2.0);
     const numAgents = this.agents.length;
 
-    // Conteo para modular la proporción de agentes dorados según la evolución temporal
-    let goldCountTarget = Math.floor(numAgents * this.goldRatio);
-
     for (let i = 0; i < numAgents; i++) {
       const a = this.agents[i];
       a.prevX = a.x;
@@ -173,16 +220,29 @@ export class AgentSystem {
       const woundData = woundField ? woundField.getWoundAt(a.x, a.y) : null;
 
       if (woundData && !woundData.isRepaired) {
-        // En la zona de herida: se transforma temporalmente a ROJO
-        a.type = AgentType.RED;
-        a.woundAffinity = Math.min(1.0, a.woundAffinity + 0.1);
-      } else {
-        // Si no está en herida: puede ser DORADO (según proporción global) o AZUL
-        if (i < goldCountTarget) {
-          a.type = AgentType.GOLD;
+        if (a.type === AgentType.GOLD) {
+          // El agente dorado está dentro de la fractura depositando su oro
+          a.goldEnergy -= 0.012; // consume gradualmente su oro al transferirlo a la fractura
+          if (a.goldEnergy <= 0) {
+            // Transfirió su oro completamente: vuelve a ser un agente azul que sigue la corriente
+            a.type = AgentType.BLUE;
+            a.goldEnergy = 0;
+          }
         } else {
+          // El agente azul entra en la fractura y se transforma temporalmente a ROJO
+          a.type = AgentType.RED;
+        }
+      } else {
+        // Fuera de la herida
+        if (a.type === AgentType.RED) {
+          // Al salir del corredor de la herida, el agente rojo vuelve a azul inmediatamente
           a.type = AgentType.BLUE;
-          a.woundAffinity = Math.max(0.0, a.woundAffinity - 0.02);
+        } else if (a.type === AgentType.GOLD) {
+          // Si el agente dorado ya entró y salió de una herida (su energía bajó), vuelve a azul
+          if (a.goldEnergy < 0.95) {
+            a.type = AgentType.BLUE;
+            a.goldEnergy = 0;
+          }
         }
       }
 
@@ -309,6 +369,8 @@ export class AgentSystem {
         a.prevX = a.x;
         a.prevY = a.y;
         a.life = a.maxLife;
+        a.type = AgentType.BLUE;
+        a.goldEnergy = 0;
         wrapped = true;
       }
 

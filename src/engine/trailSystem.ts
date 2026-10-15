@@ -1,4 +1,4 @@
-﻿/**
+/**
  * trailSystem.ts
  * Sistema de Renderizado y Persistencia de Rastros para HEAL:
  * - Lienzo principal con persistencia y desvanecimiento controlado sobre fondo azul-noche (#02040a).
@@ -69,24 +69,24 @@ export class TrailSystem {
     const ctx = this.mainCtx;
     const gCtx = this.goldCtx;
 
-    // 1. Desvanecimiento suave en el lienzo principal (preserva estelas sin saturar)
+    // 1. Desvanecimiento suave en el lienzo principal (preserva estelas luminosas sin saturar)
     ctx.fillStyle = `rgba(2, 4, 10, ${this.decayRate.toFixed(4)})`;
     ctx.fillRect(0, 0, W, H);
 
-    // Muy suave desvanecimiento del lienzo dorado para permitir que el oro kintsugi persista
-    gCtx.fillStyle = 'rgba(0, 0, 0, 0.0035)';
+    // Micro-desvanecimiento en el lienzo de costuras doradas usando destination-out para no oscurecer el fondo
+    gCtx.save();
+    gCtx.globalCompositeOperation = 'destination-out';
+    gCtx.fillStyle = 'rgba(0, 0, 0, 0.0006)';
     gCtx.fillRect(0, 0, W, H);
+    gCtx.restore();
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 0.85;
 
     gCtx.lineCap = 'round';
     gCtx.lineJoin = 'round';
-    gCtx.lineWidth = 1.15;
 
-    // Buffers de trazo agrupados por tipo y color para máximo rendimiento (cero lag)
-    // 5 tonos de azul, 5 tonos de rojo, 5 tonos de oro
+    // Buffers de trazo agrupados por tipo y color para máximo rendimiento (60 FPS fluidos)
     const blueBatchesX1: number[][] = [[], [], [], [], []];
     const blueBatchesY1: number[][] = [[], [], [], [], []];
     const blueBatchesX2: number[][] = [[], [], [], [], []];
@@ -97,10 +97,17 @@ export class TrailSystem {
     const redBatchesX2: number[][] = [[], [], [], [], []];
     const redBatchesY2: number[][] = [[], [], [], [], []];
 
+    // Lotes para la estela dinámica del agente dorado (en viaje por la corriente)
     const goldBatchesX1: number[][] = [[], [], [], [], []];
     const goldBatchesY1: number[][] = [[], [], [], [], []];
     const goldBatchesX2: number[][] = [[], [], [], [], []];
     const goldBatchesY2: number[][] = [[], [], [], [], []];
+
+    // Lotes EXCLUSIVOS para la costura Kintsugi permanente (SOLO dentro de las grietas)
+    const kintsugiBatchesX1: number[][] = [[], [], [], [], []];
+    const kintsugiBatchesY1: number[][] = [[], [], [], [], []];
+    const kintsugiBatchesX2: number[][] = [[], [], [], [], []];
+    const kintsugiBatchesY2: number[][] = [[], [], [], [], []];
 
     const agents = agentSystem.agents;
     const count = agents.length;
@@ -128,17 +135,29 @@ export class TrailSystem {
         redBatchesX2[cIdx].push(a.x);
         redBatchesY2[cIdx].push(a.y);
       } else if (a.type === AgentType.GOLD) {
+        // En el lienzo dinámico se aprecia el filamento dorado del agente
         goldBatchesX1[cIdx].push(a.prevX);
         goldBatchesY1[cIdx].push(a.prevY);
         goldBatchesX2[cIdx].push(a.x);
         goldBatchesY2[cIdx].push(a.y);
 
-        // Si el agente dorado está cerca de una herida, depositar curación
-        woundManager.addHealing(a.x, a.y, 0.004);
+        // SOLO si el agente dorado está dentro del corredor de una fractura activa:
+        const woundHit = woundManager.getWoundAt(a.x, a.y);
+        if (woundHit) {
+          // Depositar la costura permanente Kintsugi
+          kintsugiBatchesX1[cIdx].push(a.prevX);
+          kintsugiBatchesY1[cIdx].push(a.prevY);
+          kintsugiBatchesX2[cIdx].push(a.x);
+          kintsugiBatchesY2[cIdx].push(a.y);
+
+          // Curar la herida gradualmente
+          woundManager.addHealing(a.x, a.y, 0.007);
+        }
       }
     }
 
-    // Dibujar lotes de trazo azul
+    // 1. Dibujar lotes de trazo azul (alta luminosidad y presencia)
+    ctx.lineWidth = 1.15;
     for (let c = 0; c < 5; c++) {
       const bX1 = blueBatchesX1[c];
       if (bX1.length === 0) continue;
@@ -155,7 +174,8 @@ export class TrailSystem {
       ctx.stroke();
     }
 
-    // Dibujar lotes de trazo rojo (heridas)
+    // 2. Dibujar lotes de trazo rojo (fracturas abiertas en la corriente)
+    ctx.lineWidth = 1.35;
     for (let c = 0; c < 5; c++) {
       const rX1 = redBatchesX1[c];
       if (rX1.length === 0) continue;
@@ -172,7 +192,8 @@ export class TrailSystem {
       ctx.stroke();
     }
 
-    // Dibujar lotes de trazo dorado tanto en el lienzo dinámico como en el lienzo Kintsugi permanente
+    // 3. Dibujar lotes de trazo dorado dinámico (estela suave que se desvanece)
+    ctx.lineWidth = 1.35;
     for (let c = 0; c < 5; c++) {
       const gX1 = goldBatchesX1[c];
       if (gX1.length === 0) continue;
@@ -180,7 +201,6 @@ export class TrailSystem {
       const gX2 = goldBatchesX2[c];
       const gY2 = goldBatchesY2[c];
 
-      // Lienzo dinámico
       ctx.beginPath();
       for (let k = 0; k < gX1.length; k++) {
         ctx.moveTo(gX1[k], gY1[k]);
@@ -188,21 +208,30 @@ export class TrailSystem {
       }
       ctx.strokeStyle = agentSystem.goldPalette[c];
       ctx.stroke();
+    }
 
-      // Lienzo permanente Kintsugi
+    // 4. Dibujar costura Kintsugi permanente (ESTRICTAMENTE dentro de las grietas)
+    gCtx.lineWidth = 1.50;
+    for (let c = 0; c < 5; c++) {
+      const kX1 = kintsugiBatchesX1[c];
+      if (kX1.length === 0) continue;
+      const kY1 = kintsugiBatchesY1[c];
+      const kX2 = kintsugiBatchesX2[c];
+      const kY2 = kintsugiBatchesY2[c];
+
       gCtx.beginPath();
-      for (let k = 0; k < gX1.length; k++) {
-        gCtx.moveTo(gX1[k], gY1[k]);
-        gCtx.lineTo(gX2[k], gY2[k]);
+      for (let k = 0; k < kX1.length; k++) {
+        gCtx.moveTo(kX1[k], kY1[k]);
+        gCtx.lineTo(kX2[k], kY2[k]);
       }
       gCtx.strokeStyle = agentSystem.goldPalette[c];
       gCtx.stroke();
     }
 
-    // 2. Componer en el lienzo de destino
+    // 5. Componer en el lienzo de destino
     targetCtx.drawImage(this.mainCanvas, 0, 0);
 
-    // Superponer la capa dorada Kintsugi con resplandor
+    // Superponer la capa dorada Kintsugi permanente de las heridas
     targetCtx.drawImage(this.goldCanvas, 0, 0);
   }
 }

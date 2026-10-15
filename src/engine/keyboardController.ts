@@ -1,4 +1,4 @@
-﻿/**
+/**
  * keyboardController.ts
  * Controlador de Interpretación Musical por Teclado para HEAL:
  * - 9 teclas expresivas: Q, W, E, R, T, Y, U, I, O.
@@ -91,9 +91,14 @@ export class KeyboardController {
     const now = performance.now();
 
     switch (code) {
-      case 'KeyQ':
-        // Q — Herida: crea una nueva fractura en el cursor
-        const w = this.woundManager.createWound(x, y, 140.0, 1.0);
+      case 'KeyQ': {
+        // Q — Herida: crea una nueva fractura orgánica a lo largo de los caminos del Flow Field
+        const w = this.woundManager.createWound(
+          x,
+          y,
+          (fx, fy) => this.flowField.sampleVelocity(fx, fy),
+          1.0
+        );
         this.flowField.addPerturbation({
           type: 'turbulence',
           x,
@@ -104,8 +109,9 @@ export class KeyboardController {
           life: 3.5,
           maxLife: 3.5
         });
-        this.lastFeedback = { key: 'Q', label: 'Herida', action: 'Nueva fractura en el tejido', time: now };
+        this.lastFeedback = { key: 'Q', label: 'Herida', action: 'Fractura a lo largo de la corriente', time: now };
         break;
+      }
 
       case 'KeyW':
         // W — Desvío: golpe lateral de dirección en la corriente
@@ -184,18 +190,38 @@ export class KeyboardController {
         this.lastFeedback = { key: 'Y', label: 'Apertura', action: 'Separación y espacio negativo', time: now };
         break;
 
-      case 'KeyU':
-        // U — Reparación: incremento temporal de agentes dorados y vertido áureo
-        this.woundManager.addHealing(x, y, 0.22);
-        // Despertar un grupo de agentes dorados alrededor
-        for (let i = 0; i < 45 && i < this.agentSystem.agents.length; i++) {
-          const idx = Math.floor(Math.random() * this.agentSystem.agents.length);
-          const r = Math.random() * 80;
-          const a = Math.random() * Math.PI * 2;
-          this.agentSystem.agents[idx].reset(x + Math.cos(a) * r, y + Math.sin(a) * r, 2); // AgentType.GOLD
+      case 'KeyU': {
+        // U — Reparación Kintsugi: busca la herida y transforma agentes existentes corriente arriba a oro
+        let targetWound = this.woundManager.getNearestWound(x, y);
+        if (!targetWound) {
+          // Si no hay cerca del cursor, buscar cualquier herida activa no reparada
+          for (const wd of this.woundManager.wounds) {
+            if (!wd.isRepaired) {
+              targetWound = { x: wd.x, y: wd.y, intensity: wd.intensity, isRepaired: false, wound: wd };
+              break;
+            }
+          }
         }
-        this.lastFeedback = { key: 'U', label: 'Reparación', action: 'Vertido de oro Kintsugi', time: now };
+
+        if (targetWound) {
+          const upstream = this.woundManager.getUpstreamEntry(targetWound.wound);
+          const count = this.agentSystem.convertUpstreamAgentsToGold(upstream, 45);
+          this.lastFeedback = {
+            key: 'U',
+            label: 'Reparación',
+            action: `${count} agentes transformados a oro en la corriente`,
+            time: now
+          };
+        } else {
+          this.lastFeedback = {
+            key: 'U',
+            label: 'Reparación',
+            action: 'No hay fracturas abiertas que sanar',
+            time: now
+          };
+        }
         break;
+      }
 
       case 'KeyI':
         // I — Resonancia: onda expansiva ondulante concéntrica

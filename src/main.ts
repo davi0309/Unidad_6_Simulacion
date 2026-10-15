@@ -1,4 +1,4 @@
-﻿/**
+/**
  * main.ts
  * Punto de entrada principal para el Instrumento Visual Interactivo: HEAL
  * Inspirado en la metáfora del Kintsugi y la obra musical de Tom Odell.
@@ -75,10 +75,8 @@ function initApp() {
     lastTime = now;
     const timeSec = now * 0.001;
 
-    // A. Actualizar estado del audio y modular progresión temporal lenta de oro
-    const audioState = audioController.update();
-    // Proporción de agentes dorados aumenta suavemente a lo largo de la canción (0.0 -> 0.70)
-    agentSystem.goldRatio = audioState.progress * 0.70;
+    // A. Actualizar estado del audio
+    audioController.update();
 
     // B. Dinámicas de simulación
     woundManager.update(dt);
