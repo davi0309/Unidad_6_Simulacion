@@ -101,23 +101,25 @@ export class FlowFieldEngine {
     const cosPh = Math.cos(ph);
     const sinPh = Math.sin(ph);
 
-    // Muestreo toroidal periódico 4D
-    const t = time * 0.015;
+    // Muestreo toroidal periódico 4D suave
+    const t = time * 0.012;
 
-    // Primer nivel de distorsión (Domain Warp 1)
-    const qx = this.noise2D((cosTh + 1.2) * 1.5 + t, (sinTh + 1.2) * 1.5);
-    const qy = this.noise2D((cosPh + 1.2) * 1.5, (sinPh + 1.2) * 1.5 - t);
+    // Nivel 1 de distorsión de coordenadas (Domain Warp 1)
+    const qx = this.noise2D((cosTh + 1.5) * 1.6 + t, (sinTh + 1.5) * 1.6);
+    const qy = this.noise2D((cosPh + 1.5) * 1.6, (sinPh + 1.5) * 1.6 - t);
 
-    // Segundo nivel de distorsión (Domain Warp 2: produce pliegues sedosos)
-    const rx = this.noise2D((cosTh + 2.4 * qx + 1.5) * 1.4, (cosPh + 2.4 * qy + 2.2) * 1.4);
-    const ry = this.noise2D((sinTh + 2.4 * qx + 3.1) * 1.4, (sinPh + 2.4 * qy + 4.5) * 1.4);
+    // Nivel 2: pliegues dendríticos profundos que canalizan los ríos principales
+    const rx = this.noise2D((cosTh + 2.4 * qx + 1.2) * 1.4, (cosPh + 2.4 * qy + 1.8) * 1.4);
+    const ry = this.noise2D((sinTh + 2.4 * qx + 2.4) * 1.4, (sinPh + 2.4 * qy + 3.2) * 1.4);
 
-    // Ondulación armónica para dar fluidez continua
-    const harmonic = Math.sin(th * 2.0 + ph * 1.0 + t * 4.0) * 0.5;
+    // Meandro vertical predominante (top-to-bottom como en la imagen de referencia)
+    const meander = Math.sin(ph * 1.0 + cosTh * 1.2 + t * 1.8) * 0.70 + Math.cos(ph * 2.0 + t) * 0.35;
 
-    // Ángulo final con multiplicador fractal
-    const angleNoise = this.noise2D((cosTh + 2.0 * rx) * 1.6, (sinPh + 2.0 * ry) * 1.6 + t * 0.5);
-    return (angleNoise + harmonic) * Math.PI * 3.5;
+    // Pliegues y afluentes que alimentan los ríos principales desde los laterales
+    const foldNoise = (this.noise2D((cosTh + 2.2 * rx) * 1.7, (sinPh + 2.2 * ry) * 1.7 + t * 0.3) - 0.5) * 2.0;
+
+    // Flujo vertical hacia abajo (Math.PI * 0.5) modulado por los meandros y pliegues sinuosos
+    return Math.PI * 0.5 + meander + foldNoise;
   }
 
   /**
