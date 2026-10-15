@@ -1,7 +1,7 @@
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-  color: #e6edf3;
-  background-color: #000000;
+﻿:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #e2e8f0;
+  background-color: #02040a;
   color-scheme: dark;
 }
 
@@ -15,471 +15,299 @@ html, body, #app {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #000000;
+  background-color: #02040a;
   user-select: none;
 }
 
-canvas {
+canvas#renderCanvas {
   display: block;
   width: 100vw;
   height: 100vh;
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 1;
 }
 
 /* ==========================================================================
-   PANTALLA INICIAL · KINTSUGI (金継ぎ) MINIMALISTA
+   UI OVERLAY · HEAL (Minimalista y Contemplativo)
    ========================================================================== */
-.start-screen {
+.heal-ui-container {
   position: fixed;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at center, rgba(14, 18, 25, 0.90) 0%, rgba(7, 9, 12, 0.98) 100%);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  z-index: 100;
-  opacity: 1;
-  transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1), transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
-  padding: 24px;
-}
-
-.start-screen.fade-out {
-  opacity: 0;
-  transform: scale(1.025);
+  z-index: 20;
   pointer-events: none;
-}
-
-.start-card {
-  position: relative;
-  max-width: 720px;
-  width: 100%;
-  background: rgba(13, 17, 23, 0.72);
-  border: 1px solid rgba(255, 215, 120, 0.16);
-  border-radius: 20px;
-  padding: 36px 40px;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.85), 0 0 60px rgba(212, 175, 55, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  overflow: hidden;
+  justify-content: space-between;
+  padding: 24px 32px;
 }
 
-/* Marca de agua sutil en Kanji (金継ぎ = Kintsugi) */
-.kintsugi-watermark {
-  position: absolute;
-  top: -15px;
-  right: 18px;
-  font-size: 110px;
-  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Songti SC", serif;
-  font-weight: 200;
-  color: rgba(255, 215, 120, 0.035);
-  letter-spacing: 0.1em;
-  pointer-events: none;
-  line-height: 1;
-}
-
-.start-header {
-  text-align: left;
-}
-
-.start-kicker {
-  font-size: 10.5px;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: #ffd27a;
-  opacity: 0.9;
-  font-weight: 500;
-  display: block;
-}
-
-.start-title {
-  font-size: 40px;
-  font-weight: 300;
-  letter-spacing: 0.18em;
-  margin: 4px 0 2px 0;
-  color: #fff8ed;
-  text-shadow: 0 0 25px rgba(255, 210, 122, 0.25);
-}
-
-.start-subtitle {
-  font-size: 12.5px;
-  color: #8fa3b8;
-  letter-spacing: 0.04em;
-}
-
-.start-metaphor {
-  background: rgba(90, 15, 23, 0.10);
-  border-left: 2px solid #ffd27a;
-  padding: 12px 18px;
-  border-radius: 0 8px 8px 0;
-  font-size: 12.8px;
-  line-height: 1.6;
-  color: #ccd7e2;
-}
-
-.start-metaphor strong {
-  color: #ffd27a;
-  font-weight: 600;
-}
-
-.start-metaphor em {
-  display: block;
-  margin-top: 4px;
-  color: #f0d2bf;
-  font-style: italic;
-  font-size: 12px;
-}
-
-/* Grilla de controles ordenada y poética */
-.start-controls-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px 28px;
-  padding: 8px 0;
-}
-
-@media (max-width: 600px) {
-  .start-controls-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.control-col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.control-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.key-badge {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 215, 120, 0.25);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: #ffd27a;
-  white-space: nowrap;
-  min-width: 68px;
-  text-align: center;
-  box-shadow: inset 0 0 8px rgba(255, 215, 120, 0.05);
-}
-
-.control-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.control-text strong {
-  font-size: 12px;
-  font-weight: 500;
-  color: #f2f5f8;
-}
-
-.control-text span {
-  font-size: 11px;
-  color: #8b9baa;
-  line-height: 1.35;
-}
-
-/* Pie de pantalla y reproductor minimalista */
-.start-footer {
+/* 1. Barra Superior */
+.heal-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 4px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  flex-wrap: wrap;
+  pointer-events: auto;
 }
 
-/* Reproductor tipo pastilla (Pill) */
-.audio-pill {
+.brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 215, 120, 0.22);
-  border-radius: 40px;
-  padding: 6px 14px 6px 8px;
-  backdrop-filter: blur(10px);
 }
 
-.audio-play-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+.kintsugi-mark {
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", serif;
+  font-size: 15px;
+  color: #fbbf24;
+  letter-spacing: 2px;
+  opacity: 0.9;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #f8fafc;
+  text-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
+}
+
+.subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  color: #64748b;
+  letter-spacing: 1px;
+}
+
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.btn-icon {
+  background: none;
   border: none;
-  background: #ffd27a;
-  color: #0a0d13;
+  color: #38bdf8;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 0 12px rgba(255, 210, 122, 0.35);
+  transition: transform 0.15s ease, color 0.15s ease;
 }
 
-.audio-play-btn:hover {
-  transform: scale(1.08);
-  background: #fff0d0;
+.btn-icon:hover {
+  color: #7dd3fc;
+  transform: scale(1.1);
 }
 
-.audio-track-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.audio-song-name {
-  font-size: 11.5px;
-  font-weight: 500;
-  color: #eaf0f6;
-}
-
-.audio-song-desc {
-  font-size: 10px;
-  color: #8fa3b8;
-}
-
-.audio-change-label {
-  font-size: 10.5px;
-  color: #d4af37;
-  cursor: pointer;
-  opacity: 0.75;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: opacity 0.2s;
-}
-
-.audio-change-label:hover {
-  opacity: 1;
-  text-decoration: underline;
-}
-
-.audio-hidden-input {
-  display: none;
-}
-
-.start-begin-btn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 30px;
-  color: #fff6e6;
+.audio-time {
   font-size: 12px;
-  letter-spacing: 0.06em;
-  padding: 8px 18px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  transition: all 0.25s ease;
+  font-variant-numeric: tabular-nums;
+  color: #94a3b8;
+  letter-spacing: 1px;
 }
 
-.start-begin-btn:hover {
-  border-color: #ffd27a;
-  background: rgba(255, 215, 120, 0.08);
-  box-shadow: 0 0 20px rgba(255, 215, 120, 0.15);
-}
-
-.pulse-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ffd27a;
-  box-shadow: 0 0 8px #ffd27a;
-  animation: pulseAnim 2.2s infinite ease-in-out;
-}
-
-@keyframes pulseAnim {
-  0%, 100% { opacity: 0.35; transform: scale(0.9); }
-  50% { opacity: 1; transform: scale(1.25); }
-}
-
-/* ==========================================================================
-   HUD MINIMALISTA EN PANTALLA (DURANTE LA INTERPRETACIÓN)
-   ========================================================================== */
-.heal-hud {
-  position: fixed;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
-  pointer-events: auto;
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-
-.heal-hud.hidden {
-  opacity: 0;
-  transform: translateX(-50%) translateY(14px);
-  pointer-events: none;
-}
-
-.hud-capsule {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: rgba(10, 13, 19, 0.65);
-  border: 1px solid rgba(255, 215, 120, 0.18);
-  border-radius: 30px;
-  padding: 6px 16px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  font-size: 11px;
-  color: #c9d5e2;
-}
-
-.hud-section {
+.actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.hud-kanji {
-  color: #ffd27a;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.hud-label {
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #8da1b5;
-}
-
-.hud-bar-track {
-  width: 70px;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.hud-bar-fill {
-  width: 0%;
-  height: 100%;
-  background: linear-gradient(90deg, #d4af37, #fff3d1);
-  border-radius: 2px;
-  transition: width 0.3s ease;
-  box-shadow: 0 0 6px #ffd27a;
-}
-
-.hud-val {
-  font-family: ui-monospace, monospace;
+.btn-action {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
   font-size: 11px;
-  color: #ffd27a;
-  min-width: 28px;
-}
-
-.hud-sep {
-  width: 1px;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.hud-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #a0d2be;
-  box-shadow: 0 0 6px #a0d2be;
-  transition: all 0.3s ease;
-}
-
-.hud-dot.hud-dot-calm {
-  background: #a0d2be;
-  box-shadow: 0 0 6px #a0d2be;
-}
-
-.hud-dot.hud-dot-warning {
-  background: #ffd27a;
-  box-shadow: 0 0 6px #ffd27a;
-}
-
-.hud-dot.hud-dot-danger {
-  background: #ff7575;
-  box-shadow: 0 0 8px #ff7575;
-  animation: pulseDanger 0.8s infinite alternate;
-}
-
-@keyframes pulseDanger {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  100% { transform: scale(1.4); opacity: 1; }
-}
-
-.hud-btn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 3px 9px;
-  color: #c9d5e2;
-  font-size: 10.5px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
-.hud-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: #ffd27a;
-  color: #fff;
+.btn-action:hover {
+  background: rgba(30, 41, 59, 0.85);
+  color: #f8fafc;
+  border-color: rgba(56, 189, 248, 0.3);
 }
 
-.hud-btn.active {
-  border-color: #ffd27a;
-  color: #ffd27a;
-  background: rgba(255, 215, 120, 0.12);
+/* 2. Feedback de Tecla Activa */
+.key-feedback {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 6px 16px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  animation: feedbackPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.hud-key-tag {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-  padding: 1px 4px;
-  font-size: 9px;
-  font-family: monospace;
+.key-feedback .badge {
+  background: #38bdf8;
+  color: #02040a;
+  font-size: 12px;
+  font-weight: 800;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.hud-audio-btn {
-  border-color: rgba(255, 215, 120, 0.25);
-  color: #ffd27a;
+.key-feedback .desc {
+  font-size: 12px;
+  color: #e2e8f0;
+  font-weight: 500;
 }
 
-.hud-tip {
-  font-size: 9.5px;
-  color: #637688;
-  letter-spacing: 0.04em;
+@keyframes feedbackPop {
+  0% { transform: translate(-50%, -8px) scale(0.95); opacity: 0; }
+  100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
 }
 
-/* lil-gui custom tweaks */
-.lil-gui {
-  --background-color: rgba(14, 18, 26, 0.92);
-  --text-color: #d1d9e2;
-  --title-background-color: rgba(24, 30, 42, 0.95);
-  --widget-color: rgba(36, 44, 58, 0.85);
-  --hover-color: rgba(50, 62, 82, 0.85);
-  --focus-color: #ffd27a;
-  --number-color: #ffd27a;
-  --string-color: #8fa3b8;
-  border-radius: 12px;
+/* 3. Barra Inferior de Teclas */
+.heal-keyboard-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: auto;
+  background: rgba(15, 23, 42, 0.60);
   backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 210, 122, 0.2);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px 14px;
+  border-radius: 12px;
+  align-self: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.4s ease;
+}
+
+.key-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.key-item:hover {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.key-item.active {
+  background: rgba(56, 189, 248, 0.25);
+  transform: translateY(-2px);
+}
+
+.key-item .k {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.key-item .l {
+  font-size: 9px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 1px;
+}
+
+.key-item.active .l {
+  color: #38bdf8;
+}
+
+/* 4. Pantalla Final Contemplativa */
+.final-contemplation {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 4, 10, 0.85);
+  backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
   z-index: 50;
+  animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.final-card {
+  max-width: 520px;
+  text-align: center;
+  padding: 40px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 20px;
+  box-shadow: 0 0 40px rgba(245, 158, 11, 0.15);
+}
+
+.final-card .kanji {
+  font-size: 36px;
+  color: #fbbf24;
+  margin-bottom: 16px;
+  letter-spacing: 4px;
+}
+
+.final-card h2 {
+  font-size: 22px;
+  color: #f8fafc;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.final-card p {
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #02040a;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-primary:hover {
+  transform: scale(1.04);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
