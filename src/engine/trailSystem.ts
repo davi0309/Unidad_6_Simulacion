@@ -22,8 +22,8 @@ export class TrailSystem {
   public sandCanvas: HTMLCanvasElement;
   public sandCtx: CanvasRenderingContext2D;
 
-  // Parámetro de desvanecimiento suave de los filamentos sobre la arena
-  public decayRate: number = 0.018;
+  // Parámetro de desvanecimiento calibrado para que las estelas no ensucien la arena
+  public decayRate: number = 0.038;
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -62,51 +62,52 @@ export class TrailSystem {
   }
 
   /**
-   * Genera la textura pre-renderizada de arena Zen mineral oscura ("en nuestro estilo"):
-   * - Gradiente base nocturno profundo (obsidiana, lapislázuli oscuro #040817 -> #010207).
-   * - Micro-ondulaciones de rastrillo Zen / dunas suaves (Karesansui) con bajo contraste.
-   * - Millares de micro-granos de arena mineral oscura, feldespato, grafito y destellos dorados de mica.
-   * - Se pre-renderiza una sola vez en un canvas desacoplado (0 ms de coste por frame).
+   * Genera la textura pre-renderizada de arena de mar (tono piel / duna cálida y mate):
+   * - Tonalidad de arena de mar cálida, con matiz ocre/piel suave y no brillante (#9c7a60 -> #24160e).
+   * - Ondulaciones orgánicas de marea y viento marino (crestas suaves y surcos en sombra).
+   * - Micro-granulación táctil de arena costera con destellos tenues de cuarzo marino y nácar de conchilla.
+   * - Pre-renderizado en canvas desacoplado (0 ms de coste por frame).
    */
   public generateSandTexture() {
     const W = this.width;
     const H = this.height;
     const sCtx = this.sandCtx;
 
-    // 1. Gradiente base nocturno profundo (obsidiana y lapislázuli oscuro)
+    // 1. Gradiente base: Arena de mar cálida con tono piel/duna (mate, no estridente ni brillante)
     const bgGrad = sCtx.createRadialGradient(W * 0.5, H * 0.45, W * 0.08, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.65);
-    bgGrad.addColorStop(0.0, '#04091a'); // Centro nocturno con sutil profundidad mineral azulada
-    bgGrad.addColorStop(0.50, '#020612');
-    bgGrad.addColorStop(1.0, '#010207'); // Bordes en sombra viñeteada
+    bgGrad.addColorStop(0.0, '#9c7a60'); // Centro: arena de mar cálida tono piel suave (RGB: 156, 122, 96)
+    bgGrad.addColorStop(0.35, '#7f5c45'); // Matiz intermedio cálido de arena de playa
+    bgGrad.addColorStop(0.70, '#523727'); // Arena húmeda en sombra cálida
+    bgGrad.addColorStop(1.0, '#24160e');  // Bordes en viñeta profunda de bajamar nocturna
     sCtx.fillStyle = bgGrad;
     sCtx.fillRect(0, 0, W, H);
 
-    // 2. Ondulaciones de arena peinada (Surcos sutiles de jardín Zen Karesansui)
+    // 2. Ondulaciones de marea marina (surcos sutiles que deja el agua al retirarse)
     sCtx.save();
-    const rippleSpacing = 32.0;
+    const rippleSpacing = 34.0;
     const totalRipples = Math.ceil(H / rippleSpacing) + 4;
 
     for (let r = 0; r < totalRipples; r++) {
       const baseY = r * rippleSpacing - 20;
-      const phase = r * 0.35;
+      const phase = r * 0.38;
 
-      // Depresión en sombra del surco de arena
+      // Depresión en sombra del surco de la marea
       sCtx.beginPath();
-      sCtx.lineWidth = 14.0;
-      sCtx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
+      sCtx.lineWidth = 15.0;
+      sCtx.strokeStyle = 'rgba(28, 16, 10, 0.065)';
       for (let x = 0; x <= W + 40; x += 35) {
-        const y = baseY + Math.sin(x * 0.0045 + phase) * 18.0 + Math.cos(x * 0.002 - phase * 0.4) * 9.0;
+        const y = baseY + Math.sin(x * 0.0042 + phase) * 17.0 + Math.cos(x * 0.0022 - phase * 0.45) * 8.5;
         if (x === 0) sCtx.moveTo(x, y);
         else sCtx.lineTo(x, y);
       }
       sCtx.stroke();
 
-      // Cresta suavemente iluminada por luz lunar rasante
+      // Cresta de la ondulación iluminada suavemente con calidez
       sCtx.beginPath();
-      sCtx.lineWidth = 2.0;
-      sCtx.strokeStyle = 'rgba(186, 230, 253, 0.022)';
+      sCtx.lineWidth = 2.2;
+      sCtx.strokeStyle = 'rgba(255, 238, 218, 0.040)';
       for (let x = 0; x <= W + 40; x += 35) {
-        const y = baseY - 2.5 + Math.sin(x * 0.0045 + phase) * 18.0 + Math.cos(x * 0.002 - phase * 0.4) * 9.0;
+        const y = baseY - 2.5 + Math.sin(x * 0.0042 + phase) * 17.0 + Math.cos(x * 0.0022 - phase * 0.45) * 8.5;
         if (x === 0) sCtx.moveTo(x, y);
         else sCtx.lineTo(x, y);
       }
@@ -114,7 +115,7 @@ export class TrailSystem {
     }
     sCtx.restore();
 
-    // 3. Textura de micro-granos de arena mineral (grafito, cuarzo y mica dorada)
+    // 3. Textura de micro-granos de arena marina (sílice, conchilla triturada y cuarzo)
     const grainImg = sCtx.getImageData(0, 0, W, H);
     const data = grainImg.data;
     const len = data.length;
@@ -129,34 +130,34 @@ export class TrailSystem {
     for (let i = 0; i < len; i += 4) {
       const rVal = fastRand();
 
-      // Granulación táctil de arena mineral (42% de los píxeles)
-      if (rVal < 0.42) {
-        const grain = (fastRand() - 0.5) * 15;
-        data[i] = Math.min(255, Math.max(0, data[i] + grain));
-        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + grain * 1.05));
-        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + grain * 1.35));
-      } else if (rVal > 0.993) {
-        // Micro-destellos microscópicos de mica dorada o cuarzo (0.7%)
-        if (fastRand() > 0.55) {
-          // Destello dorado tenue de mica Kintsugi
-          data[i] = Math.min(255, data[i] + 48);
-          data[i + 1] = Math.min(255, data[i + 1] + 38);
+      // Granulación táctil de arena de mar (45% de los píxeles)
+      if (rVal < 0.45) {
+        const grain = (fastRand() - 0.5) * 16;
+        data[i] = Math.min(255, Math.max(0, data[i] + grain * 1.15));       // Más cálido (Rojo/Piel)
+        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + grain * 1.0)); // Amarillo suave (Verde)
+        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + grain * 0.75));// Menos azul
+      } else if (rVal > 0.992) {
+        // Micro-destellos de conchilla nacarada y granos dorados de cuarzo marino
+        if (fastRand() > 0.50) {
+          // Grano de cuarzo dorado / sílice marina cálida
+          data[i] = Math.min(255, data[i] + 45);
+          data[i + 1] = Math.min(255, data[i + 1] + 36);
           data[i + 2] = Math.min(255, data[i + 2] + 12);
         } else {
-          // Destello celeste de cuarzo mineral
-          data[i] = Math.min(255, data[i] + 28);
-          data[i + 1] = Math.min(255, data[i + 1] + 38);
-          data[i + 2] = Math.min(255, data[i + 2] + 52);
+          // Destello sutil de nácar de conchilla triturada
+          data[i] = Math.min(255, data[i] + 35);
+          data[i + 1] = Math.min(255, data[i + 1] + 32);
+          data[i + 2] = Math.min(255, data[i + 2] + 26);
         }
       }
     }
 
     sCtx.putImageData(grainImg, 0, 0);
 
-    // 4. Viñeteado suave en los bordes para centrar el foco contemplativo
-    const vignette = sCtx.createRadialGradient(W * 0.5, H * 0.5, W * 0.32, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.58);
+    // 4. Viñeteado cálido y suave en los bordes para preservar foco y profundidad
+    const vignette = sCtx.createRadialGradient(W * 0.5, H * 0.5, W * 0.30, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.60);
     vignette.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-    vignette.addColorStop(1.0, 'rgba(1, 2, 7, 0.45)');
+    vignette.addColorStop(1.0, 'rgba(20, 11, 7, 0.45)');
     sCtx.fillStyle = vignette;
     sCtx.fillRect(0, 0, W, H);
   }
