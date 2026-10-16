@@ -25,6 +25,9 @@ export class TrailSystem {
   // Parámetro de desvanecimiento calibrado para que las estelas no ensucien la arena
   public decayRate: number = 0.038;
 
+  // Alpha de transparencia del fondo de arena (más bajo, transparente y sutil)
+  public sandAlpha: number = 0.38;
+
   constructor(w: number, h: number) {
     this.width = w;
     this.height = h;
@@ -377,8 +380,15 @@ export class TrailSystem {
     }
 
     // 6. Componer en el lienzo de destino:
-    // Primero, el lecho de arena mineral Zen pre-renderizada
+    // Base nocturna profunda (#02040a)
+    targetCtx.fillStyle = '#02040a';
+    targetCtx.fillRect(0, 0, W, H);
+
+    // Primero, el lecho de arena de mar con alpha translúcido y sutil
+    targetCtx.save();
+    targetCtx.globalAlpha = this.sandAlpha;
     targetCtx.drawImage(this.sandCanvas, 0, 0);
+    targetCtx.restore();
 
     // Segundo, los filamentos luminosos que fluyen sobre la arena
     targetCtx.drawImage(this.mainCanvas, 0, 0);
