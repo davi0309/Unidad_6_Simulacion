@@ -195,7 +195,7 @@ export class WoundManager {
   }
 
   /**
-   * Crea un espacio de fractura roja (Tecla Q)
+   * Crea un espacio de fractura roja por pulsación (Tecla Q)
    */
   public createWound(
     startX: number,
@@ -204,6 +204,67 @@ export class WoundManager {
     intensity: number = 1.0
   ): TriggerZone {
     return this.createZone(startX, startY, ZoneType.WOUND, sampleFlow, intensity);
+  }
+
+  /**
+   * Inicia el trazado interactivo de una herida con el mouse sostenido (modo lápiz)
+   */
+  public startDrawnWound(x: number, y: number): TriggerZone {
+    const id = Math.random().toString(36).substring(2, 9);
+    const corridorWidth = 7.0;
+    const featherWidth = 28.0;
+
+    const zone: TriggerZone = {
+      id,
+      type: ZoneType.WOUND,
+      x,
+      y,
+      branches: [{ points: [{ x, y }] }],
+      corridorWidth,
+      featherWidth,
+      intensity: 1.0,
+      minX: x - featherWidth,
+      maxX: x + featherWidth,
+      minY: y - featherWidth,
+      maxY: y + featherWidth,
+      pulseTime: 0.0
+    };
+
+    this.zones.push(zone);
+    return zone;
+  }
+
+  /**
+   * Añade un nuevo punto al trazo del lápiz conforme el usuario arrastra el mouse
+   */
+  public addPointToDrawnWound(zone: TriggerZone, x: number, y: number) {
+    if (zone.branches.length === 0) return;
+    const pts = zone.branches[0].points;
+    const last = pts[pts.length - 1];
+
+    // Distancia mínima de 6px entre puntos para evitar sobrecargar de vértices
+    const distSq = (x - last.x) * (x - last.x) + (y - last.y) * (y - last.y);
+    if (distSq < 36.0) return;
+
+    pts.push({ x, y });
+
+    // Actualizar dinámicamente la caja delimitadora con el radio difuminado
+    zone.minX = Math.min(zone.minX, x - zone.featherWidth);
+    zone.maxX = Math.max(zone.maxX, x + zone.featherWidth);
+    zone.minY = Math.min(zone.minY, y - zone.featherWidth);
+    zone.maxY = Math.max(zone.maxY, y + zone.featherWidth);
+  }
+
+  /**
+   * Finaliza el trazo dibujado al soltar el clic
+   */
+  public finishDrawnWound(zone: TriggerZone) {
+    if (zone.branches.length === 0) return;
+    const pts = zone.branches[0].points;
+    // Si fue solo un clic estático, añadir un punto adyacente para definir el segmento
+    if (pts.length === 1) {
+      pts.push({ x: pts[0].x + 3.0, y: pts[0].y + 3.0 });
+    }
   }
 
   /**

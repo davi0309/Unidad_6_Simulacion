@@ -67,13 +67,21 @@ function initApp() {
     trailSystem.resize(screenW, screenH);
   });
 
-  // 4. Bucle principal de animación a 60 FPS
+  // 4. Bucle principal de animación a 60 FPS con dilatación temporal cinemática
   let lastTime = performance.now();
+  let currentSpeedScale = 1.0;
 
   function animate(now: number) {
-    const dt = Math.min((now - lastTime) / 1000.0, 0.08);
+    const rawDt = Math.min((now - lastTime) / 1000.0, 0.08);
     lastTime = now;
-    const timeSec = now * 0.001;
+
+    // Al sostener el clic y dibujar una herida con el cursor, el sistema entra en cámara lenta (0.30x)
+    const targetSpeedScale = keyboardController.isDrawingWound ? 0.30 : 1.0;
+    // Transición suave exponencial hacia la velocidad objetivo (cámara lenta gradual y orgánica)
+    currentSpeedScale += (targetSpeedScale - currentSpeedScale) * 0.14;
+
+    const dt = rawDt * currentSpeedScale;
+    const timeSec = now * 0.001 * currentSpeedScale;
 
     // A. Actualizar estado del audio
     audioController.update();

@@ -25,7 +25,8 @@ export class KeyboardController {
   private agentSystem: AgentSystem;
 
   public mousePos = { x: 0, y: 0 };
-  public isDragging: boolean = false;
+  public isDrawingWound: boolean = false;
+  private activeDrawingWound: any = null;
   public lastFeedback: KeyFeedback | null = null;
   public onRestartCallback?: () => void;
 
@@ -47,24 +48,67 @@ export class KeyboardController {
 
   private setupListeners() {
     window.addEventListener('pointermove', (e: PointerEvent) => {
-      if (this.isDragging) {
-        this.woundManager.moveNearestZone(this.mousePos.x, this.mousePos.y, e.clientX, e.clientY);
-      }
       this.mousePos.x = e.clientX;
       this.mousePos.y = e.clientY;
+
+      if (this.isDrawingWound && this.activeDrawingWound) {
+        // Modo lápiz: añadir punto a la herida dibujada
+        this.woundManager.addPointToDrawnWound(this.activeDrawingWound, e.clientX, e.clientY);
+
+        // Perturbación sutil en la punta del cursor dibujante
+        this.flowField.addPerturbation({
+          type: 'slow',
+          x: e.clientX,
+          y: e.clientY,
+          radius: 50.0,
+          maxRadius: 90.0,
+          strength: 2.5,
+          life: 1.0,
+          maxLife: 1.0
+        });
+      }
     });
 
     window.addEventListener('pointerdown', (e: PointerEvent) => {
-      if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
-      this.isDragging = true;
+      // Ignorar clics sobre botones o controles de la interfaz
+      if ((e.target as HTMLElement)?.closest('button, input, .audio-controls, .actions')) return;
+
+      this.isDrawingWound = true;
       this.mousePos.x = e.clientX;
       this.mousePos.y = e.clientY;
-      this.triggerKey('KeyQ', e.clientX, e.clientY);
+
+      // Iniciar el trazo de la herida con el cursor (como un lápiz)
+      this.activeDrawingWound = this.woundManager.startDrawnWound(e.clientX, e.clientY);
+
+      const now = performance.now();
+      this.lastFeedback = {
+        key: 'Mouse',
+        label: 'Dibujando Herida',
+        action: 'Trazando fractura con el cursor (cámara lenta)',
+        time: now
+      };
     });
 
-    window.addEventListener('pointerup', () => {
-      this.isDragging = false;
-    });
+    const finishDrawing = () => {
+      if (this.isDrawingWound) {
+        this.isDrawingWound = false;
+        if (this.activeDrawingWound) {
+          this.woundManager.finishDrawnWound(this.activeDrawingWound);
+          this.activeDrawingWound = null;
+          const now = performance.now();
+          this.lastFeedback = {
+            key: 'Mouse',
+            label: 'Herida Trazada',
+            action: 'Fractura completada en el tejido',
+            time: now
+          };
+        }
+      }
+    };
+
+    window.addEventListener('pointerup', finishDrawing);
+    window.addEventListener('pointercancel', finishDrawing);
+    window.addEventListener('blur', finishDrawing);
 
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       // Evitar conflictos con campos de texto
