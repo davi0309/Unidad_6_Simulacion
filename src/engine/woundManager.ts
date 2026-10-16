@@ -1,10 +1,9 @@
 /**
  * woundManager.ts
- * Gestor de Espacios Tipo Trigger (Fracturas Rojas y Costuras Doradas Kintsugi):
+ * Gestor de Espacios Tipo Trigger Difuminados (Fracturas Rojas y Costuras Doradas Kintsugi):
  * - Los espacios se construyen a lo largo de las líneas de flujo (no aleatorios).
- * - Cuando los filamentos pasan por la posición de un espacio rojo, se colorean de ROJO mientras estén dentro.
- * - Cuando los filamentos pasan por la posición de un espacio dorado, se colorean de ORO mientras estén dentro.
- * - Al salir del espacio, retornan inmediatamente a su color natural (AZUL).
+ * - Difuminado orgánico continuo (feathering): el color se funde suavemente sin bordes definidos o cortados.
+ * - Los filamentos adquieren el color del trigger de forma gradual y vuelven al azul natural al salir.
  * - Cero agentes inmóviles: el flujo es continuo, cinéticamente libre y a 60 FPS.
  */
 
@@ -28,13 +27,20 @@ export interface TriggerZone {
   x: number;
   y: number;
   branches: WoundBranch[];
-  corridorWidth: number; // Radio del corredor (ancho de influencia)
+  corridorWidth: number; // Radio del núcleo intenso (ej. 7px)
+  featherWidth: number;  // Radio del perímetro difuminado (ej. 28px)
   intensity: number;
   minX: number;
   maxX: number;
   minY: number;
   maxY: number;
   pulseTime: number;
+}
+
+export interface ZoneInfluence {
+  zone: TriggerZone;
+  intensity: number; // 0.0 (perímetro exterior) a 1.0 (núcleo interior)
+  dist: number;
 }
 
 // Alias de conveniencia para compatibilidad
@@ -135,7 +141,7 @@ export class WoundManager {
       cy = ny;
     }
 
-    // 3. Ramificación afluente compacta
+    // 3. Ramificación afluente compacta conectada en la sección media
     const branches: WoundBranch[] = [{ points: mainBranch }];
     const branchPointIdx = Math.floor(mainBranch.length * 0.50);
     const branchRoot = mainBranch[branchPointIdx];
@@ -164,7 +170,10 @@ export class WoundManager {
       branches.push({ points: subBranch });
     }
 
-    const corridorWidth = 13.0; // Corredor más pequeño y ajustado
+    // Dimensiones de difusión: núcleo concentrado y perímetro suavemente difuminado
+    const corridorWidth = 7.0; // Núcleo
+    const featherWidth = 28.0; // Borde suave difuminado
+
     const zone: TriggerZone = {
       id,
       type,
@@ -172,11 +181,12 @@ export class WoundManager {
       y: startY,
       branches,
       corridorWidth,
+      featherWidth,
       intensity,
-      minX: minX - corridorWidth,
-      maxX: maxX + corridorWidth,
-      minY: minY - corridorWidth,
-      maxY: maxY + corridorWidth,
+      minX: minX - featherWidth,
+      maxX: maxX + featherWidth,
+      minY: minY - featherWidth,
+      maxY: maxY + featherWidth,
       pulseTime: 0.0
     };
 
@@ -244,10 +254,14 @@ export class WoundManager {
   }
 
   /**
-   * Determina si el punto (x, y) de un agente está dentro del corredor de algún espacio trigger.
-   * Retorna la zona activa o null.
+   * Calcula la influencia difuminada continua (0.0 a 1.0) de un espacio trigger en (x, y).
+   * Utiliza una curva cosinusoidal suave C1 para eliminar cualquier borde duro o definido.
    */
-  public getZoneAt(x: number, y: number): TriggerZone | null {
+  public getZoneInfluence(x: number, y: number): ZoneInfluence | null {
+    let bestZone: TriggerZone | null = null;
+    let maxIntensity = 0;
+    let bestDist = 1e9;
+
     for (let i = 0; i < this.zones.length; i++) {
       const z = this.zones[i];
 
@@ -256,19 +270,52 @@ export class WoundManager {
         continue;
       }
 
-      const corridorSq = z.corridorWidth * z.corridorWidth;
+      const featherSq = z.featherWidth * z.featherWidth;
+      let minDistSq = 1e9;
 
       for (let b = 0; b < z.branches.length; b++) {
         const pts = z.branches[b].points;
         for (let p = 0; p < pts.length - 1; p++) {
           const dSq = this.distToSegmentSq(x, y, pts[p].x, pts[p].y, pts[p + 1].x, pts[p + 1].y);
-          if (dSq < corridorSq) {
-            return z;
+          if (dSq < minDistSq) {
+            minDistSq = dSq;
           }
         }
       }
+
+      if (minDistSq < featherSq) {
+        const d = Math.sqrt(minDistSq);
+        let intensity = 1.0;
+        if (d > z.corridorWidth) {
+          // Curva cosinusoidal suave C1 (difuminado sin cortes abruptos)
+          const u = (d - z.corridorWidth) / (z.featherWidth - z.corridorWidth);
+          intensity = 0.5 * (1 + Math.cos(Math.PI * Math.min(Math.max(u, 0), 1)));
+        }
+
+        if (intensity > maxIntensity) {
+          maxIntensity = intensity;
+          bestZone = z;
+          bestDist = d;
+        }
+      }
+    }
+
+    if (bestZone && maxIntensity > 0.01) {
+      return {
+        zone: bestZone,
+        intensity: maxIntensity,
+        dist: bestDist
+      };
     }
     return null;
+  }
+
+  /**
+   * Determina si el punto (x, y) de un agente está dentro del corredor de algún espacio trigger (compatibilidad).
+   */
+  public getZoneAt(x: number, y: number): TriggerZone | null {
+    const inf = this.getZoneInfluence(x, y);
+    return inf && inf.intensity > 0.2 ? inf.zone : null;
   }
 
   /**
@@ -312,14 +359,6 @@ export class WoundManager {
     for (let i = 0; i < this.zones.length; i++) {
       this.zones[i].pulseTime += dt;
     }
-  }
-
-  /**
-   * Los espacios trigger son 100% transparentes e invisibles en el fondo.
-   * Lo único que cambia de color son los filamentos del flow field al cruzar por ellos.
-   */
-  public renderAmbientSpaces(_ctx: CanvasRenderingContext2D) {
-    // Totalmente transparente: no dibuja ninguna silueta ni aura en el fondo
   }
 
   public clear() {

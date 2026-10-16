@@ -96,22 +96,40 @@ export class AgentSystem {
     'rgba(37, 99, 235, 0.72)'    // Azul cobalto luminoso
   ];
 
-  // Paleta roja de heridas (5 tonos carmesí y escarlata)
+  // Paleta roja intensa del núcleo (5 tonos carmesí y escarlata)
   public readonly redPalette = [
-    'rgba(255, 228, 230, 0.92)', // Resplandor especular claro
-    'rgba(251, 113, 133, 0.80)', // Rosa herida vivo
-    'rgba(244, 63, 94, 0.75)',   // Carmesí intenso
-    'rgba(225, 29, 72, 0.70)',   // Escarlata profundo
-    'rgba(159, 18, 57, 0.60)'    // Borgoña / sangre oscura
+    'rgba(255, 228, 230, 0.94)', // Resplandor especular claro
+    'rgba(251, 113, 133, 0.88)', // Rosa herida vivo
+    'rgba(244, 63, 94, 0.82)',   // Carmesí intenso
+    'rgba(225, 29, 72, 0.78)',   // Escarlata profundo
+    'rgba(159, 18, 57, 0.68)'    // Borgoña / sangre oscura
   ];
 
-  // Paleta dorada Kintsugi (5 tonos de oro líquido resplandeciente)
+  // Paleta roja suave / difuminada (tonos orquídea, magenta y violeta etéreo que se funden con el azul)
+  public readonly redSoftPalette = [
+    'rgba(244, 114, 182, 0.76)', // Rosa suave luminosa
+    'rgba(232, 121, 249, 0.70)', // Magenta translúcido
+    'rgba(192, 132, 252, 0.64)', // Violeta etéreo
+    'rgba(168, 85, 247, 0.58)', // Púrpura difuminado
+    'rgba(129, 140, 248, 0.50)'  // Índigo suave que se funde con el azul
+  ];
+
+  // Paleta dorada pura del núcleo (5 tonos de oro líquido resplandeciente 24K)
   public readonly goldPalette = [
     'rgba(255, 250, 220, 0.98)', // Brillo blanco-dorado especular
-    'rgba(254, 240, 138, 0.90)', // Oro claro brillante
-    'rgba(250, 204, 21, 0.85)',  // Oro 24K puro
-    'rgba(245, 158, 11, 0.80)',  // Ámbar cálido
-    'rgba(217, 119, 6, 0.70)'    // Bronce / oro antiguo
+    'rgba(254, 240, 138, 0.92)', // Oro claro brillante
+    'rgba(250, 204, 21, 0.88)',  // Oro 24K puro
+    'rgba(245, 158, 11, 0.82)',  // Ámbar cálido
+    'rgba(217, 119, 6, 0.72)'    // Bronce / oro antiguo
+  ];
+
+  // Paleta dorada suave / difuminada (tonos ámbar suave, miel y verde-aurora que se funden con el azul)
+  public readonly goldSoftPalette = [
+    'rgba(253, 224, 71, 0.80)', // Oro claro pastel
+    'rgba(251, 191, 36, 0.72)', // Ámbar suave
+    'rgba(217, 119, 6, 0.62)',  // Miel translúcida
+    'rgba(110, 231, 183, 0.58)', // Turquesa dorado / verde esmeralda translúcido
+    'rgba(56, 189, 248, 0.50)'  // Cian que se funde naturalmente con el río azul
   ];
 
   constructor(w: number, h: number, count: number = 3800) {
