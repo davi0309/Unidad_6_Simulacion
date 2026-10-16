@@ -41,6 +41,10 @@ export class Agent {
   public life: number;
   public maxLife: number;
 
+  // Morfología de gota de lluvia / lágrima
+  public dropRadius: number;
+  public dropStretch: number;
+
   constructor(x: number, y: number) {
     this.x = x;
     this.y = y;
@@ -64,6 +68,10 @@ export class Agent {
     this.life = Math.floor(Math.random() * this.maxLife);
 
     this.colorIndex = Math.floor(Math.random() * 5);
+
+    // Dimensiones de gota de lluvia / lágrima (micro-gotas a lágrimas densas con forma ahusada)
+    this.dropRadius = 1.15 + Math.random() * 1.35;
+    this.dropStretch = 1.25 + Math.random() * 0.35;
   }
 
   public reset(x: number, y: number) {

@@ -22,8 +22,8 @@ export class TrailSystem {
   public sandCanvas: HTMLCanvasElement;
   public sandCtx: CanvasRenderingContext2D;
 
-  // Parámetro de desvanecimiento calibrado para que las estelas no ensucien la arena
-  public decayRate: number = 0.038;
+  // Parámetro de desvanecimiento calibrado para lágrimas y gotas de lluvia fluidas
+  public decayRate: number = 0.046;
 
   // Alpha de transparencia del fondo de arena (oscuro, sutil y transparente)
   public sandAlpha: number = 0.32;
@@ -184,36 +184,56 @@ export class TrailSystem {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Buffers de trazo agrupados por gradiente y color para 60 FPS fluidos
+    // Buffers de estela acuosa y cabezas esféricas de lágrimas agrupadas por color
     // A. Azul natural
     const blueBatchesX1: number[][] = [[], [], [], [], []];
     const blueBatchesY1: number[][] = [[], [], [], [], []];
     const blueBatchesX2: number[][] = [[], [], [], [], []];
     const blueBatchesY2: number[][] = [[], [], [], [], []];
+    const blueHeadsX: number[][] = [[], [], [], [], []];
+    const blueHeadsY: number[][] = [[], [], [], [], []];
+    const blueHeadsR: number[][] = [[], [], [], [], []];
 
     // B1. Rojo núcleo intenso
     const redCoreBatchesX1: number[][] = [[], [], [], [], []];
     const redCoreBatchesY1: number[][] = [[], [], [], [], []];
     const redCoreBatchesX2: number[][] = [[], [], [], [], []];
     const redCoreBatchesY2: number[][] = [[], [], [], [], []];
+    const redCoreHeadsX: number[][] = [[], [], [], [], []];
+    const redCoreHeadsY: number[][] = [[], [], [], [], []];
+    const redCoreHeadsR: number[][] = [[], [], [], [], []];
 
     // B2. Rojo difuminado suave (orquídea/magenta que se funde con el azul)
     const redSoftBatchesX1: number[][] = [[], [], [], [], []];
     const redSoftBatchesY1: number[][] = [[], [], [], [], []];
     const redSoftBatchesX2: number[][] = [[], [], [], [], []];
     const redSoftBatchesY2: number[][] = [[], [], [], [], []];
+    const redSoftHeadsX: number[][] = [[], [], [], [], []];
+    const redSoftHeadsY: number[][] = [[], [], [], [], []];
+    const redSoftHeadsR: number[][] = [[], [], [], [], []];
 
     // C1. Oro núcleo puro 24K
     const goldCoreBatchesX1: number[][] = [[], [], [], [], []];
     const goldCoreBatchesY1: number[][] = [[], [], [], [], []];
     const goldCoreBatchesX2: number[][] = [[], [], [], [], []];
     const goldCoreBatchesY2: number[][] = [[], [], [], [], []];
+    const goldCoreHeadsX: number[][] = [[], [], [], [], []];
+    const goldCoreHeadsY: number[][] = [[], [], [], [], []];
+    const goldCoreHeadsR: number[][] = [[], [], [], [], []];
 
     // C2. Oro difuminado suave (miel/turquesa que se funde con el azul)
     const goldSoftBatchesX1: number[][] = [[], [], [], [], []];
     const goldSoftBatchesY1: number[][] = [[], [], [], [], []];
     const goldSoftBatchesX2: number[][] = [[], [], [], [], []];
     const goldSoftBatchesY2: number[][] = [[], [], [], [], []];
+    const goldSoftHeadsX: number[][] = [[], [], [], [], []];
+    const goldSoftHeadsY: number[][] = [[], [], [], [], []];
+    const goldSoftHeadsR: number[][] = [[], [], [], [], []];
+
+    // Destellos especulares de agua cristalina (catchlights en cada gota/lágrima)
+    const glintsX: number[] = [];
+    const glintsY: number[] = [];
+    const glintsR: number[] = [];
 
     const agents = agentSystem.agents;
     const count = agents.length;
@@ -229,6 +249,12 @@ export class TrailSystem {
       }
 
       const cIdx = a.colorIndex;
+      const r = a.dropRadius;
+
+      // Micro-destello de luz sobre la gota en el punto superior/frontal
+      glintsX.push(a.x - a.vx * 0.22);
+      glintsY.push(a.y - a.vy * 0.22);
+      glintsR.push(r * 0.35);
 
       // Evaluar la influencia difuminada continua del espacio trigger
       const inf = woundManager.getZoneInfluence(a.x, a.y);
@@ -242,6 +268,9 @@ export class TrailSystem {
             goldCoreBatchesY1[cIdx].push(a.prevY);
             goldCoreBatchesX2[cIdx].push(a.x);
             goldCoreBatchesY2[cIdx].push(a.y);
+            goldCoreHeadsX[cIdx].push(a.x);
+            goldCoreHeadsY[cIdx].push(a.y);
+            goldCoreHeadsR[cIdx].push(r * 1.08);
           } else {
             // Perímetro exterior difuminado: fundido suave estocástico
             if (intensity > 0.18 || Math.random() < (intensity / 0.18)) {
@@ -249,11 +278,17 @@ export class TrailSystem {
               goldSoftBatchesY1[cIdx].push(a.prevY);
               goldSoftBatchesX2[cIdx].push(a.x);
               goldSoftBatchesY2[cIdx].push(a.y);
+              goldSoftHeadsX[cIdx].push(a.x);
+              goldSoftHeadsY[cIdx].push(a.y);
+              goldSoftHeadsR[cIdx].push(r * 1.04);
             } else {
               blueBatchesX1[cIdx].push(a.prevX);
               blueBatchesY1[cIdx].push(a.prevY);
               blueBatchesX2[cIdx].push(a.x);
               blueBatchesY2[cIdx].push(a.y);
+              blueHeadsX[cIdx].push(a.x);
+              blueHeadsY[cIdx].push(a.y);
+              blueHeadsR[cIdx].push(r);
             }
           }
         } else {
@@ -263,6 +298,9 @@ export class TrailSystem {
             redCoreBatchesY1[cIdx].push(a.prevY);
             redCoreBatchesX2[cIdx].push(a.x);
             redCoreBatchesY2[cIdx].push(a.y);
+            redCoreHeadsX[cIdx].push(a.x);
+            redCoreHeadsY[cIdx].push(a.y);
+            redCoreHeadsR[cIdx].push(r * 1.08);
           } else {
             // Perímetro exterior difuminado: fundido suave estocástico
             if (intensity > 0.18 || Math.random() < (intensity / 0.18)) {
@@ -270,11 +308,17 @@ export class TrailSystem {
               redSoftBatchesY1[cIdx].push(a.prevY);
               redSoftBatchesX2[cIdx].push(a.x);
               redSoftBatchesY2[cIdx].push(a.y);
+              redSoftHeadsX[cIdx].push(a.x);
+              redSoftHeadsY[cIdx].push(a.y);
+              redSoftHeadsR[cIdx].push(r * 1.04);
             } else {
               blueBatchesX1[cIdx].push(a.prevX);
               blueBatchesY1[cIdx].push(a.prevY);
               blueBatchesX2[cIdx].push(a.x);
               blueBatchesY2[cIdx].push(a.y);
+              blueHeadsX[cIdx].push(a.x);
+              blueHeadsY[cIdx].push(a.y);
+              blueHeadsR[cIdx].push(r);
             }
           }
         }
@@ -284,97 +328,115 @@ export class TrailSystem {
         blueBatchesY1[cIdx].push(a.prevY);
         blueBatchesX2[cIdx].push(a.x);
         blueBatchesY2[cIdx].push(a.y);
+        blueHeadsX[cIdx].push(a.x);
+        blueHeadsY[cIdx].push(a.y);
+        blueHeadsR[cIdx].push(r);
       }
     }
 
-    // 1. Dibujar lotes de trazo azul natural (más nítido y visible)
-    ctx.lineWidth = 1.30;
+    // Función auxiliar para dibujar cabezas de gotas esféricas de agua
+    const drawDropletHeads = (hX: number[], hY: number[], hR: number[], fillStyle: string) => {
+      if (hX.length === 0) return;
+      ctx.beginPath();
+      for (let k = 0; k < hX.length; k++) {
+        const rad = hR[k];
+        ctx.moveTo(hX[k] + rad, hY[k]);
+        ctx.arc(hX[k], hY[k], rad, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = fillStyle;
+      ctx.fill();
+    };
+
+    // 1. Estelas y gotas de lluvia azul natural
+    ctx.lineWidth = 1.25;
     for (let c = 0; c < 5; c++) {
       const bX1 = blueBatchesX1[c];
-      if (bX1.length === 0) continue;
-      const bY1 = blueBatchesY1[c];
-      const bX2 = blueBatchesX2[c];
-      const bY2 = blueBatchesY2[c];
-
-      ctx.beginPath();
-      for (let k = 0; k < bX1.length; k++) {
-        ctx.moveTo(bX1[k], bY1[k]);
-        ctx.lineTo(bX2[k], bY2[k]);
+      if (bX1.length > 0) {
+        ctx.beginPath();
+        for (let k = 0; k < bX1.length; k++) {
+          ctx.moveTo(bX1[k], blueBatchesY1[c][k]);
+          ctx.lineTo(blueBatchesX2[c][k], blueBatchesY2[c][k]);
+        }
+        ctx.strokeStyle = agentSystem.bluePalette[c];
+        ctx.stroke();
       }
-      ctx.strokeStyle = agentSystem.bluePalette[c];
-      ctx.stroke();
+      drawDropletHeads(blueHeadsX[c], blueHeadsY[c], blueHeadsR[c], agentSystem.bluePalette[c]);
     }
 
-    // 2. Dibujar trazo rojo difuminado suave (borde exterior donde el rojo se disuelve en el azul)
-    ctx.lineWidth = 1.35;
+    // 2. Estelas y gotas rojas difuminadas (borde exterior magenta/orquídea)
+    ctx.lineWidth = 1.30;
     for (let c = 0; c < 5; c++) {
       const rX1 = redSoftBatchesX1[c];
-      if (rX1.length === 0) continue;
-      const rY1 = redSoftBatchesY1[c];
-      const rX2 = redSoftBatchesX2[c];
-      const rY2 = redSoftBatchesY2[c];
-
-      ctx.beginPath();
-      for (let k = 0; k < rX1.length; k++) {
-        ctx.moveTo(rX1[k], rY1[k]);
-        ctx.lineTo(rX2[k], rY2[k]);
+      if (rX1.length > 0) {
+        ctx.beginPath();
+        for (let k = 0; k < rX1.length; k++) {
+          ctx.moveTo(rX1[k], redSoftBatchesY1[c][k]);
+          ctx.lineTo(redSoftBatchesX2[c][k], redSoftBatchesY2[c][k]);
+        }
+        ctx.strokeStyle = agentSystem.redSoftPalette[c];
+        ctx.stroke();
       }
-      ctx.strokeStyle = agentSystem.redSoftPalette[c];
-      ctx.stroke();
+      drawDropletHeads(redSoftHeadsX[c], redSoftHeadsY[c], redSoftHeadsR[c], agentSystem.redSoftPalette[c]);
     }
 
-    // 3. Dibujar trazo rojo núcleo (centro de la fractura)
-    ctx.lineWidth = 1.50;
+    // 3. Estelas y lágrimas de herida roja núcleo (carmesí vivo / dolor)
+    ctx.lineWidth = 1.45;
     for (let c = 0; c < 5; c++) {
       const rX1 = redCoreBatchesX1[c];
-      if (rX1.length === 0) continue;
-      const rY1 = redCoreBatchesY1[c];
-      const rX2 = redCoreBatchesX2[c];
-      const rY2 = redCoreBatchesY2[c];
-
-      ctx.beginPath();
-      for (let k = 0; k < rX1.length; k++) {
-        ctx.moveTo(rX1[k], rY1[k]);
-        ctx.lineTo(rX2[k], rY2[k]);
+      if (rX1.length > 0) {
+        ctx.beginPath();
+        for (let k = 0; k < rX1.length; k++) {
+          ctx.moveTo(rX1[k], redCoreBatchesY1[c][k]);
+          ctx.lineTo(redCoreBatchesX2[c][k], redCoreBatchesY2[c][k]);
+        }
+        ctx.strokeStyle = agentSystem.redPalette[c];
+        ctx.stroke();
       }
-      ctx.strokeStyle = agentSystem.redPalette[c];
-      ctx.stroke();
+      drawDropletHeads(redCoreHeadsX[c], redCoreHeadsY[c], redCoreHeadsR[c], agentSystem.redPalette[c]);
     }
 
-    // 4. Dibujar trazo dorado difuminado suave (borde exterior donde el oro se disuelve en el azul)
-    ctx.lineWidth = 1.40;
+    // 4. Estelas y gotas doradas difuminadas suaves (ámbar / miel)
+    ctx.lineWidth = 1.35;
     for (let c = 0; c < 5; c++) {
       const gX1 = goldSoftBatchesX1[c];
-      if (gX1.length === 0) continue;
-      const gY1 = goldSoftBatchesY1[c];
-      const gX2 = goldSoftBatchesX2[c];
-      const gY2 = goldSoftBatchesY2[c];
-
-      ctx.beginPath();
-      for (let k = 0; k < gX1.length; k++) {
-        ctx.moveTo(gX1[k], gY1[k]);
-        ctx.lineTo(gX2[k], gY2[k]);
+      if (gX1.length > 0) {
+        ctx.beginPath();
+        for (let k = 0; k < gX1.length; k++) {
+          ctx.moveTo(gX1[k], goldSoftBatchesY1[c][k]);
+          ctx.lineTo(goldSoftBatchesX2[c][k], goldSoftBatchesY2[c][k]);
+        }
+        ctx.strokeStyle = agentSystem.goldSoftPalette[c];
+        ctx.stroke();
       }
-      ctx.strokeStyle = agentSystem.goldSoftPalette[c];
-      ctx.stroke();
+      drawDropletHeads(goldSoftHeadsX[c], goldSoftHeadsY[c], goldSoftHeadsR[c], agentSystem.goldSoftPalette[c]);
     }
 
-    // 5. Dibujar trazo dorado núcleo (centro de Kintsugi)
-    ctx.lineWidth = 1.60;
+    // 5. Estelas y lágrimas de oro puro 24K resplandeciente (Kintsugi)
+    ctx.lineWidth = 1.55;
     for (let c = 0; c < 5; c++) {
       const gX1 = goldCoreBatchesX1[c];
-      if (gX1.length === 0) continue;
-      const gY1 = goldCoreBatchesY1[c];
-      const gX2 = goldCoreBatchesX2[c];
-      const gY2 = goldCoreBatchesY2[c];
-
-      ctx.beginPath();
-      for (let k = 0; k < gX1.length; k++) {
-        ctx.moveTo(gX1[k], gY1[k]);
-        ctx.lineTo(gX2[k], gY2[k]);
+      if (gX1.length > 0) {
+        ctx.beginPath();
+        for (let k = 0; k < gX1.length; k++) {
+          ctx.moveTo(gX1[k], goldCoreBatchesY1[c][k]);
+          ctx.lineTo(goldCoreBatchesX2[c][k], goldCoreBatchesY2[c][k]);
+        }
+        ctx.strokeStyle = agentSystem.goldPalette[c];
+        ctx.stroke();
       }
-      ctx.strokeStyle = agentSystem.goldPalette[c];
-      ctx.stroke();
+      drawDropletHeads(goldCoreHeadsX[c], goldCoreHeadsY[c], goldCoreHeadsR[c], agentSystem.goldPalette[c]);
+    }
+
+    // 6. Micro-destellos de agua cristalina (specular catchlights de las lágrimas)
+    if (glintsX.length > 0) {
+      ctx.beginPath();
+      for (let k = 0; k < glintsX.length; k++) {
+        const rad = glintsR[k];
+        ctx.moveTo(glintsX[k] + rad, glintsY[k]);
+        ctx.arc(glintsX[k], glintsY[k], rad, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.90)';
+      ctx.fill();
     }
 
     // 6. Componer en el lienzo de destino:
