@@ -25,8 +25,8 @@ export class TrailSystem {
   // Parámetro de desvanecimiento calibrado para que las estelas no ensucien la arena
   public decayRate: number = 0.038;
 
-  // Alpha de transparencia del fondo de arena (más bajo, transparente y sutil)
-  public sandAlpha: number = 0.38;
+  // Alpha de transparencia del fondo de arena (oscuro, sutil y transparente)
+  public sandAlpha: number = 0.32;
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -65,10 +65,10 @@ export class TrailSystem {
   }
 
   /**
-   * Genera la textura pre-renderizada de arena de mar (tono piel / duna cálida y mate):
-   * - Tonalidad de arena de mar cálida, con matiz ocre/piel suave y no brillante (#9c7a60 -> #24160e).
-   * - Ondulaciones orgánicas de marea y viento marino (crestas suaves y surcos en sombra).
-   * - Micro-granulación táctil de arena costera con destellos tenues de cuarzo marino y nácar de conchilla.
+   * Genera la textura pre-renderizada de arena de mar oscura (tono piel / duna nocturna):
+   * - Tonalidad oscurecida y profunda para máximo contraste con los flow fields (#483424 -> #0b0603).
+   * - Ondulaciones orgánicas de marea con sombreado sutil y crestas delicadas.
+   * - Micro-granulación táctil de arena costera con destellos tenues.
    * - Pre-renderizado en canvas desacoplado (0 ms de coste por frame).
    */
   public generateSandTexture() {
@@ -76,12 +76,12 @@ export class TrailSystem {
     const H = this.height;
     const sCtx = this.sandCtx;
 
-    // 1. Gradiente base: Arena de mar cálida con tono piel/duna (mate, no estridente ni brillante)
+    // 1. Gradiente base: Arena de mar oscura con matiz cálido tono piel/duna nocturna
     const bgGrad = sCtx.createRadialGradient(W * 0.5, H * 0.45, W * 0.08, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.65);
-    bgGrad.addColorStop(0.0, '#9c7a60'); // Centro: arena de mar cálida tono piel suave (RGB: 156, 122, 96)
-    bgGrad.addColorStop(0.35, '#7f5c45'); // Matiz intermedio cálido de arena de playa
-    bgGrad.addColorStop(0.70, '#523727'); // Arena húmeda en sombra cálida
-    bgGrad.addColorStop(1.0, '#24160e');  // Bordes en viñeta profunda de bajamar nocturna
+    bgGrad.addColorStop(0.0, '#483424'); // Centro: arena de mar oscura con tono piel/ocre cálido tenue (RGB: 72, 52, 36)
+    bgGrad.addColorStop(0.35, '#332115'); // Matiz intermedio en penumbra cálida
+    bgGrad.addColorStop(0.70, '#1c110a'); // Arena húmeda nocturna
+    bgGrad.addColorStop(1.0, '#0b0603');  // Bordes profundos en sombra
     sCtx.fillStyle = bgGrad;
     sCtx.fillRect(0, 0, W, H);
 
@@ -97,7 +97,7 @@ export class TrailSystem {
       // Depresión en sombra del surco de la marea
       sCtx.beginPath();
       sCtx.lineWidth = 15.0;
-      sCtx.strokeStyle = 'rgba(28, 16, 10, 0.065)';
+      sCtx.strokeStyle = 'rgba(0, 0, 0, 0.09)';
       for (let x = 0; x <= W + 40; x += 35) {
         const y = baseY + Math.sin(x * 0.0042 + phase) * 17.0 + Math.cos(x * 0.0022 - phase * 0.45) * 8.5;
         if (x === 0) sCtx.moveTo(x, y);
@@ -105,10 +105,10 @@ export class TrailSystem {
       }
       sCtx.stroke();
 
-      // Cresta de la ondulación iluminada suavemente con calidez
+      // Cresta de la ondulación iluminada suavemente con calidez tenue
       sCtx.beginPath();
-      sCtx.lineWidth = 2.2;
-      sCtx.strokeStyle = 'rgba(255, 238, 218, 0.040)';
+      sCtx.lineWidth = 2.0;
+      sCtx.strokeStyle = 'rgba(240, 205, 175, 0.025)';
       for (let x = 0; x <= W + 40; x += 35) {
         const y = baseY - 2.5 + Math.sin(x * 0.0042 + phase) * 17.0 + Math.cos(x * 0.0022 - phase * 0.45) * 8.5;
         if (x === 0) sCtx.moveTo(x, y);
@@ -133,34 +133,32 @@ export class TrailSystem {
     for (let i = 0; i < len; i += 4) {
       const rVal = fastRand();
 
-      // Granulación táctil de arena de mar (45% de los píxeles)
-      if (rVal < 0.45) {
-        const grain = (fastRand() - 0.5) * 16;
-        data[i] = Math.min(255, Math.max(0, data[i] + grain * 1.15));       // Más cálido (Rojo/Piel)
-        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + grain * 1.0)); // Amarillo suave (Verde)
-        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + grain * 0.75));// Menos azul
-      } else if (rVal > 0.992) {
-        // Micro-destellos de conchilla nacarada y granos dorados de cuarzo marino
+      // Granulación táctil de arena de mar oscura (42% de los píxeles)
+      if (rVal < 0.42) {
+        const grain = (fastRand() - 0.5) * 14;
+        data[i] = Math.min(255, Math.max(0, data[i] + grain * 1.15));
+        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + grain * 0.95));
+        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + grain * 0.70));
+      } else if (rVal > 0.993) {
+        // Micro-destellos de conchilla y cuarzo marino
         if (fastRand() > 0.50) {
-          // Grano de cuarzo dorado / sílice marina cálida
-          data[i] = Math.min(255, data[i] + 45);
-          data[i + 1] = Math.min(255, data[i + 1] + 36);
-          data[i + 2] = Math.min(255, data[i + 2] + 12);
+          data[i] = Math.min(255, data[i] + 36);
+          data[i + 1] = Math.min(255, data[i + 1] + 28);
+          data[i + 2] = Math.min(255, data[i + 2] + 10);
         } else {
-          // Destello sutil de nácar de conchilla triturada
-          data[i] = Math.min(255, data[i] + 35);
-          data[i + 1] = Math.min(255, data[i + 1] + 32);
-          data[i + 2] = Math.min(255, data[i + 2] + 26);
+          data[i] = Math.min(255, data[i] + 28);
+          data[i + 1] = Math.min(255, data[i + 1] + 25);
+          data[i + 2] = Math.min(255, data[i + 2] + 20);
         }
       }
     }
 
     sCtx.putImageData(grainImg, 0, 0);
 
-    // 4. Viñeteado cálido y suave en los bordes para preservar foco y profundidad
-    const vignette = sCtx.createRadialGradient(W * 0.5, H * 0.5, W * 0.30, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.60);
+    // 4. Viñeteado oscuro y profundo en los bordes para máximo contraste central
+    const vignette = sCtx.createRadialGradient(W * 0.5, H * 0.5, W * 0.28, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.58);
     vignette.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-    vignette.addColorStop(1.0, 'rgba(20, 11, 7, 0.45)');
+    vignette.addColorStop(1.0, 'rgba(8, 4, 2, 0.60)');
     sCtx.fillStyle = vignette;
     sCtx.fillRect(0, 0, W, H);
   }
@@ -289,8 +287,8 @@ export class TrailSystem {
       }
     }
 
-    // 1. Dibujar lotes de trazo azul natural
-    ctx.lineWidth = 1.15;
+    // 1. Dibujar lotes de trazo azul natural (más nítido y visible)
+    ctx.lineWidth = 1.30;
     for (let c = 0; c < 5; c++) {
       const bX1 = blueBatchesX1[c];
       if (bX1.length === 0) continue;
@@ -308,7 +306,7 @@ export class TrailSystem {
     }
 
     // 2. Dibujar trazo rojo difuminado suave (borde exterior donde el rojo se disuelve en el azul)
-    ctx.lineWidth = 1.20;
+    ctx.lineWidth = 1.35;
     for (let c = 0; c < 5; c++) {
       const rX1 = redSoftBatchesX1[c];
       if (rX1.length === 0) continue;
@@ -326,7 +324,7 @@ export class TrailSystem {
     }
 
     // 3. Dibujar trazo rojo núcleo (centro de la fractura)
-    ctx.lineWidth = 1.35;
+    ctx.lineWidth = 1.50;
     for (let c = 0; c < 5; c++) {
       const rX1 = redCoreBatchesX1[c];
       if (rX1.length === 0) continue;
@@ -344,7 +342,7 @@ export class TrailSystem {
     }
 
     // 4. Dibujar trazo dorado difuminado suave (borde exterior donde el oro se disuelve en el azul)
-    ctx.lineWidth = 1.25;
+    ctx.lineWidth = 1.40;
     for (let c = 0; c < 5; c++) {
       const gX1 = goldSoftBatchesX1[c];
       if (gX1.length === 0) continue;
@@ -362,7 +360,7 @@ export class TrailSystem {
     }
 
     // 5. Dibujar trazo dorado núcleo (centro de Kintsugi)
-    ctx.lineWidth = 1.45;
+    ctx.lineWidth = 1.60;
     for (let c = 0; c < 5; c++) {
       const gX1 = goldCoreBatchesX1[c];
       if (gX1.length === 0) continue;
