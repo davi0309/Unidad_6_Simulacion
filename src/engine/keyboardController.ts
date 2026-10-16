@@ -240,18 +240,30 @@ export class KeyboardController {
         break;
 
       case 'KeyU': {
-        // U — Reparación Kintsugi: transmuta la herida más cercana a espacio de oro o crea uno nuevo
+        // U — Reparación Kintsugi: activa la sanación progresiva y lenta hacia el oro
         const res = this.woundManager.transformOrCreateGoldZone(
           x,
           y,
           (fx, fy) => this.flowField.sampleVelocity(fx, fy)
         );
 
+        // Pulso suave de sanación armónica en el punto de contacto
+        this.flowField.addPerturbation({
+          type: 'ripple',
+          x,
+          y,
+          radius: 20.0,
+          maxRadius: 260.0,
+          strength: 2.2,
+          life: 2.5,
+          maxLife: 2.5
+        });
+
         if (res.wasTransformed) {
           this.lastFeedback = {
             key: 'U',
             label: 'Kintsugi',
-            action: 'Herida transmutada en espacio áureo',
+            action: 'Sanación progresiva: oro líquido fluyendo por la herida',
             time: now
           };
         } else {

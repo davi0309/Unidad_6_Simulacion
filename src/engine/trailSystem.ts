@@ -262,7 +262,11 @@ export class TrailSystem {
       if (inf) {
         const { zone, intensity } = inf;
 
-        if (zone.type === ZoneType.GOLD) {
+        // Transmutación progresiva de rojo a oro Kintsugi (Tecla U)
+        const goldRatio = woundManager.getZoneGoldRatio(zone, a.x, a.y);
+        const isGold = Math.random() < goldRatio;
+
+        if (isGold) {
           if (intensity > 0.60) {
             goldCoreBatchesX1[cIdx].push(a.prevX);
             goldCoreBatchesY1[cIdx].push(a.prevY);

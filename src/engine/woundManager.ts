@@ -35,6 +35,13 @@ export interface TriggerZone {
   minY: number;
   maxY: number;
   pulseTime: number;
+
+  // Sanación progresiva y lenta Kintsugi (Tecla U)
+  healingProgress: number; // 0.0 (rojo puro) a 1.0 (oro puro)
+  isHealing: boolean;      // true mientras la curación avanza
+  healOriginX: number;     // Coordenada x de origen de la curación
+  healOriginY: number;     // Coordenada y de origen de la curación
+  maxBranchDist: number;   // Distancia máxima de la fractura para avance progresivo
 }
 
 export interface ZoneInfluence {
@@ -187,7 +194,12 @@ export class WoundManager {
       maxX: maxX + featherWidth,
       minY: minY - featherWidth,
       maxY: maxY + featherWidth,
-      pulseTime: 0.0
+      pulseTime: 0.0,
+      healingProgress: type === ZoneType.GOLD ? 1.0 : 0.0,
+      isHealing: false,
+      healOriginX: startX,
+      healOriginY: startY,
+      maxBranchDist: 100.0
     };
 
     this.zones.push(zone);
@@ -227,7 +239,12 @@ export class WoundManager {
       maxX: x + featherWidth,
       minY: y - featherWidth,
       maxY: y + featherWidth,
-      pulseTime: 0.0
+      pulseTime: 0.0,
+      healingProgress: 0.0,
+      isHealing: false,
+      healOriginX: x,
+      healOriginY: y,
+      maxBranchDist: 80.0
     };
 
     this.zones.push(zone);
@@ -256,7 +273,7 @@ export class WoundManager {
   }
 
   /**
-   * Finaliza el trazo dibujado al soltar el clic
+   * Finaliza el trazo dibujado al soltar el clic y calcula su longitud total
    */
   public finishDrawnWound(zone: TriggerZone) {
     if (zone.branches.length === 0) return;
@@ -265,11 +282,20 @@ export class WoundManager {
     if (pts.length === 1) {
       pts.push({ x: pts[0].x + 3.0, y: pts[0].y + 3.0 });
     }
+
+    // Calcular longitud de la fractura dibujada
+    let maxDist = 40.0;
+    const origin = pts[0];
+    for (const pt of pts) {
+      const d = Math.hypot(pt.x - origin.x, pt.y - origin.y);
+      if (d > maxDist) maxDist = d;
+    }
+    zone.maxBranchDist = maxDist;
   }
 
   /**
-   * Transforma la herida roja más cercana en un espacio dorado Kintsugi (Tecla U),
-   * o crea un nuevo espacio dorado si no hay heridas existentes.
+   * Activa la sanación progresiva y lenta Kintsugi (Tecla U) en la herida más cercana.
+   * La curación se expande suavemente como una ola de oro líquido a lo largo de la fractura.
    */
   public transformOrCreateGoldZone(
     x: number,
@@ -281,7 +307,8 @@ export class WoundManager {
 
     for (let i = 0; i < this.zones.length; i++) {
       const z = this.zones[i];
-      if (z.type === ZoneType.WOUND) {
+      // Buscar heridas que aún tengan componente rojo (no completamente sanadas)
+      if (z.type === ZoneType.WOUND || z.healingProgress < 0.99) {
         const d = Math.hypot(z.x - x, z.y - y);
         if (d < minDist) {
           minDist = d;
@@ -290,15 +317,69 @@ export class WoundManager {
       }
     }
 
-    // Si hay una herida en pantalla, transmutar su espacio en oro
+    // Si hay una herida en pantalla, activar su sanación lenta y progresiva Kintsugi
     if (nearestWound) {
-      nearestWound.type = ZoneType.GOLD;
+      nearestWound.isHealing = true;
+      nearestWound.healOriginX = x;
+      nearestWound.healOriginY = y;
+
+      // Calcular la distancia máxima de los puntos de la fractura respecto al punto de curación
+      let maxDist = 50.0;
+      for (const b of nearestWound.branches) {
+        for (const pt of b.points) {
+          const d = Math.hypot(pt.x - x, pt.y - y);
+          if (d > maxDist) maxDist = d;
+        }
+      }
+      nearestWound.maxBranchDist = maxDist;
+
       return { zone: nearestWound, wasTransformed: true };
     }
 
     // Si no había herida, crear un espacio dorado en la posición actual
     const newGoldZone = this.createZone(x, y, ZoneType.GOLD, sampleFlow, 1.0);
+    newGoldZone.healingProgress = 1.0;
+    newGoldZone.isHealing = false;
     return { zone: newGoldZone, wasTransformed: false };
+  }
+
+  /**
+   * Calcula el ratio de oro (0.0 = rojo puro, 1.0 = oro puro) para un punto (x, y) de la herida,
+   * permitiendo una sanación progresiva que avanza como una ola de oro desde el punto de curación.
+   */
+  public getZoneGoldRatio(zone: TriggerZone, x: number, y: number): number {
+    if (zone.type === ZoneType.GOLD && !zone.isHealing) {
+      return 1.0;
+    }
+    if (zone.type === ZoneType.WOUND && !zone.isHealing && zone.healingProgress <= 0.0) {
+      return 0.0;
+    }
+
+    const P = zone.healingProgress;
+    if (P <= 0.0) return 0.0;
+    if (P >= 1.0) return 1.0;
+
+    // Distancia desde el origen de la curación
+    const distFromOrigin = Math.hypot(x - zone.healOriginX, y - zone.healOriginY);
+    const maxDist = Math.max(zone.maxBranchDist, 80.0);
+
+    // Radio del frente de avance de oro
+    const frontRadius = P * (maxDist + 50.0);
+    const featherBand = 45.0; // Ancho de la zona de transición suave
+
+    let waveGold = 0.0;
+    if (distFromOrigin < frontRadius - featherBand) {
+      waveGold = 1.0;
+    } else if (distFromOrigin > frontRadius + featherBand) {
+      waveGold = 0.0;
+    } else {
+      // Transición cosinusoidal suave C1 en el frente de avance
+      const u = (frontRadius + featherBand - distFromOrigin) / (2 * featherBand);
+      waveGold = 0.5 * (1 - Math.cos(Math.PI * Math.min(Math.max(u, 0), 1)));
+    }
+
+    // Mezcla de la ola expansiva con una filtración global sutil de oro
+    return Math.min(1.0, Math.max(waveGold, P * 0.40));
   }
 
   /**
@@ -414,11 +495,22 @@ export class WoundManager {
   }
 
   /**
-   * Actualiza el pulso sutil de los espacios
+   * Actualiza el pulso y la sanación progresiva y lenta Kintsugi
    */
   public update(dt: number) {
     for (let i = 0; i < this.zones.length; i++) {
-      this.zones[i].pulseTime += dt;
+      const z = this.zones[i];
+      z.pulseTime += dt;
+
+      // Sanación lenta y progresiva Kintsugi (Tecla U): ~5.5 segundos para transmutar completamente a oro
+      if (z.isHealing && z.healingProgress < 1.0) {
+        const healRate = 0.18; // 18% por segundo (~5.5 segundos de avance contemplativo)
+        z.healingProgress = Math.min(1.0, z.healingProgress + dt * healRate);
+        if (z.healingProgress >= 1.0) {
+          z.type = ZoneType.GOLD;
+          z.isHealing = false;
+        }
+      }
     }
   }
 
