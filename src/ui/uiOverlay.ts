@@ -1,4 +1,4 @@
-﻿/**
+/**
  * uiOverlay.ts
  * Interfaz y HUD Minimalista para HEAL:
  * - Título sutil, tiempo transcurrido y botón de play/pausa.
@@ -19,6 +19,7 @@ export class UIOverlay {
   private audioController: AudioController;
   private keyboardController: KeyboardController;
   private finalBannerEl: HTMLDivElement;
+  public isUIHidden: boolean = false;
 
   private onRestartCallback: () => void;
 
@@ -69,7 +70,7 @@ export class UIOverlay {
         </div>
 
         <div class="actions">
-          <button class="btn-action btn-fullscreen" title="Pantalla Completa (Tecla F)">
+          <button class="btn-action btn-fullscreen" title="Pantalla Completa y Ocultar UI (Tecla F)">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
             </svg>
@@ -118,26 +119,65 @@ export class UIOverlay {
     `;
   }
 
+  public setUIVisible(visible: boolean) {
+    this.isUIHidden = !visible;
+    if (this.isUIHidden) {
+      this.container.classList.add('ui-hidden');
+    } else {
+      this.container.classList.remove('ui-hidden');
+    }
+  }
+
+  public toggleFullscreenAndUI() {
+    if (document.fullscreenElement || this.isUIHidden) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      this.setUIVisible(true);
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+      this.setUIVisible(false);
+    }
+  }
+
   private setupEvents() {
     this.playBtn.addEventListener('click', () => {
       this.audioController.togglePlay();
       this.updatePlayState();
     });
 
+    // Vincular la tecla F con la alternancia de pantalla completa y ocultación de la interfaz
+    this.keyboardController.onToggleFullscreenCallback = () => {
+      this.toggleFullscreenAndUI();
+    };
+
+    // Restaurar UI automáticamente si se sale de pantalla completa mediante ESC o controles del navegador
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        this.setUIVisible(true);
+      } else {
+        this.setUIVisible(false);
+      }
+    });
+
     const fsBtn = this.container.querySelector('.btn-fullscreen');
     if (fsBtn) {
-      fsBtn.addEventListener('click', () => this.keyboardController.toggleFullscreen());
+      fsBtn.addEventListener('click', () => this.toggleFullscreenAndUI());
     }
 
     const restartBtn = this.container.querySelector('.btn-restart');
     if (restartBtn) {
-      restartBtn.addEventListener('click', () => this.onRestartCallback());
+      restartBtn.addEventListener('click', () => {
+        this.setUIVisible(true);
+        this.onRestartCallback();
+      });
     }
 
     const finalRestart = this.container.querySelector('.btn-final-restart');
     if (finalRestart) {
       finalRestart.addEventListener('click', () => {
         this.finalBannerEl.classList.add('hidden');
+        this.setUIVisible(true);
         this.onRestartCallback();
       });
     }
@@ -187,8 +227,11 @@ export class UIOverlay {
       this.container.querySelectorAll('.key-item.active').forEach(el => el.classList.remove('active'));
     }
 
-    // Mostrar contemplación final si la canción ha concluido
+    // Mostrar contemplación final si la canción ha concluido (asegurando visibilidad)
     if (audioState.isFinished) {
+      if (this.isUIHidden) {
+        this.setUIVisible(true);
+      }
       this.finalBannerEl.classList.remove('hidden');
     }
   }

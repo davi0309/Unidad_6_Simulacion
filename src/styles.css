@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: #e2e8f0;
   background-color: #02040a;
@@ -41,6 +41,13 @@ canvas#renderCanvas {
   flex-direction: column;
   justify-content: space-between;
   padding: 24px 32px;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.heal-ui-container.ui-hidden {
+  opacity: 0;
+  pointer-events: none !important;
+  visibility: hidden;
 }
 
 /* 1. Barra Superior */

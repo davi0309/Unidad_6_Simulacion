@@ -29,6 +29,7 @@ export class KeyboardController {
   private activeDrawingWound: any = null;
   public lastFeedback: KeyFeedback | null = null;
   public onRestartCallback?: () => void;
+  public onToggleFullscreenCallback?: () => void;
 
   constructor(
     flowField: FlowField,
@@ -291,10 +292,14 @@ export class KeyboardController {
   }
 
   public toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+    if (this.onToggleFullscreenCallback) {
+      this.onToggleFullscreenCallback();
     } else {
-      document.exitFullscreen().catch(() => {});
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
     }
   }
 }
