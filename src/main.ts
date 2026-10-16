@@ -69,16 +69,16 @@ function initApp() {
 
   // 4. Bucle principal de animación a 60 FPS con dilatación temporal cinemática
   let lastTime = performance.now();
-  let currentSpeedScale = 1.0;
+  let currentSpeedScale = 0.55; // Velocidad base global más lenta y contemplativa
 
   function animate(now: number) {
     const rawDt = Math.min((now - lastTime) / 1000.0, 0.08);
     lastTime = now;
 
-    // Al sostener el clic y dibujar una herida con el cursor, el sistema entra en cámara lenta (0.30x)
-    const targetSpeedScale = keyboardController.isDrawingWound ? 0.30 : 1.0;
+    // Velocidad base serena (0.55x). Al sostener el clic y dibujar una herida, cae a cámara lenta profunda (0.16x)
+    const targetSpeedScale = keyboardController.isDrawingWound ? 0.16 : 0.55;
     // Transición suave exponencial hacia la velocidad objetivo (cámara lenta gradual y orgánica)
-    currentSpeedScale += (targetSpeedScale - currentSpeedScale) * 0.14;
+    currentSpeedScale += (targetSpeedScale - currentSpeedScale) * 0.12;
 
     const dt = rawDt * currentSpeedScale;
     const timeSec = now * 0.001 * currentSpeedScale;

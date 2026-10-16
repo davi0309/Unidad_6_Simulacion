@@ -17,8 +17,8 @@ export class TrailSystem {
   public mainCanvas: HTMLCanvasElement;
   public mainCtx: CanvasRenderingContext2D;
 
-  // Parámetro de desvanecimiento general (fade/decay rate)
-  public decayRate: number = 0.022;
+  // Parámetro de desvanecimiento general calibrado para velocidad más lenta y meditativa
+  public decayRate: number = 0.016;
 
   constructor(w: number, h: number) {
     this.width = w;

@@ -49,16 +49,16 @@ export class Agent {
 
     const angle = Math.random() * Math.PI * 2;
     this.heading = angle;
-    this.maxSpeed = 1.6 + Math.random() * 1.1; // Variación orgánica de velocidad
+    this.maxSpeed = 1.05 + Math.random() * 0.70; // Velocidad base más lenta, fluida y contemplativa
     this.vx = Math.cos(angle) * this.maxSpeed;
     this.vy = Math.sin(angle) * this.maxSpeed;
     this.ax = 0;
     this.ay = 0;
 
-    this.maxForce = 0.12 + Math.random() * 0.08;
+    this.maxForce = 0.08 + Math.random() * 0.05;
     this.sensorDist = 18.0 + Math.random() * 14.0;
     this.sensorAngle = (22.0 + Math.random() * 18.0) * (Math.PI / 180.0);
-    this.turnSpeed = 0.14 + Math.random() * 0.08;
+    this.turnSpeed = 0.10 + Math.random() * 0.05;
 
     this.maxLife = 220 + Math.floor(Math.random() * 180);
     this.life = Math.floor(Math.random() * this.maxLife);
@@ -221,14 +221,14 @@ export class AgentSystem {
       a.ax = 0;
       a.ay = 0;
 
-      // Limitar a velocidad máxima y asegurar que nunca se detenga (sin agentes inmóviles)
+      // Limitar a velocidad máxima y asegurar velocidad mínima fluida
       const curSpeed = Math.hypot(a.vx, a.vy);
       if (curSpeed > a.maxSpeed) {
         a.vx = (a.vx / curSpeed) * a.maxSpeed;
         a.vy = (a.vy / curSpeed) * a.maxSpeed;
-      } else if (curSpeed < 1.2) {
-        a.vx = Math.cos(a.heading) * 1.5;
-        a.vy = Math.sin(a.heading) * 1.5;
+      } else if (curSpeed < 0.60) {
+        a.vx = Math.cos(a.heading) * 0.85;
+        a.vy = Math.sin(a.heading) * 0.85;
       }
 
       // Actualizar posición
