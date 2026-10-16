@@ -258,7 +258,7 @@ export class KeyboardController {
           this.lastFeedback = {
             key: 'U',
             label: 'Kintsugi',
-            action: 'Espacio áureo creado en la corriente',
+            action: 'Sin heridas pendientes por sanar',
             time: now
           };
         }

@@ -295,13 +295,13 @@ export class WoundManager {
 
   /**
    * Activa la sanación progresiva y lenta Kintsugi (Tecla U) en la herida más cercana.
-   * La curación se expande suavemente como una ola de oro líquido a lo largo de la fractura.
+   * La curación se carga homogéneamente a lo largo de la fractura sin crear focos ni concentraciones.
    */
   public transformOrCreateGoldZone(
     x: number,
     y: number,
-    sampleFlow?: (x: number, y: number) => { vx: number; vy: number }
-  ): { zone: TriggerZone; wasTransformed: boolean } {
+    _sampleFlow?: (x: number, y: number) => { vx: number; vy: number }
+  ): { zone: TriggerZone | null; wasTransformed: boolean } {
     let nearestWound: TriggerZone | null = null;
     let minDist = 1e9;
 
@@ -320,34 +320,18 @@ export class WoundManager {
     // Si hay una herida en pantalla, activar su sanación lenta y progresiva Kintsugi
     if (nearestWound) {
       nearestWound.isHealing = true;
-      nearestWound.healOriginX = x;
-      nearestWound.healOriginY = y;
-
-      // Calcular la distancia máxima de los puntos de la fractura respecto al punto de curación
-      let maxDist = 50.0;
-      for (const b of nearestWound.branches) {
-        for (const pt of b.points) {
-          const d = Math.hypot(pt.x - x, pt.y - y);
-          if (d > maxDist) maxDist = d;
-        }
-      }
-      nearestWound.maxBranchDist = maxDist;
-
       return { zone: nearestWound, wasTransformed: true };
     }
 
-    // Si no había herida, crear un espacio dorado en la posición actual
-    const newGoldZone = this.createZone(x, y, ZoneType.GOLD, sampleFlow, 1.0);
-    newGoldZone.healingProgress = 1.0;
-    newGoldZone.isHealing = false;
-    return { zone: newGoldZone, wasTransformed: false };
+    // Si no hay heridas por sanar, no creamos ningún foco ni zona artificial en el cursor
+    return { zone: null, wasTransformed: false };
   }
 
   /**
-   * Calcula el ratio de oro (0.0 = rojo puro, 1.0 = oro puro) para un punto (x, y) de la herida,
-   * permitiendo una sanación progresiva que avanza como una ola de oro desde el punto de curación.
+   * Calcula el ratio de oro (0.0 = rojo puro, 1.0 = oro puro) para un punto de la herida.
+   * Progresión suave, uniforme y contemplativa sin concentraciones ni frentes artificiales.
    */
-  public getZoneGoldRatio(zone: TriggerZone, x: number, y: number): number {
+  public getZoneGoldRatio(zone: TriggerZone, _x: number, _y: number): number {
     if (zone.type === ZoneType.GOLD && !zone.isHealing) {
       return 1.0;
     }
@@ -359,27 +343,8 @@ export class WoundManager {
     if (P <= 0.0) return 0.0;
     if (P >= 1.0) return 1.0;
 
-    // Distancia desde el origen de la curación
-    const distFromOrigin = Math.hypot(x - zone.healOriginX, y - zone.healOriginY);
-    const maxDist = Math.max(zone.maxBranchDist, 80.0);
-
-    // Radio del frente de avance de oro
-    const frontRadius = P * (maxDist + 50.0);
-    const featherBand = 45.0; // Ancho de la zona de transición suave
-
-    let waveGold = 0.0;
-    if (distFromOrigin < frontRadius - featherBand) {
-      waveGold = 1.0;
-    } else if (distFromOrigin > frontRadius + featherBand) {
-      waveGold = 0.0;
-    } else {
-      // Transición cosinusoidal suave C1 en el frente de avance
-      const u = (frontRadius + featherBand - distFromOrigin) / (2 * featherBand);
-      waveGold = 0.5 * (1 - Math.cos(Math.PI * Math.min(Math.max(u, 0), 1)));
-    }
-
-    // Mezcla de la ola expansiva con una filtración global sutil de oro
-    return Math.min(1.0, Math.max(waveGold, P * 0.40));
+    // Carga progresiva armónica continua (smoothstep) en todo el cuerpo de la fractura
+    return P * P * (3 - 2 * P);
   }
 
   /**

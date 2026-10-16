@@ -274,7 +274,7 @@ export class TrailSystem {
             goldCoreBatchesY2[cIdx].push(a.y);
             goldCoreHeadsX[cIdx].push(a.x);
             goldCoreHeadsY[cIdx].push(a.y);
-            goldCoreHeadsR[cIdx].push(r * 1.08);
+            goldCoreHeadsR[cIdx].push(r);
           } else {
             // Perímetro exterior difuminado: fundido suave estocástico
             if (intensity > 0.18 || Math.random() < (intensity / 0.18)) {
@@ -284,7 +284,7 @@ export class TrailSystem {
               goldSoftBatchesY2[cIdx].push(a.y);
               goldSoftHeadsX[cIdx].push(a.x);
               goldSoftHeadsY[cIdx].push(a.y);
-              goldSoftHeadsR[cIdx].push(r * 1.04);
+              goldSoftHeadsR[cIdx].push(r);
             } else {
               blueBatchesX1[cIdx].push(a.prevX);
               blueBatchesY1[cIdx].push(a.prevY);
@@ -304,7 +304,7 @@ export class TrailSystem {
             redCoreBatchesY2[cIdx].push(a.y);
             redCoreHeadsX[cIdx].push(a.x);
             redCoreHeadsY[cIdx].push(a.y);
-            redCoreHeadsR[cIdx].push(r * 1.08);
+            redCoreHeadsR[cIdx].push(r);
           } else {
             // Perímetro exterior difuminado: fundido suave estocástico
             if (intensity > 0.18 || Math.random() < (intensity / 0.18)) {
@@ -314,7 +314,7 @@ export class TrailSystem {
               redSoftBatchesY2[cIdx].push(a.y);
               redSoftHeadsX[cIdx].push(a.x);
               redSoftHeadsY[cIdx].push(a.y);
-              redSoftHeadsR[cIdx].push(r * 1.04);
+              redSoftHeadsR[cIdx].push(r);
             } else {
               blueBatchesX1[cIdx].push(a.prevX);
               blueBatchesY1[cIdx].push(a.prevY);
@@ -368,7 +368,7 @@ export class TrailSystem {
     }
 
     // 2. Estelas y gotas rojas difuminadas (borde exterior magenta/orquídea)
-    ctx.lineWidth = 1.30;
+    ctx.lineWidth = 1.25;
     for (let c = 0; c < 5; c++) {
       const rX1 = redSoftBatchesX1[c];
       if (rX1.length > 0) {
@@ -384,7 +384,7 @@ export class TrailSystem {
     }
 
     // 3. Estelas y lágrimas de herida roja núcleo (carmesí vivo / dolor)
-    ctx.lineWidth = 1.45;
+    ctx.lineWidth = 1.25;
     for (let c = 0; c < 5; c++) {
       const rX1 = redCoreBatchesX1[c];
       if (rX1.length > 0) {
@@ -400,7 +400,7 @@ export class TrailSystem {
     }
 
     // 4. Estelas y gotas doradas difuminadas suaves (ámbar / miel)
-    ctx.lineWidth = 1.35;
+    ctx.lineWidth = 1.25;
     for (let c = 0; c < 5; c++) {
       const gX1 = goldSoftBatchesX1[c];
       if (gX1.length > 0) {
@@ -416,7 +416,7 @@ export class TrailSystem {
     }
 
     // 5. Estelas y lágrimas de oro puro 24K resplandeciente (Kintsugi)
-    ctx.lineWidth = 1.55;
+    ctx.lineWidth = 1.25;
     for (let c = 0; c < 5; c++) {
       const gX1 = goldCoreBatchesX1[c];
       if (gX1.length > 0) {
