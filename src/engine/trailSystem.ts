@@ -1,10 +1,12 @@
 /**
  * trailSystem.ts
- * Sistema de Renderizado de Estelas y Espacios Trigger Difuminados para HEAL:
- * - Lienzo dinámico con persistencia y desvanecimiento suave sobre fondo azul-noche (#02040a).
- * - Difuminado continuo (feathering): el color de los filamentos cambia de forma gradual y orgánica.
- * - Sin cortes abruptos ni bordes definidos: el rojo y el oro se funden suavemente con el río azul.
- * - Cero estelas estáticas o agentes inmóviles: flujo 100% cinético y vivo a 60 FPS.
+ * Sistema de Renderizado de Estelas y Fondo de Arena Zen Mineral para HEAL:
+ * - Fondo de arena mineral nocturna (estilo Zen Karesansui / obsidiana / Raku):
+ *   gradiente profundo, surcos sutiles de rastrillo en sombra y luz rasante,
+ *   micro-granos minerales y destellos microscópicos de cuarzo y mica dorada Kintsugi.
+ * - Desvanecimiento transparente continuo de filamentos (sin ensuciar la arena).
+ * - Difuminado continuo (feathering) de heridas rojas y Kintsugi dorado sobre el lecho de arena.
+ * - Rendimiento óptimo a 60 FPS con textura de arena pre-renderizada en memoria (0 ms por frame).
  */
 
 import { AgentSystem } from './agentSystem';
@@ -17,8 +19,11 @@ export class TrailSystem {
   public mainCanvas: HTMLCanvasElement;
   public mainCtx: CanvasRenderingContext2D;
 
-  // Parámetro de desvanecimiento general calibrado para velocidad más lenta y meditativa
-  public decayRate: number = 0.016;
+  public sandCanvas: HTMLCanvasElement;
+  public sandCtx: CanvasRenderingContext2D;
+
+  // Parámetro de desvanecimiento suave de los filamentos sobre la arena
+  public decayRate: number = 0.018;
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -29,21 +34,131 @@ export class TrailSystem {
     this.mainCanvas.height = h;
     this.mainCtx = this.mainCanvas.getContext('2d', { willReadFrequently: false })!;
 
+    this.sandCanvas = document.createElement('canvas');
+    this.sandCanvas.width = w;
+    this.sandCanvas.height = h;
+    this.sandCtx = this.sandCanvas.getContext('2d', { willReadFrequently: false })!;
+
+    this.generateSandTexture();
     this.clear();
   }
 
   public resize(w: number, h: number) {
     this.width = w;
     this.height = h;
+
     this.mainCanvas.width = w;
     this.mainCanvas.height = h;
+
+    this.sandCanvas.width = w;
+    this.sandCanvas.height = h;
+
+    this.generateSandTexture();
     this.clear();
   }
 
   public clear() {
-    // Fondo azul casi negro (#02040a)
-    this.mainCtx.fillStyle = '#02040a';
-    this.mainCtx.fillRect(0, 0, this.width, this.height);
+    this.mainCtx.clearRect(0, 0, this.width, this.height);
+  }
+
+  /**
+   * Genera la textura pre-renderizada de arena Zen mineral oscura ("en nuestro estilo"):
+   * - Gradiente base nocturno profundo (obsidiana, lapislázuli oscuro #040817 -> #010207).
+   * - Micro-ondulaciones de rastrillo Zen / dunas suaves (Karesansui) con bajo contraste.
+   * - Millares de micro-granos de arena mineral oscura, feldespato, grafito y destellos dorados de mica.
+   * - Se pre-renderiza una sola vez en un canvas desacoplado (0 ms de coste por frame).
+   */
+  public generateSandTexture() {
+    const W = this.width;
+    const H = this.height;
+    const sCtx = this.sandCtx;
+
+    // 1. Gradiente base nocturno profundo (obsidiana y lapislázuli oscuro)
+    const bgGrad = sCtx.createRadialGradient(W * 0.5, H * 0.45, W * 0.08, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.65);
+    bgGrad.addColorStop(0.0, '#04091a'); // Centro nocturno con sutil profundidad mineral azulada
+    bgGrad.addColorStop(0.50, '#020612');
+    bgGrad.addColorStop(1.0, '#010207'); // Bordes en sombra viñeteada
+    sCtx.fillStyle = bgGrad;
+    sCtx.fillRect(0, 0, W, H);
+
+    // 2. Ondulaciones de arena peinada (Surcos sutiles de jardín Zen Karesansui)
+    sCtx.save();
+    const rippleSpacing = 32.0;
+    const totalRipples = Math.ceil(H / rippleSpacing) + 4;
+
+    for (let r = 0; r < totalRipples; r++) {
+      const baseY = r * rippleSpacing - 20;
+      const phase = r * 0.35;
+
+      // Depresión en sombra del surco de arena
+      sCtx.beginPath();
+      sCtx.lineWidth = 14.0;
+      sCtx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
+      for (let x = 0; x <= W + 40; x += 35) {
+        const y = baseY + Math.sin(x * 0.0045 + phase) * 18.0 + Math.cos(x * 0.002 - phase * 0.4) * 9.0;
+        if (x === 0) sCtx.moveTo(x, y);
+        else sCtx.lineTo(x, y);
+      }
+      sCtx.stroke();
+
+      // Cresta suavemente iluminada por luz lunar rasante
+      sCtx.beginPath();
+      sCtx.lineWidth = 2.0;
+      sCtx.strokeStyle = 'rgba(186, 230, 253, 0.022)';
+      for (let x = 0; x <= W + 40; x += 35) {
+        const y = baseY - 2.5 + Math.sin(x * 0.0045 + phase) * 18.0 + Math.cos(x * 0.002 - phase * 0.4) * 9.0;
+        if (x === 0) sCtx.moveTo(x, y);
+        else sCtx.lineTo(x, y);
+      }
+      sCtx.stroke();
+    }
+    sCtx.restore();
+
+    // 3. Textura de micro-granos de arena mineral (grafito, cuarzo y mica dorada)
+    const grainImg = sCtx.getImageData(0, 0, W, H);
+    const data = grainImg.data;
+    const len = data.length;
+
+    // Generador pseudo-aleatorio rápido con semilla fija para textura determinista
+    let seed = 1337;
+    const fastRand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return (seed & 0xffff) / 65536.0;
+    };
+
+    for (let i = 0; i < len; i += 4) {
+      const rVal = fastRand();
+
+      // Granulación táctil de arena mineral (42% de los píxeles)
+      if (rVal < 0.42) {
+        const grain = (fastRand() - 0.5) * 15;
+        data[i] = Math.min(255, Math.max(0, data[i] + grain));
+        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + grain * 1.05));
+        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + grain * 1.35));
+      } else if (rVal > 0.993) {
+        // Micro-destellos microscópicos de mica dorada o cuarzo (0.7%)
+        if (fastRand() > 0.55) {
+          // Destello dorado tenue de mica Kintsugi
+          data[i] = Math.min(255, data[i] + 48);
+          data[i + 1] = Math.min(255, data[i + 1] + 38);
+          data[i + 2] = Math.min(255, data[i + 2] + 12);
+        } else {
+          // Destello celeste de cuarzo mineral
+          data[i] = Math.min(255, data[i] + 28);
+          data[i + 1] = Math.min(255, data[i + 1] + 38);
+          data[i + 2] = Math.min(255, data[i + 2] + 52);
+        }
+      }
+    }
+
+    sCtx.putImageData(grainImg, 0, 0);
+
+    // 4. Viñeteado suave en los bordes para centrar el foco contemplativo
+    const vignette = sCtx.createRadialGradient(W * 0.5, H * 0.5, W * 0.32, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.58);
+    vignette.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(1.0, 'rgba(1, 2, 7, 0.45)');
+    sCtx.fillStyle = vignette;
+    sCtx.fillRect(0, 0, W, H);
   }
 
   /**
@@ -57,9 +172,12 @@ export class TrailSystem {
 
     const ctx = this.mainCtx;
 
-    // 1. Desvanecimiento suave en el lienzo principal (preserva estelas vivas sin ensuciar el fondo)
-    ctx.fillStyle = `rgba(2, 4, 10, ${this.decayRate.toFixed(4)})`;
+    // 1. Desvanecimiento transparente suave de las estelas (preserva la textura de arena intacta)
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = `rgba(0, 0, 0, ${this.decayRate.toFixed(4)})`;
     ctx.fillRect(0, 0, W, H);
+    ctx.restore();
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -257,7 +375,11 @@ export class TrailSystem {
       ctx.stroke();
     }
 
-    // 6. Componer en el lienzo de destino
+    // 6. Componer en el lienzo de destino:
+    // Primero, el lecho de arena mineral Zen pre-renderizada
+    targetCtx.drawImage(this.sandCanvas, 0, 0);
+
+    // Segundo, los filamentos luminosos que fluyen sobre la arena
     targetCtx.drawImage(this.mainCanvas, 0, 0);
   }
 }
