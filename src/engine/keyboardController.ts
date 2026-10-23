@@ -27,6 +27,7 @@ export class KeyboardController {
   public mousePos = { x: 0, y: 0 };
   public isDrawingWound: boolean = false;
   private activeDrawingWound: any = null;
+  private cursorElement: HTMLDivElement;
   public lastFeedback: KeyFeedback | null = null;
   public onRestartCallback?: () => void;
   public onToggleFullscreenCallback?: () => void;
@@ -43,6 +44,10 @@ export class KeyboardController {
     this.onRestartCallback = onRestart;
 
     this.mousePos = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5 };
+    this.cursorElement = document.createElement('div');
+    this.cursorElement.className = 'gold-cursor';
+    this.cursorElement.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(this.cursorElement);
 
     this.setupListeners();
   }
@@ -51,6 +56,11 @@ export class KeyboardController {
     window.addEventListener('pointermove', (e: PointerEvent) => {
       this.mousePos.x = e.clientX;
       this.mousePos.y = e.clientY;
+      if (e.pointerType !== 'touch') {
+        this.cursorElement.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        this.cursorElement.classList.add('visible');
+        document.body.classList.add('gold-cursor-active');
+      }
 
       if (this.isDrawingWound && this.activeDrawingWound) {
         // Modo lápiz: añadir punto a la herida dibujada
@@ -68,6 +78,11 @@ export class KeyboardController {
           maxLife: 1.0
         });
       }
+    });
+
+    window.addEventListener('pointerleave', () => {
+      this.cursorElement.classList.remove('visible');
+      document.body.classList.remove('gold-cursor-active');
     });
 
     window.addEventListener('pointerdown', (e: PointerEvent) => {

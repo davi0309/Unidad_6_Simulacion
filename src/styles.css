@@ -19,6 +19,12 @@ html, body, #app {
   user-select: none;
 }
 
+canvas#renderCanvas,
+body.gold-cursor-active,
+body.gold-cursor-active * {
+  cursor: none !important;
+}
+
 canvas#renderCanvas {
   display: block;
   width: 100vw;
@@ -27,6 +33,41 @@ canvas#renderCanvas {
   top: 0;
   left: 0;
   z-index: 1;
+  cursor: none;
+}
+
+.gold-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 1px solid rgba(255, 241, 184, 0.95);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fffdf0 0 12%, #fff1b8 28%, #fbbf24 68%, #b45309 100%);
+  box-shadow: 0 0 6px 2px rgba(255, 210, 90, 0.8), 0 0 20px 7px rgba(245, 158, 11, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-100px, -100px, 0);
+  transition: opacity 100ms ease;
+  z-index: 1000;
+  will-change: transform;
+}
+
+.gold-cursor::after {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  content: '';
+}
+
+.gold-cursor.visible {
+  opacity: 1;
 }
 
 /* ==========================================================================
@@ -120,6 +161,30 @@ canvas#renderCanvas {
   font-variant-numeric: tabular-nums;
   color: #94a3b8;
   letter-spacing: 1px;
+}
+
+.song-section {
+  border-left: 1px solid rgba(251, 191, 36, 0.24);
+  padding-left: 10px;
+  color: #fcd98b;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.audio-status {
+  max-width: 280px;
+  color: #fcd98b;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.audio-status:empty {
+  display: none;
+}
+
+.audio-status-error {
+  color: #fda4af;
 }
 
 .actions {
@@ -317,4 +382,20 @@ canvas#renderCanvas {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .song-section {
+    display: none;
+  }
+
+  .audio-status {
+    position: fixed;
+    top: 72px;
+    left: 50%;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    transform: translateX(-50%);
+    text-align: center;
+  }
 }

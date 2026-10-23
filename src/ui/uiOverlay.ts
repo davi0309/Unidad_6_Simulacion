@@ -9,6 +9,7 @@
  */
 
 import { AudioController } from '../engine/audioController';
+import { getMusicSection } from '../engine/flowField';
 import { KeyboardController } from '../engine/keyboardController';
 
 export class UIOverlay {
@@ -67,6 +68,8 @@ export class UIOverlay {
             </svg>
           </button>
           <span class="audio-time">0:00 / 3:50</span>
+          <span class="audio-status" role="status" aria-live="polite"></span>
+          <span class="song-section">Apertura · Corriente ascendente</span>
         </div>
 
         <div class="actions">
@@ -211,6 +214,16 @@ export class UIOverlay {
 
     // Actualizar tiempo
     this.timeEl.textContent = `${this.audioController.formatTime(audioState.currentTime)} / ${this.audioController.formatTime(audioState.duration)}`;
+    const section = getMusicSection(audioState.progress);
+    const sectionEl = this.container.querySelector('.song-section');
+    if (sectionEl) {
+      sectionEl.textContent = `${section.name} · ${section.movement}`;
+    }
+    const playbackStatusEl = this.container.querySelector('.audio-status');
+    if (playbackStatusEl) {
+      playbackStatusEl.textContent = this.audioController.playbackMessage;
+      playbackStatusEl.classList.toggle('audio-status-error', this.audioController.playbackMessage.length > 0);
+    }
     this.updatePlayState();
 
     // Feedback de tecla

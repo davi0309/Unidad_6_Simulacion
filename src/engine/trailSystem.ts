@@ -166,7 +166,13 @@ export class TrailSystem {
   /**
    * Renderiza el paso de simulación con acumulación y respuesta de color difuminada (feathering)
    */
-  public render(agentSystem: AgentSystem, woundManager: WoundManager, targetCtx: CanvasRenderingContext2D) {
+  public render(
+    agentSystem: AgentSystem,
+    woundManager: WoundManager,
+    targetCtx: CanvasRenderingContext2D,
+    songProgress: number = 0,
+    songTime: number = 0
+  ) {
     const W = this.width;
     const H = this.height;
     const halfW = W * 0.5;
@@ -431,6 +437,42 @@ export class TrailSystem {
       drawDropletHeads(goldCoreHeadsX[c], goldCoreHeadsY[c], goldCoreHeadsR[c], agentSystem.goldPalette[c]);
     }
 
+    // Un grupo pequeño de agentes adopta una silueta de lágrima según su dirección.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < count; i += 24) {
+      const agent = agents[i];
+      const dx = Math.abs(agent.x - agent.prevX);
+      const dy = Math.abs(agent.y - agent.prevY);
+      if (dx > halfW || dy > halfH) continue;
+
+      const influence = woundManager.getZoneInfluence(agent.x, agent.y);
+      const colorIndex = agent.colorIndex;
+      const color = influence
+        ? (woundManager.getZoneGoldRatio(influence.zone, agent.x, agent.y) > 0.5
+          ? agentSystem.goldPalette[colorIndex]
+          : agentSystem.redPalette[colorIndex])
+        : agentSystem.bluePalette[colorIndex];
+      const radius = agent.dropRadius;
+
+      ctx.save();
+      ctx.translate(agent.x, agent.y);
+      ctx.rotate(Math.atan2(agent.vy, agent.vx) - Math.PI / 2);
+      ctx.scale(radius * 0.82, radius * 1.45);
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(0, -1.7);
+      ctx.bezierCurveTo(0.55, -0.85, 1.25, 0.05, 1.0, 0.72);
+      ctx.quadraticCurveTo(0.78, 1.55, 0, 1.55);
+      ctx.quadraticCurveTo(-0.78, 1.55, -1.0, 0.72);
+      ctx.bezierCurveTo(-1.25, 0.05, -0.55, -0.85, 0, -1.7);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
     // 6. Micro-destellos de agua cristalina (specular catchlights de las lágrimas)
     if (glintsX.length > 0) {
       ctx.beginPath();
@@ -456,5 +498,59 @@ export class TrailSystem {
 
     // Segundo, los filamentos luminosos que fluyen sobre la arena
     targetCtx.drawImage(this.mainCanvas, 0, 0);
+
+    const rainFadeIn = Math.max(0, Math.min(1, (songProgress - 0.65) / 0.035));
+    const rainFadeOut = Math.max(0, Math.min(1, (0.87 - songProgress) / 0.035));
+    const rainIntensity = Math.min(rainFadeIn, rainFadeOut);
+    if (rainIntensity > 0) {
+      this.drawRainOnGlass(targetCtx, songTime, rainIntensity);
+    }
+  }
+
+  private drawRainOnGlass(ctx: CanvasRenderingContext2D, time: number, intensity: number) {
+    const W = this.width;
+    const H = this.height;
+    const smoothIntensity = intensity * intensity * (3 - 2 * intensity);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = smoothIntensity * 0.62;
+
+    for (let i = 0; i < 17; i++) {
+      const seed = (i * 0.61803398875 + 0.13) % 1;
+      const x = seed * W + Math.sin(time * 0.16 + i * 2.4) * 14;
+      const radius = 4 + (i % 4) * 1.8;
+      const cycle = (time * (0.035 + (i % 3) * 0.008) + seed * 1.7) % 1;
+      const y = cycle * (H + 100) - 50;
+      const tailLength = 12 + radius * 2.5;
+
+      const trail = ctx.createLinearGradient(x, y - tailLength, x, y);
+      trail.addColorStop(0, 'rgba(173, 220, 255, 0)');
+      trail.addColorStop(1, 'rgba(173, 220, 255, 0.32)');
+      ctx.strokeStyle = trail;
+      ctx.lineWidth = Math.max(1, radius * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y - tailLength);
+      ctx.quadraticCurveTo(x + 3, y - tailLength * 0.45, x, y);
+      ctx.stroke();
+
+      const drop = ctx.createRadialGradient(
+        x - radius * 0.32,
+        y - radius * 0.32,
+        0.5,
+        x,
+        y,
+        radius * 1.25
+      );
+      drop.addColorStop(0, 'rgba(241, 250, 255, 0.86)');
+      drop.addColorStop(0.3, 'rgba(177, 224, 255, 0.58)');
+      drop.addColorStop(1, 'rgba(96, 165, 250, 0.08)');
+      ctx.fillStyle = drop;
+      ctx.beginPath();
+      ctx.ellipse(x, y, radius * 0.78, radius * 1.18, -0.12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 }

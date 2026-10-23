@@ -19,6 +19,33 @@ export interface FlowPerturbation {
   direction?: { x: number; y: number };
 }
 
+export interface MusicSection {
+  name: string;
+  movement: string;
+  start: number;
+  pattern: 'rise' | 'organic' | 'vortex' | 'rain' | 'gather';
+}
+
+export const MUSIC_SECTIONS: MusicSection[] = [
+  { name: 'Apertura', movement: 'Corriente ascendente', start: 0, pattern: 'rise' },
+  { name: 'Desarrollo', movement: 'Meandros orgánicos', start: 0.22, pattern: 'organic' },
+  { name: 'Clímax', movement: 'Espiral expansiva', start: 0.5, pattern: 'vortex' },
+  { name: 'Lágrimas', movement: 'Gotas sobre el vidrio', start: 0.68, pattern: 'rain' },
+  { name: 'Coda', movement: 'Espiral convergente', start: 0.84, pattern: 'gather' }
+];
+
+export function getMusicSection(progress: number): MusicSection {
+  const normalizedProgress = Math.max(0, Math.min(1, progress));
+  let section = MUSIC_SECTIONS[0];
+
+  for (const candidate of MUSIC_SECTIONS) {
+    if (normalizedProgress < candidate.start) break;
+    section = candidate;
+  }
+
+  return section;
+}
+
 export class FlowField {
   public width: number;
   public height: number;
@@ -30,6 +57,7 @@ export class FlowField {
 
   // Perturbaciones activas inyectadas por teclas o heridas
   public perturbations: FlowPerturbation[] = [];
+  private songProgress: number = 0;
 
   // Tabla de permutación para ruido suave 2D/4D
   private perm: Uint8Array;
@@ -127,6 +155,7 @@ export class FlowField {
     const H = this.height;
     const cellW = W / cols;
     const cellH = H / rows;
+    const transition = this.getMusicTransition(this.songProgress);
 
     for (let j = 0; j < rows; j++) {
       const v = j / rows;
@@ -136,9 +165,9 @@ export class FlowField {
         const u = i / cols;
         const cellX = (i + 0.5) * cellW;
 
-        const baseAngle = this.getAngle(u, v, timeSec);
-        let vx = Math.cos(baseAngle);
-        let vy = Math.sin(baseAngle);
+        const flow = this.getMusicFlow(u, v, timeSec, transition);
+        let vx = flow.vx;
+        let vy = flow.vy;
 
         // Aplicar perturbaciones locales activas
         for (let pIdx = 0; pIdx < this.perturbations.length; pIdx++) {
@@ -238,7 +267,84 @@ export class FlowField {
     }
   }
 
-  public update(dt: number, timeSec: number) {
+  private getMusicTransition(progress: number) {
+    const transitionWidth = 0.035;
+
+    for (let i = 1; i < MUSIC_SECTIONS.length; i++) {
+      const boundary = MUSIC_SECTIONS[i].start;
+      const start = boundary - transitionWidth;
+      const end = boundary + transitionWidth;
+      if (progress < end) {
+        const t = Math.max(0, Math.min(1, (progress - start) / (end - start)));
+        const eased = t * t * (3 - 2 * t);
+        return {
+          from: MUSIC_SECTIONS[i - 1].pattern,
+          to: MUSIC_SECTIONS[i].pattern,
+          amount: eased
+        };
+      }
+    }
+
+    const lastPattern = MUSIC_SECTIONS[MUSIC_SECTIONS.length - 1].pattern;
+    return { from: lastPattern, to: lastPattern, amount: 0 };
+  }
+
+  private getMusicFlow(
+    u: number,
+    v: number,
+    timeSec: number,
+    transition: ReturnType<FlowField['getMusicTransition']>
+  ) {
+    const baseAngle = this.getAngle(u, v, timeSec);
+    const baseX = Math.cos(baseAngle);
+    const baseY = Math.sin(baseAngle);
+    const getPatternVector = (pattern: MusicSection['pattern']) => {
+      const x = (u - 0.5) * 2;
+      const y = (v - 0.5) * 2;
+      const radius = Math.max(0.12, Math.hypot(x, y));
+      const nx = x / radius;
+      const ny = y / radius;
+
+      switch (pattern) {
+        case 'rise': {
+          const wave = Math.sin(u * Math.PI * 4 + v * Math.PI * 2 + timeSec * 0.18);
+          const angle = -Math.PI / 2 + wave * 0.42 + baseAngle * 0.08;
+          return { vx: Math.cos(angle), vy: Math.sin(angle) };
+        }
+        case 'vortex':
+          return {
+            vx: -ny * 0.9 + nx * 0.55 + baseX * 0.25,
+            vy: nx * 0.9 + ny * 0.55 + baseY * 0.25
+          };
+        case 'gather':
+          return {
+            vx: -nx * 0.85 - ny * 0.45 + baseX * 0.2,
+            vy: -ny * 0.85 + nx * 0.45 + baseY * 0.2
+          };
+        case 'rain':
+          return {
+            vx: Math.sin(u * 15 + v * 4 + timeSec * 0.12) * 0.45 + baseX * 0.2,
+            vy: 0.95 + baseY * 0.12
+          };
+        case 'organic':
+          return { vx: baseX, vy: baseY };
+      }
+    };
+
+    const from = getPatternVector(transition.from);
+    const to = getPatternVector(transition.to);
+    const vx = from.vx * (1 - transition.amount) + to.vx * transition.amount;
+    const vy = from.vy * (1 - transition.amount) + to.vy * transition.amount;
+    const magnitude = Math.hypot(vx, vy);
+
+    return magnitude > 1e-5
+      ? { vx: vx / magnitude, vy: vy / magnitude }
+      : { vx: baseX, vy: baseY };
+  }
+
+  public update(dt: number, timeSec: number, songProgress: number = this.songProgress) {
+    this.songProgress = Math.max(0, Math.min(1, songProgress));
+
     for (let i = this.perturbations.length - 1; i >= 0; i--) {
       const p = this.perturbations[i];
       p.life -= dt;

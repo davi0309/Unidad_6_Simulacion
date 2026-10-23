@@ -83,16 +83,16 @@ function initApp() {
     const dt = rawDt * currentSpeedScale;
     const timeSec = now * 0.001 * currentSpeedScale;
 
-    // A. Actualizar estado del audio
-    audioController.update();
+    // A. El avance del campo sigue el tiempo real de reproducción de la canción
+    const audioState = audioController.update();
 
     // B. Dinámicas de simulación
     woundManager.update(dt);
-    flowField.update(dt, timeSec);
+    flowField.update(dt, timeSec, audioState.progress);
     agentSystem.update(dt, flowField);
 
     // C. Renderizado y persistencia de estelas (Azul, Rojo herida, Oro Kintsugi)
-    trailSystem.render(agentSystem, woundManager, ctx);
+    trailSystem.render(agentSystem, woundManager, ctx, audioState.progress, audioState.currentTime);
 
     // D. Actualizar interfaz y feedback
     uiOverlay.update();

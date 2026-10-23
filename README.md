@@ -9,7 +9,9 @@ Instrumento visual interactivo y generativo para la **interpretación musical en
 - **Espacio Esférico 3D:** Los más de $130{,}000$ agentes se mueven por todo el volumen tridimensional, confinados elásticamente dentro de una gran esfera. Puedes orbitar en 360° con el ratón para apreciar la profundidad, los pliegues y las capas interiores.
 - **Velocidad Serenade y Control de Tempo:** Por defecto, los filamentos se desplazan de manera más lenta y majestuosa, permitiendo apreciar nítidamente la geometría de las figuras (flores en copa, alas de mariposa, toroides y supernovas). Puedes cambiar de tempo al instante con los botones en pantalla, la tecla `T` o manteniendo presionada la tecla `Shift` para un turbo momentáneo.
 - **Conducción 100% Humana:** La música no mueve ni deforma las partículas; toda la física y dirección de flujo es decidida en vivo por el intérprete.
-- **Iluminación Reactiva por Audio:** El audio en segundo plano modula sutilmente el **fulgor, luminancia y destellos de color de los filamentos** sin intervenir en las trayectorias.
+- **Sincronización musical:** El reproductor sirve de referencia temporal para las transiciones visuales; el sistema no analiza el audio con FFT.
+- **Cursor Kintsugi:** El puntero se convierte en una esfera dorada luminosa, integrada en el lienzo de la experiencia.
+- **Flow fields por tramo musical:** Al reproducir la canción, el movimiento cambia gradualmente entre corriente ascendente, meandros orgánicos, espiral expansiva, una etapa de lágrimas sobre un vidrio lluvioso y una espiral convergente final. Algunos agentes también adoptan una silueta de gota orientada por su movimiento. El indicador junto al tiempo muestra la etapa actual.
 - **Variabilidad Procedural sin Pausar la Música (`R`):** Al presionar la tecla `R`, el sistema muta las semillas armónicas y reinicia los filamentos visuales sin detener ni reiniciar la reproducción de la canción.
 - **Soporte Multi-Canción:** Permite cargar cualquier archivo `.mp3`, `.wav`, etc., mediante un botón en la interfaz o arrastrando y soltando el archivo sobre la ventana.
 
